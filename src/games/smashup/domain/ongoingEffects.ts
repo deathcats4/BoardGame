@@ -153,6 +153,8 @@ interface TriggerEntry {
     sourceDefId: string;
     timing: TriggerTiming;
     callback: TriggerCallback;
+    /** 额外的环境/状态条件检查 */
+    condition?: (state: SmashUpCore, playerId: PlayerId) => boolean;
 }
 
 interface InterceptorEntry {
@@ -197,11 +199,12 @@ export function registerRestriction(
 export function registerTrigger(
     sourceDefId: string,
     timing: TriggerTiming,
-    callback: TriggerCallback
+    callback: TriggerCallback,
+    condition?: (state: SmashUpCore, playerId: PlayerId) => boolean
 ): void {
     // 去重保护：同一 sourceDefId + timing 只注册一次（防止 HMR 重复注册）
     if (triggerRegistry.some(e => e.sourceDefId === sourceDefId && e.timing === timing)) return;
-    triggerRegistry.push({ sourceDefId, timing, callback });
+    triggerRegistry.push({ sourceDefId, timing, callback, condition });
 }
 
 /** 注册事件拦截器（替代效果） */
@@ -390,6 +393,22 @@ export function isBaseAbilitySuppressed(
     for (const entry of baseAbilitySuppressionRegistry) {
         if (!isSourceActiveOnBase(state, entry.sourceDefId, baseIndex)) continue;
         if (entry.checker(state, baseIndex)) return true;
+    }
+    return false;
+}
+
+/**
+ * 检查随从能力是否被压制
+ */
+export function isMinionAbilitySuppressed(
+    state: SmashUpCore,
+    minionUid: string
+): boolean {
+    for (const base of state.bases) {
+        const m = base.minions.find(minion => minion.uid === minionUid);
+        if (m) {
+            return !!m.metadata?.abilitiesSuppressed;
+        }
     }
     return false;
 }
@@ -633,6 +652,69 @@ export function fireTriggers(
     return { events, matchState };
 }
 
+/**
+ * 触发指定 defId 的特定触发器
+ */
+export function fireSpecificTrigger(
+    state: SmashUpCore,
+    timing: TriggerTiming,
+    sourceDefId: string,
+    ctx: Omit<TriggerContext, 'timing'>
+): TriggerResult {
+    const entry = triggerRegistry.find(e => e.sourceDefId === sourceDefId && e.timing === timing);
+    if (!entry) return { events: [] };
+
+    // 【核心修复】检查 condition（如果存在）
+    if (entry.condition) {
+        const playerId = ctx.playerId ?? state.turnOrder[state.currentPlayerIndex];
+        if (!entry.condition(state, playerId)) {
+            console.log(`[fireSpecificTrigger] Condition check failed for ${sourceDefId}, skipping trigger`);
+            return { events: [] };
+        }
+    }
+
+    const result = entry.callback({ ...ctx, timing });
+    if (Array.isArray(result)) {
+        return { events: result };
+    }
+    return result;
+}
+
+/**
+ * 获取指定时机下所有当前生效且合格（满足 condition）的触发器
+ * 
+ * @param state 当前核心状态
+ * @param timing 触发时机
+ * @param playerId 关联玩家（如当前回合玩家）
+ * @param handledIds 本时机已处理的能力列表（用于回合开始等需玩家自行排序的时机）
+ */
+export function getEligibleTriggers(
+    state: SmashUpCore,
+    timing: TriggerTiming,
+    playerId?: PlayerId,
+    handledIds: string[] = []
+): TriggerEntry[] {
+    return triggerRegistry.filter(entry => {
+        if (entry.timing !== timing) return false;
+
+        // 过滤已处理的 onTurnStart 能力
+        if (timing === 'onTurnStart' && handledIds.length > 0) {
+            // 【核心修复】变体互通检查：如果原版或 POD 版中任一已处理，则另一个版本也不再活跃
+            const baseId = entry.sourceDefId.endsWith('_pod') ? entry.sourceDefId.replace('_pod', '') : entry.sourceDefId;
+            const podId = `${baseId}_pod`;
+            if (handledIds.includes(baseId) || handledIds.includes(podId)) return false;
+        }
+
+        // 1. 检查来源是否活跃（传递 playerId 以过滤对手的随从）
+        if (!isSourceActive(state, entry.sourceDefId, playerId)) return false;
+
+        // 2. 检查自定义前置条件
+        if (entry.condition && !entry.condition(state, playerId ?? state.turnOrder[state.currentPlayerIndex])) return false;
+
+        return true;
+    });
+}
+
 // ============================================================================
 // 内部辅助
 // ============================================================================
@@ -645,8 +727,10 @@ export function fireTriggers(
  * 2. 基地上的 ongoing 行动卡（ongoingActions 中的 defId）
  * 3. 基地上的随从（minions 中的 defId，且有 ongoing 能力标签）
  * 4. 随从上附着的 ongoing 行动卡（attachedActions 中的 defId）
+ * 
+ * @param playerId 可选参数，如果提供则只检查该玩家控制的随从
  */
-function isSourceActive(state: SmashUpCore, sourceDefId: string): boolean {
+function isSourceActive(state: SmashUpCore, sourceDefId: string, playerId?: PlayerId): boolean {
     if (state.pendingAfterScoringSpecials?.some(s => s.sourceDefId === sourceDefId)) {
         return true;
     }
@@ -656,16 +740,16 @@ function isSourceActive(state: SmashUpCore, sourceDefId: string): boolean {
             return true;
         }
         // 检查基地上的 ongoing 行动卡
-        if (base.ongoingActions.some(o => o.defId === sourceDefId)) {
+        if (base.ongoingActions.some(o => o.defId === sourceDefId && !state.suppressedCards?.[o.uid])) {
             return true;
         }
-        // 检查基地上的随从
-        if (base.minions.some(m => m.defId === sourceDefId)) {
+        // 检查基地上的随从（如果提供了 playerId，则只检查该玩家控制的随从）
+        if (base.minions.some(m => m.defId === sourceDefId && (!playerId || m.controller === playerId) && !m.metadata?.abilitiesSuppressed && !state.suppressedCards?.[m.uid])) {
             return true;
         }
         // 检查随从上附着的行动卡
         for (const m of base.minions) {
-            if (m.attachedActions?.some(a => a.defId === sourceDefId)) {
+            if (m.attachedActions?.some(a => a.defId === sourceDefId && !state.suppressedCards?.[a.uid])) {
                 return true;
             }
         }
@@ -684,9 +768,9 @@ export function isSourceActiveOnBase(state: SmashUpCore, sourceDefId: string, ba
     // 检查基地本身
     if (base.defId === sourceDefId) return true;
     // 检查基地上的 ongoing 行动卡
-    if (base.ongoingActions.some(o => o.defId === sourceDefId)) return true;
+    if (base.ongoingActions.some(o => o.defId === sourceDefId && !state.suppressedCards?.[o.uid])) return true;
     // 检查基地上的随从
-    if (base.minions.some(m => m.defId === sourceDefId)) return true;
+    if (base.minions.some(m => m.defId === sourceDefId && !m.metadata?.abilitiesSuppressed && !state.suppressedCards?.[m.uid])) return true;
     return false;
 }
 

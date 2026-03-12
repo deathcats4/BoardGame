@@ -165,30 +165,52 @@ export function triggerAllBaseAbilities(
     minionContext?: { baseIndex: number; minionUid: string; minionDefId: string; minionPower: number },
     matchState?: MatchState<SmashUpCore>,
 ): BaseAbilityResult {
+    const result = getEligibleBaseAbilities(timing, state, playerId, minionContext);
     const events: SmashUpEvent[] = [];
     let ms = matchState;
-    for (let i = 0; i < state.bases.length; i++) {
-        const base = state.bases[i];
-        // onMinionPlayed 只触发随从所在基地
-        if (timing === 'onMinionPlayed' && minionContext && i !== minionContext.baseIndex) {
-            continue;
-        }
+    for (const entry of result) {
         const ctx: BaseAbilityContext = {
             state,
             matchState: ms,
-            baseIndex: i,
-            baseDefId: base.defId,
+            baseIndex: entry.baseIndex,
+            baseDefId: entry.baseDefId,
             playerId,
             minionUid: minionContext?.minionUid,
             minionDefId: minionContext?.minionDefId,
             minionPower: minionContext?.minionPower,
             now,
         };
-        const result = triggerBaseAbility(base.defId, timing, ctx);
-        events.push(...result.events);
-        if (result.matchState) ms = result.matchState;
+        const callbackResult = triggerBaseAbility(entry.baseDefId, timing, ctx);
+        events.push(...callbackResult.events);
+        if (callbackResult.matchState) ms = callbackResult.matchState;
     }
     return { events, matchState: ms };
+}
+
+/**
+ * 获取当前所有可触发的基地能力
+ */
+export function getEligibleBaseAbilities(
+    timing: BaseTriggerTiming,
+    state: SmashUpCore,
+    playerId: PlayerId,
+    minionContext?: { baseIndex: number; minionUid: string; minionDefId: string; minionPower: number },
+): Array<{ baseIndex: number; baseDefId: string }> {
+    const result: Array<{ baseIndex: number; baseDefId: string }> = [];
+    const handledIds = state.players[playerId]?.onTurnStartAbilitiesHandled ?? [];
+    for (let i = 0; i < state.bases.length; i++) {
+        const base = state.bases[i];
+        if (timing === 'onMinionPlayed' && minionContext && i !== minionContext.baseIndex) {
+            continue;
+        }
+        if (isBaseAbilitySuppressed(state, i)) continue;
+        const id = `base_${i}_${base.defId}`;
+        if (timing === 'onTurnStart' && handledIds.includes(id)) continue;
+        if (hasBaseAbility(base.defId, timing)) {
+            result.push({ baseIndex: i, baseDefId: base.defId });
+        }
+    }
+    return result;
 }
 
 /** 检查基地是否有指定时机的能力 */
@@ -481,7 +503,7 @@ export function registerBaseAbilities(): void {
             // 创建第一个平局选择交互，剩余通过 continuationContext 链式传递
             const first = tieBreakPlayers[0];
             const remaining = tieBreakPlayers.slice(1);
-            
+
             // 保存随从快照（包括第一个玩家和剩余玩家的所有候选随从）
             const firstCandidatesSnapshot = first.candidates.map(m => ({
                 uid: m.uid,
@@ -489,14 +511,14 @@ export function registerBaseAbilities(): void {
                 owner: m.owner,
                 power: getEffectivePower(ctx.state, m, ctx.baseIndex),
             }));
-            
+
             const options = firstCandidatesSnapshot.map(m => {
                 const def = getCardDef(m.defId) as MinionCardDef | undefined;
                 const name = def?.name ?? m.defId;
-                return { 
-                    uid: m.uid, 
-                    defId: m.defId, 
-                    baseIndex: ctx.baseIndex, 
+                return {
+                    uid: m.uid,
+                    defId: m.defId,
+                    baseIndex: ctx.baseIndex,
                     label: `${name} (力量 ${first.maxPower})`,
                     displayMode: 'card' as const,
                 };
@@ -509,26 +531,28 @@ export function registerBaseAbilities(): void {
             const remainingData = remaining.map(tb => ({
                 playerId: tb.playerId,
                 // 保存每个玩家的候选随从快照
-                candidateUids: tb.candidates.map(c => ({ 
-                    uid: c.uid, 
-                    defId: c.defId, 
+                candidateUids: tb.candidates.map(c => ({
+                    uid: c.uid,
+                    defId: c.defId,
                     owner: c.owner,
                     power: getEffectivePower(ctx.state, c, ctx.baseIndex),
                 })),
                 maxPower: tb.maxPower,
             }));
-            return { events, matchState: queueInteraction(ctx.matchState, {
-                ...interaction,
-                data: { 
-                    ...interaction.data, 
-                    continuationContext: { 
-                        baseIndex: ctx.baseIndex, 
-                        remainingPlayers: remainingData,
-                        // 保存第一个玩家的候选随从快照
-                        firstCandidatesSnapshot,
+            return {
+                events, matchState: queueInteraction(ctx.matchState, {
+                    ...interaction,
+                    data: {
+                        ...interaction.data,
+                        continuationContext: {
+                            baseIndex: ctx.baseIndex,
+                            remainingPlayers: remainingData,
+                            // 保存第一个玩家的候选随从快照
+                            firstCandidatesSnapshot,
+                        },
                     },
-                },
-            }) };
+                })
+            };
         }
 
         return { events };
@@ -580,13 +604,13 @@ export function registerBaseAbilities(): void {
         }
         // 多张手牌→Prompt 选择弃哪张
         if (!ctx.matchState) return { events: [] };
-        
+
         // 生成初始选项（基于当前状态）
         const initialOptions = player.hand.map((c, i) => {
             const def = getCardDef(c.defId);
             return { id: `card-${i}`, label: def?.name ?? c.defId, value: { cardUid: c.uid, defId: c.defId }, _source: 'hand' as const, displayMode: 'card' as const };
         });
-        
+
         const pid = ctx.playerId;
         const interaction = createSimpleChoice(
             `base_haunted_house_al9000_${ctx.now}`,
@@ -595,7 +619,7 @@ export function registerBaseAbilities(): void {
             initialOptions,
             { sourceId: 'base_haunted_house_al9000', targetType: 'hand' },
         );
-        
+
         // 手牌弃牌类交互：使用 optionsGenerator 动态生成选项
         // 确保新抽到的牌也能被选择（如幽灵能力同时触发抓牌）
         interaction.data.optionsGenerator = state => {
@@ -607,7 +631,7 @@ export function registerBaseAbilities(): void {
                 return { id: `card-${i}`, label: def?.name ?? c.defId, value: { cardUid: c.uid, defId: c.defId }, _source: 'hand' as const, displayMode: 'card' as const };
             });
         };
-        
+
         return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
     });
 
@@ -919,14 +943,14 @@ export function registerBaseAbilities(): void {
             getEffectivePower(ctx.state, m, ctx.baseIndex) <= 3
         );
         if (eligible.length === 0) return { events: [] };
-        
+
         // 将随从信息存入快照，供交互解决时使用
         const minionsSnapshot = eligible.map(m => ({
             uid: m.uid,
             defId: m.defId,
             power: getEffectivePower(ctx.state, m, ctx.baseIndex),
         }));
-        
+
         const minionOptions = minionsSnapshot.map((m, i) => {
             const def = getCardDef(m.defId);
             return {
@@ -951,9 +975,9 @@ export function registerBaseAbilities(): void {
             events: [],
             matchState: queueInteraction(ctx.matchState, {
                 ...interaction,
-                data: { 
-                    ...interaction.data, 
-                    continuationContext: { 
+                data: {
+                    ...interaction.data,
+                    continuationContext: {
                         baseIndex: ctx.baseIndex,
                         minionsSnapshot, // 保存随从快照
                     },
@@ -1014,13 +1038,13 @@ export function registerBaseAbilities(): void {
             minionsCount: ctx.state.bases[ctx.baseIndex]?.minions.length ?? 0,
             timestamp: ctx.now,
         });
-        
+
         if (!ctx.rankings || ctx.rankings.length === 0) return { events: [] };
         const winnerId = ctx.rankings[0].playerId;
         const base = ctx.state.bases[ctx.baseIndex];
         if (!base) return { events: [] };
         const events: SmashUpEvent[] = [];
-        
+
         // 【防重复触发】检查是否已经为这个基地创建过交互
         // 使用 matchState.sys 上的临时标记，避免重复创建相同的交互
         const sysState = ctx.matchState?.sys as PirateCoveSysState | undefined;
@@ -1031,17 +1055,17 @@ export function registerBaseAbilities(): void {
         if (!sysState._pirateCoveTriggered) {
             sysState._pirateCoveTriggered = new Set<number>();
         }
-        const triggeredBases = sysState._pirateCoveTriggered;
-        
+        const triggeredBases = sysAny._pirateCoveTriggered as Set<number>;
+
         if (triggeredBases.has(ctx.baseIndex)) {
             console.log('[海盗湾] 已为基地', ctx.baseIndex, '创建过交互，跳过');
             return { events, matchState: ctx.matchState };
         }
-        
+
         // 标记此基地已触发
         triggeredBases.add(ctx.baseIndex);
         console.log('[海盗湾] 标记基地', ctx.baseIndex, '已触发');
-        
+
         // 遍历非冠军玩家，为每位在此有随从的玩家生成 Prompt
         const playerMinions = new Map<string, MinionOnBase[]>();
         for (const m of base.minions) {
@@ -1050,12 +1074,12 @@ export function registerBaseAbilities(): void {
             list.push(m);
             playerMinions.set(m.controller, list);
         }
-        
+
         console.log('[海盗湾] 非冠军玩家随从:', Array.from(playerMinions.entries()).map(([pid, minions]) => ({
             playerId: pid,
             minionCount: minions.length,
         })));
-        
+
         for (const [pid, minions] of playerMinions) {
             // 将随从信息存入 continuationContext，供交互解决时使用
             const minionsSnapshot = minions.map(m => ({
@@ -1064,7 +1088,7 @@ export function registerBaseAbilities(): void {
                 owner: m.owner,
                 power: getEffectivePower(ctx.state, m, ctx.baseIndex),
             }));
-            
+
             const minionOptions = minionsSnapshot.map((m, i) => {
                 const def = getCardDef(m.defId);
                 return {
@@ -1083,31 +1107,31 @@ export function registerBaseAbilities(): void {
                 // 使用 state.nextUid 确保交互 ID 唯一
                 const interactionId = `base_pirate_cove_${pid}_${ctx.state.nextUid}`;
                 console.log('[海盗湾] 为玩家', pid, '创建交互:', interactionId);
-                
+
                 const interaction = createSimpleChoice(
                     interactionId, pid,
                     '海盗湾：选择移动一个随从到其他基地', options,
                     { sourceId: 'base_pirate_cove', targetType: 'minion' },
                 );
-                
+
                 // 【修复】使用 optionsGenerator 动态生成选项，确保交互解决时使用最新状态
                 // 问题：海盗湾的 afterScoring 能力和大副的 afterScoring 能力都创建了交互
                 // 如果大副的交互先解决，大副被移动到其他基地，海盗湾的交互选项中仍包含大副
                 // 解决方案：使用 optionsGenerator 动态生成选项，过滤掉已经不在原基地上的随从
-                interaction.data.optionsGenerator = state => {
-                    const currentBase = (state.core as SmashUpCore).bases?.[ctx.baseIndex];
-                    if (!currentBase) return [{ id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }];
-                    
+                (interaction.data as any).optionsGenerator = (state: any) => {
+                    const currentBase = state.core?.bases?.[ctx.baseIndex];
+                    if (!currentBase) return [{ id: 'skip', label: '跳过', value: { skip: true } }];
+
                     // 过滤出仍在原基地上的随从
-                    const stillOnBase = minionsSnapshot.filter(m => 
-                        currentBase.minions.some(minion => minion.uid === m.uid)
+                    const stillOnBase = minionsSnapshot.filter(m =>
+                        currentBase.minions.some((minion: any) => minion.uid === m.uid)
                     );
-                    
+
                     if (stillOnBase.length === 0) {
                         // 所有随从都已被移动，只返回"跳过"选项
                         return [{ id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }];
                     }
-                    
+
                     const refreshedOptions = stillOnBase.map((m, i) => {
                         const def = getCardDef(m.defId);
                         return {
@@ -1118,18 +1142,18 @@ export function registerBaseAbilities(): void {
                             displayMode: 'card' as const,
                         };
                     });
-                    
+
                     return [
                         { id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const },
                         ...refreshedOptions,
                     ];
                 };
-                
+
                 ctx.matchState = queueInteraction(ctx.matchState, {
                     ...interaction,
-                    data: { 
-                        ...interaction.data, 
-                        continuationContext: { 
+                    data: {
+                        ...interaction.data,
+                        continuationContext: {
                             baseIndex: ctx.baseIndex,
                             minionsSnapshot, // 保存随从快照
                         },
@@ -1306,11 +1330,13 @@ export function registerBaseInteractionHandlers(): void {
     // 鬼屋：选择弃哪张卡
     registerInteractionHandler('base_haunted_house_al9000', (state, playerId, value, _iData, _random, timestamp) => {
         const { cardUid } = value as { cardUid: string };
-        return { state, events: [{
-            type: SU_EVENTS.CARDS_DISCARDED,
-            payload: { playerId, cardUids: [cardUid] },
-            timestamp,
-        } as CardsDiscardedEvent] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.CARDS_DISCARDED,
+                payload: { playerId, cardUids: [cardUid] },
+                timestamp,
+            } as CardsDiscardedEvent]
+        };
     });
 
     // 拉莱耶：消灭随从+1VP
@@ -1321,14 +1347,16 @@ export function registerBaseInteractionHandlers(): void {
         if (!base) return { state, events: [] };
         const target = base.minions.find(m => m.uid === selected.minionUid);
         if (!target) return { state, events: [] };
-        return { state, events: [
-            destroyMinion(target.uid, target.defId, selected.baseIndex!, target.owner, undefined, 'base_rlyeh', timestamp),
-            {
-                type: SU_EVENTS.VP_AWARDED,
-                payload: { playerId, amount: 1, reason: '拉莱耶：消灭随从获得1VP' },
-                timestamp,
-            } as VpAwardedEvent,
-        ] };
+        return {
+            state, events: [
+                destroyMinion(target.uid, target.defId, selected.baseIndex!, target.owner, undefined, 'base_rlyeh', timestamp),
+                {
+                    type: SU_EVENTS.VP_AWARDED,
+                    payload: { playerId, amount: 1, reason: '拉莱耶：消灭随从获得1VP' },
+                    timestamp,
+                } as VpAwardedEvent,
+            ]
+        };
     });
 
     // 血堡：可选在刚打出的随从上放 +1 指示物
@@ -1344,73 +1372,30 @@ export function registerBaseInteractionHandlers(): void {
 
     // 母舰：收回随从到手牌
     registerInteractionHandler('base_the_mothership', (state, playerId, value, iData, _random, timestamp) => {
-        const selected = value as {
-            skip?: boolean;
-            minionUid?: string;
-            minionDefId?: string;
-            uid?: string;
-            defId?: string;
+        const selected = value as { skip?: boolean; minionUid?: string; minionDefId?: string };
+        if (selected.skip) return { state, events: [] };
+        const ctx = getContinuationContext<{ baseIndex: number }>(iData);
+        if (!ctx) return { state, events: [] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.MINION_RETURNED,
+                payload: {
+                    minionUid: selected.minionUid!,
+                    minionDefId: selected.minionDefId!,
+                    fromBaseIndex: ctx.baseIndex,
+                    toPlayerId: playerId,
+                    reason: '母舰：冠军收回随从',
+                },
+                timestamp,
+            } as MinionReturnedEvent]
         };
-        const events: SmashUpEvent[] = [];
-        if (!selected.skip) {
-            const ctx = getContinuationContext<{
-                baseIndex: number;
-                minionsSnapshot?: Array<{ uid: string; defId: string; power: number }>;
-            }>(iData);
-            if (!ctx) return { state, events: [] };
-            const minionUid = selected.minionUid ?? selected.uid;
-            const minionDefId = selected.minionDefId ?? selected.defId;
-            if (!minionUid || !minionDefId) return { state, events: [] };
-            const returnEvents = buildValidatedReturnEvents(state, {
-                minionUid,
-                minionDefId,
-                fromBaseIndex: ctx.baseIndex,
-                toPlayerId: playerId,
-                reason: '母舰：冠军收回随从',
-                now: timestamp,
-            });
-            if (returnEvents.length > 0) {
-                events.push(...returnEvents);
-            } else {
-                const existsElsewhere = state.core.bases.some(base =>
-                    base.minions.some(minion => minion.uid === minionUid),
-                ) || Object.values(state.core.players).some(player =>
-                    player.hand.some(card => card.uid === minionUid)
-                    || player.deck.some(card => card.uid === minionUid)
-                    || player.discard.some(card => card.uid === minionUid),
-                );
-                const isInSnapshot = !ctx.minionsSnapshot
-                    || ctx.minionsSnapshot.some(minion => minion.uid === minionUid && minion.defId === minionDefId);
-                if (isInSnapshot && !existsElsewhere) {
-                    events.push({
-                        type: SU_EVENTS.MINION_RETURNED,
-                        payload: {
-                            minionUid,
-                            minionDefId,
-                            fromBaseIndex: ctx.baseIndex,
-                            toPlayerId: playerId,
-                            reason: '母舰：冠军收回随从',
-                        },
-                        timestamp,
-                    } as MinionReturnedEvent);
-                }
-            }
-        }
-
-        const deferredEvents = getDeferredPostScoringEvents(iData);
-        const isLastInteraction = !state.sys.interaction?.queue?.length;
-        if (deferredEvents && deferredEvents.length > 0 && isLastInteraction) {
-            events.push(...deferredEvents as SmashUpEvent[]);
-        }
-
-        return { state, events };
     });
 
     // 忍者道场：消灭随从
     registerInteractionHandler('base_ninja_dojo', (state, _playerId, value, iData, _random, timestamp) => {
         const selected = value as { skip?: boolean; minionUid?: string; baseIndex?: number; minionDefId?: string; ownerId?: string };
         const events: SmashUpEvent[] = [];
-        
+
         if (!selected.skip) {
             events.push(...buildValidatedDestroyEvents(state, {
                 minionUid: selected.minionUid!,
@@ -1420,25 +1405,26 @@ export function registerBaseInteractionHandlers(): void {
                 now: timestamp,
             }));
         }
-        
+
         // 【关键修复】检查是否是最后一个交互，如果是则补发延迟事件
         // 当有多个 afterScoring 交互时（如海盗湾 + 忍者道场），延迟的 BASE_CLEARED 事件
         // 存储在第一个交互的 continuationContext._deferredPostScoringEvents 中。
         // InteractionSystem.resolveInteraction 会自动传递给下一个交互，最后一个交互解决时必须补发。
-        const deferredEvents = getDeferredPostScoringEvents(iData);
-        
+        const deferredEvents = (iData?.continuationContext as any)?._deferredPostScoringEvents as
+            { type: string; payload: unknown; timestamp: number }[] | undefined;
+
         // 检查是否是最后一个交互（队列为空）
         const isLastInteraction = !state.sys.interaction?.queue?.length;
-        
+
         if (deferredEvents && deferredEvents.length > 0 && isLastInteraction) {
             events.push(...deferredEvents as SmashUpEvent[]);
-            
+
             // 【关键】补发后必须清除延迟事件，避免在交互链中传播时被多次补发
             // 这是通过返回更新后的 state 实现的（不可变更新）
             // 注意：这里不能直接修改 iData，因为它是只读的
             // 延迟事件的清除由 InteractionSystem 在 resolveInteraction 时自动处理
         }
-        
+
         return { state, events };
     });
 
@@ -1448,7 +1434,7 @@ export function registerBaseInteractionHandlers(): void {
         if (selected.skip) return { state, events: [] };
         const ctx = getContinuationContext<{ baseIndex: number }>(iData);
         if (!ctx) return { state, events: [] };
-        
+
         // 收集可用的目标基地（排除原基地）
         const baseCandidates: { baseIndex: number; label: string }[] = [];
         for (let i = 0; i < state.core.bases.length; i++) {
@@ -1456,23 +1442,18 @@ export function registerBaseInteractionHandlers(): void {
             const bDef = getBaseDef(state.core.bases[i].defId);
             baseCandidates.push({ baseIndex: i, label: bDef?.name ?? `基地 ${i + 1}` });
         }
-        
+
         // 只有一个目标基地→自动移动
         if (baseCandidates.length <= 1) {
             const targetBase = baseCandidates.length === 1 ? baseCandidates[0].baseIndex : 0;
             return {
-                state,
-                events: buildValidatedMoveEvents(state, {
-                    minionUid: selected.minionUid!,
-                    minionDefId: selected.minionDefId!,
-                    fromBaseIndex: ctx.baseIndex,
-                    toBaseIndex: targetBase,
-                    reason: '海盗湾：移动随从到其他基地',
-                    now: timestamp,
-                }),
+                state, events: [moveMinion(
+                    selected.minionUid!, selected.minionDefId!, ctx.baseIndex, targetBase,
+                    '海盗湾：移动随从到其他基地', timestamp,
+                )]
             };
         }
-        
+
         // 多个目标基地→链式交互选择
         const options = buildBaseTargetOptions(baseCandidates, state.core);
         const interaction = createSimpleChoice(
@@ -1480,10 +1461,10 @@ export function registerBaseInteractionHandlers(): void {
             '海盗湾：选择移动到的基地', options,
             { sourceId: 'base_pirate_cove_choose_base', targetType: 'base' },
         );
-        
+
         // 关键修复：将延迟的 BASE_CLEARED 事件传递到链式交互
-        const deferredEvents = getDeferredPostScoringEvents(iData);
-        
+        const deferredEvents = (iData?.continuationContext as any)?._deferredPostScoringEvents;
+
         return {
             // 使用 urgent 标志，确保链式交互的第二步不被其他交互插队
             state: queueInteraction(state, {
@@ -1509,15 +1490,10 @@ export function registerBaseInteractionHandlers(): void {
         const ctx = getContinuationContext<{ minionUid: string; minionDefId: string; fromBaseIndex: number }>(iData);
         if (!ctx) return { state, events: [] };
         return {
-            state,
-            events: buildValidatedMoveEvents(state, {
-                minionUid: ctx.minionUid,
-                minionDefId: ctx.minionDefId,
-                fromBaseIndex: ctx.fromBaseIndex,
-                toBaseIndex: targetBase,
-                reason: '海盗湾：移动随从到其他基地',
-                now: timestamp,
-            }),
+            state, events: [moveMinion(
+                ctx.minionUid, ctx.minionDefId, ctx.fromBaseIndex, targetBase,
+                '海盗湾：移动随从到其他基地', timestamp,
+            )]
         };
     });
 
@@ -1527,44 +1503,15 @@ export function registerBaseInteractionHandlers(): void {
         if (selected.skip) return { state, events: [] };
         const ctx = getContinuationContext<{ baseIndex: number }>(iData);
         if (!ctx) return { state, events: [] };
-        const moveEvents = buildValidatedMoveEvents(state, {
-            minionUid: selected.minionUid!,
-            minionDefId: selected.minionDefId!,
-            fromBaseIndex: selected.fromBaseIndex ?? -1,
-            toBaseIndex: ctx.baseIndex,
-            reason: '托尔图加：亚军移动随从到替换基地',
-            now: timestamp,
-        });
-        if (moveEvents.length === 0) {
-            return { state, events: [] };
-        }
-        const deferredEvents = getDeferredPostScoringEvents(iData);
-        if (deferredEvents && deferredEvents.length > 0) {
-            const pendingAction: PendingPostScoringAction = {
-                kind: 'moveMinionToReplacementBase',
-                minionUid: selected.minionUid!,
-                minionDefId: selected.minionDefId!,
-                fromBaseIndex: selected.fromBaseIndex ?? -1,
-                toBaseIndex: ctx.baseIndex,
-                reason: '托尔图加：亚军移动随从到替换基地',
-            };
-            return {
-                state: {
-                    ...state,
-                    core: {
-                        ...state.core,
-                        pendingPostScoringActions: [
-                            ...(state.core.pendingPostScoringActions ?? []),
-                            pendingAction,
-                        ],
-                    },
-                },
-                events: [],
-            };
-        }
         return {
-            state,
-            events: moveEvents,
+            state, events: [moveMinion(
+                selected.minionUid!,
+                selected.minionDefId!,
+                selected.fromBaseIndex ?? -1,
+                ctx.baseIndex,
+                '托尔图加：亚军移动随从到替换基地',
+                timestamp,
+            )]
         };
     });
 
@@ -1576,14 +1523,16 @@ export function registerBaseInteractionHandlers(): void {
         const chosenDefId = selected.defId;
         const remaining = ctx.topCards.filter(id => id !== chosenDefId);
         const newOrder = [chosenDefId, ...remaining];
-        return { state, events: [{
-            type: SU_EVENTS.BASE_DECK_REORDERED,
-            payload: {
-                topDefIds: newOrder,
-                reason: '巫师学院：冠军重排基地牌库顶',
-            },
-            timestamp,
-        } as BaseDeckReorderedEvent] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.BASE_DECK_REORDERED,
+                payload: {
+                    topDefIds: newOrder,
+                    reason: '巫师学院：冠军重排基地牌库顶',
+                },
+                timestamp,
+            } as BaseDeckReorderedEvent]
+        };
     });
 
     // 蘑菇王国：移动对手随从到蘑菇王国
@@ -1593,15 +1542,14 @@ export function registerBaseInteractionHandlers(): void {
         const ctx = getContinuationContext<{ mushroomBaseIndex: number }>(iData);
         if (!ctx) return { state, events: [] };
         return {
-            state,
-            events: buildValidatedMoveEvents(state, {
-                minionUid: selected.minionUid!,
-                minionDefId: selected.minionDefId!,
-                fromBaseIndex: selected.fromBaseIndex!,
-                toBaseIndex: ctx.mushroomBaseIndex,
-                reason: '蘑菇王国：移动对手随从',
-                now: timestamp,
-            }),
+            state, events: [moveMinion(
+                selected.minionUid!,
+                selected.minionDefId!,
+                selected.fromBaseIndex!,
+                ctx.mushroomBaseIndex,
+                '蘑菇王国：移动对手随从',
+                timestamp,
+            )]
         };
     });
 
@@ -1639,25 +1587,25 @@ export function registerBaseInteractionHandlers(): void {
                 '刚柔流寺庙：选择放入牌库底的最高力量随从', buildMinionTargetOptions(options, { state: state.core, sourcePlayerId: playerId }),
                 { sourceId: 'base_temple_of_goju_tiebreak', targetType: 'minion' },
             );
-            
+
             // 关键修复：将延迟的 BASE_CLEARED 事件传递到链式交互
-            const deferredEvents = getDeferredPostScoringEvents(iData);
-            
-            return { 
+            const deferredEvents = (iData?.continuationContext as any)?._deferredPostScoringEvents;
+
+            return {
                 // 使用 urgent 标志，确保链式交互的后续步骤不被其他交互插队
-                state: queueInteraction(state, { 
-                    ...interaction, 
-                    data: { 
-                        ...interaction.data, 
-                        continuationContext: { 
-                            baseIndex: ctx!.baseIndex, 
+                state: queueInteraction(state, {
+                    ...interaction,
+                    data: {
+                        ...interaction.data,
+                        continuationContext: {
+                            baseIndex: ctx!.baseIndex,
                             remainingPlayers: rest,
                             // 传递延迟事件到下一个交互
                             ...(deferredEvents ? { _deferredPostScoringEvents: deferredEvents } : {}),
-                        } 
-                    } 
+                        }
+                    }
                 }, { urgent: true }), // 链式交互的后续步骤标记为 urgent
-                events 
+                events
             };
         }
 

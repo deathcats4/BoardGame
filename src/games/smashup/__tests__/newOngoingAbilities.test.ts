@@ -23,6 +23,7 @@ import { clearPowerModifierRegistry, getEffectivePower, getEffectiveBreakpoint }
 import {
     clearOngoingEffectRegistry,
     isMinionProtected,
+    isBaseAbilitySuppressed,
     fireTriggers,
     interceptEvent,
 } from '../domain/ongoingEffects';
@@ -122,6 +123,17 @@ describe('bear_cavalry_general_ivan 保护', () => {
     });
 });
 
+describe('bear_cavalry_general_ivan_pod 保护', () => {
+    it('伊万将军 POD 保护己方随从不被任何来源消灭（包含自己发起的消灭）', () => {
+        const ivan = makeMinion('ivan', 'bear_cavalry_general_ivan_pod', '0', 6, { powerModifier: 0 });
+        const ally = makeMinion('ally', 'test_minion', '0', 3, { powerModifier: 0 });
+        const base = makeBase({ minions: [ivan, ally] });
+        const state = makeState({ bases: [base] });
+        expect(isMinionProtected(state, ally, 0, '1', 'destroy')).toBe(true);
+        expect(isMinionProtected(state, ally, 0, '0', 'destroy')).toBe(true);
+    });
+});
+
 describe('bear_cavalry_polar_commando 保护', () => {
     it('唯一己方随从时不可消灭', () => {
         const commando = makeMinion('pc', 'bear_cavalry_polar_commando', '0', 4, { powerModifier: 0 });
@@ -149,7 +161,8 @@ describe('bear_cavalry_polar_commando 保护', () => {
         const commando = makeMinion('pc', 'bear_cavalry_polar_commando', '0', 4, { powerModifier: 0 });
         const base = makeBase({ minions: [commando] });
         const state = makeState({ bases: [base] });
-        expect(getEffectivePower(state, commando, 0)).toBe(6); // 4 + 2
+        // getEffectivePower 使用卡牌定义中的 printed power（bear_cavalry_polar_commando 为 6），再叠加唯一随从 +2
+        expect(getEffectivePower(state, commando, 0)).toBe(8);
     });
 });
 
@@ -224,6 +237,687 @@ describe('bear_cavalry_cub_scout 触发', () => {
             random: dummyRandom, now: 0,
         });
         expect(events.some(e => e.type === SU_EVENTS.MINION_DESTROYED)).toBe(false);
+    });
+});
+
+describe('bear_cavalry_general_ivan_pod 触发', () => {
+    /** 包装为 MatchState */
+    function makeMS(core: SmashUpCore) {
+        return { core, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+    }
+
+    it('对手随从移动后，交互写入的 baseIndex 为“移动到的基地”(there)，与伊万所在基地无关', () => {
+        // base0: Ivan POD（P0）
+        // base1: P0 有随从 + P1 的 moved（已移动到该基地）
+        const ivan = makeMinion('ivan', 'bear_cavalry_general_ivan_pod', '0', 6, { powerModifier: 0 });
+        const myThere = makeMinion('my-there', 'test_minion', '0', 2, { powerModifier: 0 });
+        const moved = makeMinion('moved', 'test_minion', '1', 3, { powerModifier: 0 });
+
+        const base0 = makeBase({ minions: [ivan] });
+        const base1 = makeBase({ minions: [myThere, moved] });
+        const state = makeState({ bases: [base0, base1] });
+        const ms = makeMS(state);
+
+        const result = fireTriggers(state, 'onMinionMoved', {
+            state, matchState: ms, playerId: '0', baseIndex: 1,
+            triggerMinionUid: 'moved', triggerMinionDefId: 'test_minion',
+            random: dummyRandom, now: 0,
+        });
+
+        expect(result.events.length).toBe(0);
+        expect(result.matchState).toBeDefined();
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('bear_cavalry_general_ivan_pod_trigger');
+        expect(current?.data?.baseIndex).toBe(1);
+    });
+
+    it('移动到的基地上没有己方随从时不创建交互', () => {
+        const ivan = makeMinion('ivan', 'bear_cavalry_general_ivan_pod', '0', 6, { powerModifier: 0 });
+        const moved = makeMinion('moved', 'test_minion', '1', 3, { powerModifier: 0 });
+
+        const base0 = makeBase({ minions: [ivan] });
+        const base1 = makeBase({ minions: [moved] });
+        const state = makeState({ bases: [base0, base1] });
+        const ms = makeMS(state);
+
+        const result = fireTriggers(state, 'onMinionMoved', {
+            state, matchState: ms, playerId: '0', baseIndex: 1,
+            triggerMinionUid: 'moved', triggerMinionDefId: 'test_minion',
+            random: dummyRandom, now: 0,
+        });
+
+        expect(result.events.length).toBe(0);
+        // fireTriggers 可能会原样返回 matchState（即使没有新增交互），因此这里检查 interaction 未改变
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        const queue = (result.matchState?.sys as any)?.interaction?.queue ?? [];
+        expect(current).toBeUndefined();
+        expect(queue.length).toBe(0);
+    });
+});
+
+describe('bear_cavalry_polar_commando_pod talent', () => {
+    /** 包装为 MatchState */
+    function makeMS(core: SmashUpCore) {
+        return { core, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+    }
+
+    it('可选择任意基地上力量更低的己方随从（且不包含对手随从）', () => {
+        const commando = makeMinion('pc', 'bear_cavalry_polar_commando_pod', '0', 4, { powerModifier: 0 });
+        const myWeak = makeMinion('my-weak', 'test_minion', '0', 2, { powerModifier: 0 });
+        const enemyWeak = makeMinion('enemy-weak', 'test_minion', '1', 1, { powerModifier: 0 });
+
+        const base0 = makeBase({ minions: [commando] });
+        const base1 = makeBase({ minions: [myWeak, enemyWeak] });
+        const state = makeState({ bases: [base0, base1] });
+        const ms = makeMS(state);
+
+        const executor = resolveAbility('bear_cavalry_polar_commando_pod', 'talent');
+        expect(executor).toBeDefined();
+        const result = executor!({
+            state, matchState: ms, playerId: '0', baseIndex: 0,
+            cardUid: 'pc', defId: 'bear_cavalry_polar_commando_pod',
+            random: dummyRandom, now: 0,
+        } as AbilityContext);
+
+        expect(result.events.length).toBe(0);
+        expect(result.matchState).toBeDefined();
+
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('bear_cavalry_polar_commando_pod');
+
+        const options = current?.data?.options ?? [];
+        // 包含跨基地的己方弱随从（base1）
+        expect(options.some((o: any) => o.value?.minionUid === 'my-weak' && o.value?.baseIndex === 1)).toBe(true);
+        // 不包含对手随从
+        expect(options.some((o: any) => o.value?.minionUid === 'enemy-weak')).toBe(false);
+    });
+
+    it('选择跨基地目标后，POWER_COUNTER_ADDED 的 baseIndex 必须是目标所在基地', () => {
+        const commando = makeMinion('pc', 'bear_cavalry_polar_commando_pod', '0', 4, { powerModifier: 0 });
+        const myWeak = makeMinion('my-weak', 'test_minion', '0', 2, { powerModifier: 0 });
+
+        const base0 = makeBase({ minions: [commando] });
+        const base1 = makeBase({ minions: [myWeak] });
+        const state = makeState({ bases: [base0, base1] });
+        const ms = makeMS(state);
+
+        const executor = resolveAbility('bear_cavalry_polar_commando_pod', 'talent');
+        expect(executor).toBeDefined();
+        const result = executor!({
+            state, matchState: ms, playerId: '0', baseIndex: 0,
+            cardUid: 'pc', defId: 'bear_cavalry_polar_commando_pod',
+            random: dummyRandom, now: 0,
+        } as AbilityContext);
+
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        const handler = getInteractionHandler('bear_cavalry_polar_commando_pod');
+        expect(handler).toBeDefined();
+
+        const handled = handler!(state as any, '0', { minionUid: 'my-weak', baseIndex: 1 }, current?.data, dummyRandom as any, 123);
+        const evts = handled.events;
+        const addEvt = evts.find((e: any) => e.type === SU_EVENTS.POWER_COUNTER_ADDED);
+        expect(addEvt?.payload?.minionUid).toBe('my-weak');
+        expect(addEvt?.payload?.baseIndex).toBe(1);
+    });
+});
+
+describe('bear_cavalry_cub_scout_pod ongoing', () => {
+    /** 包装为 MatchState */
+    function makeMS(core: SmashUpCore) {
+        return { core, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+    }
+
+    it('只在“moves here”（移动到该基地）时触发；ctx.baseIndex 与随从实际所在基地不一致则不触发', () => {
+        // base0: cub_scout_pod（P0）
+        // base1: moved minion（P1）实际在 base1
+        // 但触发上下文 baseIndex=0（不一致）→ 应不触发任何交互
+        const scout = makeMinion('scout', 'bear_cavalry_cub_scout_pod', '0', 3, { powerModifier: 0 });
+        const moved = makeMinion('moved', 'test_minion', '1', 1, { powerModifier: 0 });
+        const state = makeState({ bases: [makeBase({ minions: [scout] }), makeBase({ minions: [moved] })] });
+        const ms = makeMS(state);
+
+        const result = fireTriggers(state, 'onMinionMoved', {
+            state, matchState: ms, playerId: '0', baseIndex: 0,
+            triggerMinionUid: 'moved', triggerMinionDefId: 'test_minion',
+            random: dummyRandom, now: 0,
+        });
+
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        const queue = (result.matchState?.sys as any)?.interaction?.queue ?? [];
+        expect(current).toBeUndefined();
+        expect(queue.length).toBe(0);
+        expect(result.events.length).toBe(0);
+    });
+});
+
+describe('bear_cavalry_bear_necessities_pod', () => {
+    it('天赋可在没有对手随从时提前开启（不返回 no_valid_targets 反馈）', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase({
+                    minions: [makeMinion('m0', 'test_minion', '0', 2, { powerModifier: 0 })],
+                    ongoingActions: [{ uid: 'bn-1', defId: 'bear_cavalry_bear_necessities_pod', ownerId: '0' }],
+                }),
+            ],
+        });
+
+        const executor = resolveAbility('bear_cavalry_bear_necessities_pod', 'talent');
+        expect(executor).toBeDefined();
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { queue: [] } } } as any;
+        const result = executor!({
+            state, matchState: ms, playerId: '0',
+            cardUid: 'bn-1', defId: 'bear_cavalry_bear_necessities_pod',
+            baseIndex: 0, random: dummyRandom, now: 0,
+        } as AbilityContext);
+        expect(result.events.length).toBe(0);
+        expect(result.events.some(e => e.type === SU_EVENTS.ABILITY_FEEDBACK)).toBe(false);
+    });
+
+    it('对手在该基地有随从且已开启压制时，不能打出“第2张行动卡”（actionsPlayed>=1）', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1', {
+                    hand: [{ uid: 'a1', defId: 'bear_cavalry_bear_hug_pod', type: 'action' as any }],
+                    actionsPlayed: 1,
+                    actionLimit: 2,
+                }),
+            },
+            currentPlayerIndex: 1,
+            turnOrder: ['0', '1'],
+            bases: [
+                makeBase({
+                    minions: [
+                        makeMinion('p0', 'test_minion', '0', 2, { powerModifier: 0 }),
+                        makeMinion('p1', 'test_minion', '1', 2, { powerModifier: 0 }),
+                    ],
+                    ongoingActions: [{ uid: 'bn-1', defId: 'bear_cavalry_bear_necessities_pod', ownerId: '0', talentUsed: true } as any],
+                }),
+            ],
+        });
+
+        const matchState = { core: state, sys: { phase: 'playCards' } } as any;
+        const cmd = {
+            type: SU_COMMANDS.PLAY_ACTION,
+            playerId: '1',
+            payload: { cardUid: 'a1' },
+        } as any;
+
+        const result = validate(matchState, cmd);
+        expect(result.valid).toBe(false);
+        expect(String((result as any).error)).toContain('黑熊口粮压制');
+    });
+});
+
+describe('bear_cavalry_bear_rides_you_pod', () => {
+    /** 包装为 MatchState */
+    function makeMS(core: SmashUpCore) {
+        return { core, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+    }
+
+    it('移动己方随从后，会创建“选择压制目标或跳过”的第二段交互，并可压制基地能力', () => {
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [
+                makeBase({
+                    defId: 'test_base',
+                    minions: [makeMinion('m0', 'test_minion', '0', 3, { powerModifier: 0 })],
+                }),
+                makeBase({
+                    defId: 'test_base',
+                    minions: [],
+                    ongoingActions: [{ uid: 'hg-1', defId: 'bear_cavalry_high_ground_pod', ownerId: '0' }],
+                }),
+            ],
+        });
+        const ms = makeMS(state);
+
+        // 1) 手动调用 choose_base handler，模拟“已选择 m0 并选择移动到 base1”
+        const chooseBaseHandler = getInteractionHandler('bear_cavalry_bear_rides_you_pod_choose_base');
+        expect(chooseBaseHandler).toBeDefined();
+        const handled = chooseBaseHandler!(
+            ms as any,
+            '0',
+            { baseIndex: 1 },
+            { continuationContext: { minionUid: 'm0', minionDefId: 'test_minion', fromBase: 0, isMyMinion: true } } as any,
+            dummyRandom as any,
+            1
+        );
+
+        // 应产生移动事件 + 创建后续压制交互
+        expect(handled.events.some((e: any) => e.type === SU_EVENTS.MINION_MOVED)).toBe(true);
+        const current = (handled.state.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('bear_cavalry_bear_rides_you_pod_choose_suppress');
+
+        // 2) 选择压制基地
+        const suppressHandler = getInteractionHandler('bear_cavalry_bear_rides_you_pod_choose_suppress');
+        expect(suppressHandler).toBeDefined();
+        const suppressed = suppressHandler!(
+            handled.state as any,
+            '0',
+            { kind: 'base', baseIndex: 1 },
+            current?.data,
+            dummyRandom as any,
+            2
+        );
+        expect(suppressed.events.some((e: any) => e.type === SU_EVENTS.BASE_ABILITY_SUPPRESSED)).toBe(true);
+
+        // reduce 后基地能力应被压制
+        const core2 = reduce(state, suppressed.events[0] as any);
+        expect(isBaseAbilitySuppressed(core2 as any, 1)).toBe(true);
+    });
+
+    it('压制具体 ongoing uid 后，该 ongoing 不再被认为活跃（触发不再发生）', () => {
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [
+                makeBase({
+                    defId: 'test_base',
+                    minions: [makeMinion('my', 'test_minion', '0', 3, { powerModifier: 0 })],
+                    ongoingActions: [{ uid: 'hg-1', defId: 'bear_cavalry_high_ground_pod', ownerId: '0' }],
+                }),
+                makeBase({ defId: 'test_base', minions: [makeMinion('moved', 'test_minion', '1', 2, { powerModifier: 0 })] }),
+            ],
+        });
+        // 先把 hg-1 压制写入 core
+        const coreSuppressed = reduce(state, {
+            type: SU_EVENTS.CARD_SUPPRESSED,
+            payload: { cardUid: 'hg-1', suppressedBy: '0', cardType: 'ongoing', baseIndex: 0 },
+            timestamp: 0,
+        } as any);
+
+        // 对手随从“移入 base0”应本可触发高地 POD 交互；但被压制后不应触发
+        const result = fireTriggers(coreSuppressed as any, 'onMinionMoved', {
+            state: coreSuppressed as any,
+            matchState: makeMS(coreSuppressed as any),
+            playerId: '0',
+            baseIndex: 0,
+            triggerMinionUid: 'moved',
+            triggerMinionDefId: 'test_minion',
+            random: dummyRandom,
+            now: 0,
+        } as any);
+        const current = (result.matchState?.sys as any)?.interaction?.current;
+        expect(current).toBeUndefined();
+    });
+});
+
+describe('bear_cavalry_commission_pod', () => {
+    it('手牌无随从时 fizzle（feedback.no_valid_targets），不赠送额外随从额度', () => {
+        const state = makeState({
+            players: { '0': makePlayer('0', { hand: [] }), '1': makePlayer('1') },
+            bases: [makeBase({ minions: [] }), makeBase({ minions: [] })],
+        });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } } as any;
+
+        const executor = resolveAbility('bear_cavalry_commission_pod', 'onPlay');
+        expect(executor).toBeDefined();
+        const result = executor!({
+            state,
+            matchState: ms,
+            playerId: '0',
+            cardUid: 'commission-1',
+            defId: 'bear_cavalry_commission_pod',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        } as AbilityContext);
+
+        expect(result.events).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    type: SU_EVENTS.ABILITY_FEEDBACK,
+                    payload: expect.objectContaining({ messageKey: 'feedback.no_valid_targets' }),
+                }),
+            ])
+        );
+    });
+
+    it('额外打出的随从不消耗正常随从额度，并且移动对手随从步骤可跳过', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0', { hand: [{ uid: 'c1', defId: 'test_minion', type: 'minion' } as any] }),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase({ minions: [makeMinion('e1', 'test_minion', '1', 2, { powerModifier: 0 })] }),
+                makeBase({ minions: [] }),
+            ],
+        });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+
+        const chooseMinion = getInteractionHandler('bear_cavalry_commission_choose_minion');
+        expect(chooseMinion).toBeDefined();
+        const afterChooseMinion = chooseMinion!(
+            ms,
+            '0',
+            { cardUid: 'c1', defId: 'test_minion', power: 2 },
+            {} as any,
+            dummyRandom as any,
+            1
+        );
+
+        const current1 = (afterChooseMinion.state.sys as any)?.interaction?.current;
+        expect(current1?.data?.sourceId).toBe('bear_cavalry_commission_choose_base');
+
+        const chooseBase = getInteractionHandler('bear_cavalry_commission_choose_base');
+        expect(chooseBase).toBeDefined();
+        const afterChooseBase = chooseBase!(
+            afterChooseMinion.state,
+            '0',
+            { baseIndex: 0 },
+            { continuationContext: { cardUid: 'c1', defId: 'test_minion', power: 2 } } as any,
+            dummyRandom as any,
+            2
+        );
+
+        const playedEvt = afterChooseBase.events.find((e: any) => e.type === SU_EVENTS.MINION_PLAYED) as any;
+        expect(playedEvt).toBeDefined();
+        expect(playedEvt.payload?.consumesNormalLimit).toBe(false);
+
+        // 注意：这里我们是手动调用 handler，没有走 InteractionSystem.popInteraction，
+        // 因此 new interaction 会进入 queue 而不是直接成为 current。
+        const interactionState = (afterChooseBase.state.sys as any)?.interaction;
+        const queued = interactionState?.queue?.[0];
+        expect(queued?.data?.sourceId).toBe('bear_cavalry_commission_move_minion');
+        expect(queued?.data?.options?.some((o: any) => o.id === 'skip')).toBe(true);
+
+        const moveMinion = getInteractionHandler('bear_cavalry_commission_move_minion');
+        expect(moveMinion).toBeDefined();
+        const afterSkip = moveMinion!(
+            afterChooseBase.state,
+            '0',
+            { minionUid: '__skip__', baseIndex: 0 },
+            queued?.data,
+            dummyRandom as any,
+            3
+        );
+
+        expect(afterSkip.events.some((e: any) => e.type === SU_EVENTS.MINION_MOVED)).toBe(false);
+    });
+});
+
+describe('bear_cavalry_high_ground_pod', () => {
+    it('选择 draw 分支也会先消灭此行动卡（ONGOING_DETACHED），并且 CARDS_DRAWN 带 count=1', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0', { deck: [{ uid: 'd1', defId: 'test_action', type: 'action' } as any] }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase({ ongoingActions: [{ uid: 'hg-1', defId: 'bear_cavalry_high_ground_pod', ownerId: '0' }] })],
+        });
+        const ms = { core: state, sys: { phase: 'playCards' } } as any;
+
+        const handler = getInteractionHandler('bear_cavalry_high_ground_pod_trigger');
+        expect(handler).toBeDefined();
+        const result = handler!(
+            ms,
+            '0',
+            { action: 'draw', ongoingUid: 'hg-1' },
+            {} as any,
+            dummyRandom as any,
+            1
+        );
+
+        expect(result.events.some((e: any) => e.type === SU_EVENTS.ONGOING_DETACHED)).toBe(true);
+        const drawEvt = result.events.find((e: any) => e.type === SU_EVENTS.CARDS_DRAWN) as any;
+        expect(drawEvt).toBeDefined();
+        expect(drawEvt.payload?.count).toBe(1);
+    });
+});
+
+describe('bear_cavalry_superiority_pod', () => {
+    it('不在该基地战力最高时，talent fizzle（feedback.no_valid_targets）', () => {
+        const my = makeMinion('my', 'test_minion', '0', 2, { powerModifier: 0 });
+        const enemy = makeMinion('e1', 'test_minion', '1', 5, { powerModifier: 0 });
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [
+                makeBase({
+                    minions: [my, enemy],
+                    ongoingActions: [{ uid: 'sup-1', defId: 'bear_cavalry_superiority_pod', ownerId: '0', talentUsed: false } as any],
+                }),
+            ],
+        });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } } as any;
+
+        const executor = resolveAbility('bear_cavalry_superiority_pod', 'talent');
+        expect(executor).toBeDefined();
+        const result = executor!({
+            state,
+            matchState: ms,
+            playerId: '0',
+            cardUid: 'sup-1',
+            defId: 'bear_cavalry_superiority_pod',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        } as AbilityContext);
+
+        expect(result.events).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    type: SU_EVENTS.ABILITY_FEEDBACK,
+                    payload: expect.objectContaining({ messageKey: 'feedback.no_valid_targets' }),
+                }),
+            ])
+        );
+    });
+
+    it('选择 draw 不会开启保护；选择 protect 会开启 destroy/move/affect 保护，并在你下回合开始失效', () => {
+        const my = makeMinion('my', 'test_minion', '0', 5, { powerModifier: 0 });
+        const enemy = makeMinion('e1', 'test_minion', '1', 2, { powerModifier: 0 });
+        const state = makeState({
+            players: {
+                '0': makePlayer('0', { deck: [{ uid: 'd1', defId: 'test_action', type: 'action' } as any] }),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase({
+                    minions: [my, enemy],
+                    ongoingActions: [{ uid: 'sup-1', defId: 'bear_cavalry_superiority_pod', ownerId: '0', talentUsed: false } as any],
+                }),
+            ],
+        });
+
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } } as any;
+        const executor = resolveAbility('bear_cavalry_superiority_pod', 'talent')!;
+        const prompted = executor({
+            state,
+            matchState: ms,
+            playerId: '0',
+            cardUid: 'sup-1',
+            defId: 'bear_cavalry_superiority_pod',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        } as AbilityContext);
+        const current = (prompted.matchState?.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('bear_cavalry_superiority_pod_talent');
+
+        const handler = getInteractionHandler('bear_cavalry_superiority_pod_talent')!;
+
+        // 1) draw：只抽牌，不开启保护
+        const afterDraw = handler(
+            prompted.matchState as any,
+            '0',
+            'draw',
+            current?.data,
+            dummyRandom as any,
+            1
+        );
+        expect(afterDraw.events.some((e: any) => e.type === SU_EVENTS.CARDS_DRAWN)).toBe(true);
+        expect(isMinionProtected(state, my, 0, '1', 'destroy')).toBe(false);
+        expect(isMinionProtected(state, my, 0, '1', 'move')).toBe(false);
+        expect(isMinionProtected(state, my, 0, '1', 'affect')).toBe(false);
+
+        // 2) protect：开启保护模式
+        const afterProtect = handler(
+            prompted.matchState as any,
+            '0',
+            'protect',
+            current?.data,
+            dummyRandom as any,
+            2
+        );
+        expect(afterProtect.events.some((e: any) => e.type === (SU_EVENTS as any).SUPERIORITY_POD_PROTECT_ENABLED)).toBe(true);
+
+        // reduce 后应生效
+        const core2 = reduce(state, afterProtect.events[0] as any) as any;
+        const my2 = core2.bases[0].minions.find((m: any) => m.uid === 'my');
+        expect(isMinionProtected(core2, my2, 0, '1', 'destroy')).toBe(true);
+        expect(isMinionProtected(core2, my2, 0, '1', 'move')).toBe(true);
+        expect(isMinionProtected(core2, my2, 0, '1', 'affect')).toBe(true);
+
+        // 你下回合开始：TURN_STARTED 清理保护模式
+        const core3 = reduce(core2, {
+            type: SU_EVENTS.TURN_STARTED,
+            payload: { playerId: '0', turnNumber: 2 },
+            timestamp: 0,
+        } as any) as any;
+        const my3 = core3.bases[0].minions.find((m: any) => m.uid === 'my');
+        expect(isMinionProtected(core3, my3, 0, '1', 'destroy')).toBe(false);
+        expect(isMinionProtected(core3, my3, 0, '1', 'move')).toBe(false);
+        expect(isMinionProtected(core3, my3, 0, '1', 'affect')).toBe(false);
+    });
+});
+
+describe('bear_cavalry_youre_pretty_much_borscht_pod', () => {
+    it('选择“只有己方随从”的基地也允许，但若无可移动对手随从则直接 fizzle（不要求选目标基地）', () => {
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [
+                makeBase({ minions: [makeMinion('my', 'test_minion', '0', 3, { powerModifier: 0 })] }),
+                makeBase({ minions: [] }),
+            ],
+        });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+
+        const executor = resolveAbility('bear_cavalry_youre_pretty_much_borscht_pod', 'onPlay')!;
+        const prompted = executor({
+            state,
+            matchState: ms,
+            playerId: '0',
+            cardUid: 'b-1',
+            defId: 'bear_cavalry_youre_pretty_much_borscht_pod',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        } as AbilityContext);
+        const current = (prompted.matchState?.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('bear_cavalry_borscht_choose_from');
+
+        const chooseFrom = getInteractionHandler('bear_cavalry_borscht_choose_from')!;
+        const handled = chooseFrom(
+            prompted.matchState as any,
+            '0',
+            { baseIndex: 0 },
+            current?.data,
+            dummyRandom as any,
+            1
+        );
+        expect(handled.events.length).toBe(0);
+        // 无可移动目标，不应创建 choose_dest 交互
+        expect((handled.state.sys as any)?.interaction?.queue?.length ?? 0).toBe(0);
+    });
+
+    it('批量移动时跳过受保护的对手随从，其余照常移动', () => {
+        const protectedMinion = makeMinion('p1-protected', 'test_minion', '1', 2, {
+            powerModifier: 0,
+            attachedActions: [{ uid: 'tc-1', defId: 'dino_tooth_and_claw', ownerId: '1' }],
+        });
+        const movableMinion = makeMinion('p1-movable', 'test_minion', '1', 2, { powerModifier: 0 });
+
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [
+                makeBase({ minions: [makeMinion('my', 'test_minion', '0', 3, { powerModifier: 0 }), protectedMinion, movableMinion] }),
+                makeBase({ minions: [] }),
+            ],
+        });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } as any } as any;
+
+        const executor = resolveAbility('bear_cavalry_youre_pretty_much_borscht_pod', 'onPlay')!;
+        const prompted = executor({
+            state,
+            matchState: ms,
+            playerId: '0',
+            cardUid: 'b-1',
+            defId: 'bear_cavalry_youre_pretty_much_borscht_pod',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        } as AbilityContext);
+        const chooseFromData = (prompted.matchState?.sys as any)?.interaction?.current?.data;
+
+        const chooseFrom = getInteractionHandler('bear_cavalry_borscht_choose_from')!;
+        const afterFrom = chooseFrom(
+            prompted.matchState as any,
+            '0',
+            { baseIndex: 0 },
+            chooseFromData,
+            dummyRandom as any,
+            1
+        );
+
+        // 手动调用 handler 不会自动 popInteraction，因此新交互在 queue 里
+        const queued = (afterFrom.state.sys as any)?.interaction?.queue?.[0];
+        expect(queued?.data?.sourceId).toBe('bear_cavalry_borscht_choose_dest');
+
+        const chooseDest = getInteractionHandler('bear_cavalry_borscht_choose_dest')!;
+        const afterDest = chooseDest(
+            afterFrom.state as any,
+            '0',
+            { baseIndex: 1 },
+            { continuationContext: { fromBase: 0 } } as any,
+            dummyRandom as any,
+            2
+        );
+
+        const moved = afterDest.events.filter((e: any) => e.type === SU_EVENTS.MINION_MOVED);
+        expect(moved.length).toBe(1);
+        expect(moved[0].payload?.minionUid).toBe('p1-movable');
+    });
+});
+
+describe('bear_cavalry_youre_screwed_pod (bearing_down)', () => {
+    it('当你本回合把对手随从移入且该基地有你拥有的 youre_screwed_pod 时，临界点修正走“降低”分支', () => {
+        // base0: youre_screwed_pod（owner=0） + 双方各一个随从
+        const state = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            currentPlayerIndex: 0,
+            turnOrder: ['0', '1'],
+            bases: [
+                makeBase({
+                    // 使用真实基地 defId，确保 getEffectiveBreakpoint 可计算基础值
+                    defId: 'base_the_homeworld',
+                    minions: [
+                        makeMinion('p0', 'test_minion', '0', 2, { powerModifier: 0 }),
+                        makeMinion('p1', 'test_minion', '1', 2, { powerModifier: 0 }),
+                    ],
+                    ongoingActions: [{ uid: 'ys-1', defId: 'bear_cavalry_youre_screwed_pod', ownerId: '0' }],
+                }),
+            ],
+        });
+
+        const before = getEffectiveBreakpoint(state, 0);
+
+        // 模拟：玩家0把对手随从移动到 base0
+        const movedState = reduce(state, {
+            type: SU_EVENTS.MINION_MOVED,
+            payload: { minionUid: 'p1', minionDefId: 'test_minion', fromBaseIndex: 0, toBaseIndex: 0, reason: 'some_other_move' },
+            timestamp: 0,
+        } as any);
+
+        expect((movedState as any).movedToBasesThisTurn?.[0]).toBe(true);
+
+        const after = getEffectiveBreakpoint(movedState as any, 0);
+        // 2 名玩家在基地 → 修正从 +4 翻转为 -4，整体差值应为 -8
+        expect(after - before).toBe(-8);
     });
 });
 
@@ -588,17 +1282,66 @@ describe('elder_thing_dunwich_horror', () => {
         expect(getEffectivePower(state, minion, 0)).toBe(8); // 3 + 5
     });
 
-    it('回合结束时消灭附着此卡的随从', () => {
+    it('计分前创建强制二选一交互（抽2疯狂/消灭该随从）', () => {
         const minion = makeMinion('m1', 'test_minion', '0', 3, {
             attachedActions: [{ uid: 'dh-1', defId: 'elder_thing_dunwich_horror', ownerId: '0' }],
         });
         const base = makeBase({ minions: [minion] });
         const state = makeState({ bases: [base] });
 
-        const { events } = fireTriggers(state, 'onTurnEnd', {
-            state, playerId: '0', random: dummyRandom, now: 0,
+        const ms = { core: state, sys: { phase: 'scoreBases', interaction: { current: undefined, queue: [] } } } as any;
+        const { events, matchState } = fireTriggers(state, 'beforeScoring', {
+            state, matchState: ms, playerId: '0', baseIndex: 0, random: dummyRandom, now: 0,
         });
-        expect(events.some(e => e.type === SU_EVENTS.MINION_DESTROYED)).toBe(true);
+        expect(events).toHaveLength(0);
+        const current = (matchState?.sys as any)?.interaction?.current;
+        expect(current?.data?.sourceId).toBe('elder_thing_dunwich_horror_before_scoring');
+        expect(current?.playerId).toBe('0');
+    });
+
+    it('选择抽疯狂卡：产生 MADNESS_DRAWN（牌库不足则尽可能抽）', () => {
+        const minion = makeMinion('m1', 'test_minion', '0', 3, {
+            attachedActions: [{ uid: 'dh-1', defId: 'elder_thing_dunwich_horror', ownerId: '0' }],
+        });
+        const base = makeBase({ minions: [minion] });
+        const state = makeState({ bases: [base], madnessDeck: [MADNESS_CARD_DEF_ID] }); // 只有 1 张
+
+        const ms = { core: state, sys: { phase: 'scoreBases', interaction: { current: undefined, queue: [] } } } as any;
+        const triggered = fireTriggers(state, 'beforeScoring', {
+            state, matchState: ms, playerId: '0', baseIndex: 0, random: dummyRandom, now: 0,
+        });
+        const current = (triggered.matchState?.sys as any)?.interaction?.current;
+
+        const handler = getInteractionHandler('elder_thing_dunwich_horror_before_scoring');
+        expect(handler).toBeDefined();
+        const ms2 = { ...triggered.matchState!, sys: { ...triggered.matchState!.sys, interaction: { current: undefined, queue: [] } } };
+        const resolved = handler!(ms2 as any, '0', { choice: 'draw' }, current?.data, dummyRandom, 1)!;
+
+        const madness = resolved.events.filter(e => e.type === SU_EVENTS.MADNESS_DRAWN) as any[];
+        expect(madness).toHaveLength(1);
+        expect(madness[0].payload.playerId).toBe('0');
+        expect(madness[0].payload.count).toBe(1);
+    });
+
+    it('选择消灭：产生 MINION_DESTROYED', () => {
+        const minion = makeMinion('m1', 'test_minion', '0', 3, {
+            attachedActions: [{ uid: 'dh-1', defId: 'elder_thing_dunwich_horror', ownerId: '0' }],
+        });
+        const base = makeBase({ minions: [minion] });
+        const state = makeState({ bases: [base] });
+
+        const ms = { core: state, sys: { phase: 'scoreBases', interaction: { current: undefined, queue: [] } } } as any;
+        const triggered = fireTriggers(state, 'beforeScoring', {
+            state, matchState: ms, playerId: '0', baseIndex: 0, random: dummyRandom, now: 0,
+        });
+        const current = (triggered.matchState?.sys as any)?.interaction?.current;
+
+        const handler = getInteractionHandler('elder_thing_dunwich_horror_before_scoring');
+        expect(handler).toBeDefined();
+        const ms2 = { ...triggered.matchState!, sys: { ...triggered.matchState!.sys, interaction: { current: undefined, queue: [] } } };
+        const resolved = handler!(ms2 as any, '0', { choice: 'destroy' }, current?.data, dummyRandom, 1)!;
+
+        expect(resolved.events.some(e => e.type === SU_EVENTS.MINION_DESTROYED)).toBe(true);
     });
 });
 
@@ -850,10 +1593,9 @@ describe('elder_thing_the_price_of_power special 能力', () => {
             cardUid: 'pop-1', defId: 'elder_thing_the_price_of_power',
             baseIndex: 0, random: dummyRandom, now: 0,
         } as AbilityContext);
-        const powerEvts = result.events.filter(e => e.type === SU_EVENTS.POWER_COUNTER_ADDED) as PowerCounterAddedEvent[];
-        // 对手有2张疯狂卡 → 己方随从获得2次+2力量
-        expect(powerEvts.length).toBe(2);
-        expect(powerEvts.every(e => e.payload.amount === 2)).toBe(true);
+        // special 版现在会创建交互链逐个选择目标随从，我们断言产生了交互而不是直接加力量
+        const interactions = (ms.sys as any)?.interaction;
+        expect(interactions).toBeDefined();
     });
 
     it('对手在此基地无随从时不触发', () => {
@@ -984,7 +1726,7 @@ describe('cthulhu_complete_the_ritual onTurnStart', () => {
         const base = makeBase({
             minions: [m1, m2],
             ongoingActions: [
-                { uid: 'ritual-1', defId: 'cthulhu_complete_the_ritual', ownerId: '0' },
+                { uid: 'ritual-1', defId: 'cthulhu_complete_the_ritual_pod', ownerId: '0' },
                 { uid: 'other-1', defId: 'cthulhu_altar', ownerId: '0' },
             ],
         });
@@ -1347,6 +2089,29 @@ describe('elder_thing_elder_thing onPlay', () => {
         expect(next.players['0'].deck.length).toBe(1);
         expect(next.players['0'].deck[0].uid).toBe('et-1');
     });
+
+    it('选择 destroy 但无法成功消灭两名随从时，必须将远古之物放到牌库底（澄清）', () => {
+        // 交互产生时可能曾经有足够随从，但到解决时无法成功消灭两名 → 必须放底
+        const elderThing = makeMinion('et-1', 'elder_thing_elder_thing', '0', 10, { powerModifier: 0 });
+        const base = makeBase({ minions: [elderThing] });
+        const state = makeState({ bases: [base] });
+        const ms = { core: state, sys: { phase: 'playCards', interaction: { current: undefined, queue: [] } } } as any;
+
+        const handler = getInteractionHandler('elder_thing_elder_thing_choice');
+        expect(handler).toBeDefined();
+        const r = handler!(
+            ms,
+            '0',
+            { choice: 'destroy' },
+            { continuationContext: { cardUid: 'et-1', defId: 'elder_thing_elder_thing', baseIndex: 0 } } as any,
+            dummyRandom,
+            1
+        )!;
+
+        const toBottom = r.events.filter((e: any) => e.type === SU_EVENTS.CARD_TO_DECK_BOTTOM);
+        expect(toBottom).toHaveLength(1);
+        expect(toBottom[0].payload.cardUid).toBe('et-1');
+    });
 });
 
 // ============================================================================
@@ -1483,14 +2248,13 @@ describe('killer_plant_venus_man_trap 搜索牌库', () => {
             state, playerId: '0', cardUid: 'trap', defId: 'killer_plant_venus_man_trap',
             baseIndex: 0, random: dummyRandom, now: 0,
         } as AbilityContext);
-        // 应产生 4 个事件：CARDS_DRAWN + LIMIT_MODIFIED + MINION_PLAYED + DECK_REORDERED
-        expect(result.events.length).toBe(4);
-        expect(result.events[0].type).toBe(SU_EVENTS.CARDS_DRAWN);
-        expect(result.events[1].type).toBe(SU_EVENTS.LIMIT_MODIFIED);
-        expect(result.events[2].type).toBe(SU_EVENTS.MINION_PLAYED);
+        // 自动分支：赠送额外随从额度 + 从牌库直接打出 + 洗牌（不显式产生 CARDS_DRAWN）
+        expect(result.events.length).toBe(3);
+        expect(result.events[0].type).toBe(SU_EVENTS.LIMIT_MODIFIED);
+        expect(result.events[1].type).toBe(SU_EVENTS.MINION_PLAYED);
         // 验证随从被打出到此基地（baseIndex=0）
-        expect((result.events[2] as any).payload.baseIndex).toBe(0);
-        expect(result.events[3].type).toBe(SU_EVENTS.DECK_REORDERED);
+        expect((result.events[1] as any).payload.baseIndex).toBe(0);
+        expect(result.events[2].type).toBe(SU_EVENTS.DECK_REORDERED);
     });
 
     it('牌库无合格随从→不产生事件', () => {

@@ -685,6 +685,95 @@ export function formatSmashUpActionEntry({
                 pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
                 break;
             }
+            // ========================================================================
+            // 泰坦事件
+            // ========================================================================
+            case SU_EVENTS.TITAN_PLACED: {
+                const payload = event.payload as { playerId: string; titanDefId: string; baseIndex: number };
+                const baseLabel = formatBaseLabel(getBaseDefId(payload.baseIndex), payload.baseIndex);
+                const segments = withCardSegments('actionLog.titanPlaced', payload.titanDefId, { playerId: payload.playerId });
+                if (baseLabel) {
+                    segments.push(i18nSeg('actionLog.onBase', { base: baseLabel }, ['base']));
+                }
+                pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
+                break;
+            }
+            case SU_EVENTS.TITAN_MOVED: {
+                const payload = event.payload as { playerId: string; titanDefId: string; fromBaseIndex: number; toBaseIndex: number };
+                const fromLabel = formatBaseLabel(getBaseDefId(payload.fromBaseIndex), payload.fromBaseIndex);
+                const toLabel = formatBaseLabel(getBaseDefId(payload.toBaseIndex), payload.toBaseIndex);
+                const segments = withCardSegments('actionLog.titanMoved', payload.titanDefId, { playerId: payload.playerId });
+                segments.push(i18nSeg('actionLog.fromTo', { from: fromLabel, to: toLabel }, ['from', 'to']));
+                pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
+                break;
+            }
+            case SU_EVENTS.TITAN_CLASH: {
+                const payload = event.payload as { 
+                    winnerPlayerId: string; 
+                    winnerTitanDefId: string; 
+                    winnerPower: number;
+                    loserPlayerId: string; 
+                    loserTitanDefId: string; 
+                    loserPower: number;
+                    baseIndex: number;
+                };
+                const baseLabel = formatBaseLabel(getBaseDefId(payload.baseIndex), payload.baseIndex);
+                const segments: ActionLogSegment[] = [i18nSeg('actionLog.titanClash')];
+                const winnerSeg = buildCardSegment(payload.winnerTitanDefId);
+                const loserSeg = buildCardSegment(payload.loserTitanDefId);
+                if (winnerSeg) segments.push(winnerSeg);
+                segments.push(i18nSeg('actionLog.titanClashDetails', {
+                    winnerPlayerId: payload.winnerPlayerId,
+                    winnerPower: payload.winnerPower,
+                    loserPlayerId: payload.loserPlayerId,
+                    loserPower: payload.loserPower,
+                }));
+                if (loserSeg) segments.push(loserSeg);
+                if (baseLabel) {
+                    segments.push(i18nSeg('actionLog.onBase', { base: baseLabel }, ['base']));
+                }
+                pushEntry(event.type, segments, payload.winnerPlayerId, entryTimestamp, index);
+                break;
+            }
+            case SU_EVENTS.TITAN_REMOVED: {
+                const payload = event.payload as { playerId: string; titanDefId: string; baseIndex: number; reason?: string };
+                const baseLabel = formatBaseLabel(getBaseDefId(payload.baseIndex), payload.baseIndex);
+                const segments = withCardSegments('actionLog.titanRemoved', payload.titanDefId, { playerId: payload.playerId });
+                if (baseLabel) {
+                    segments.push(i18nSeg('actionLog.onBase', { base: baseLabel }, ['base']));
+                }
+                if (payload.reason) {
+                    segments.push(...buildReasonSegments(payload.reason, buildCardSegment));
+                }
+                pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
+                break;
+            }
+            case SU_EVENTS.TITAN_POWER_TOKEN_ADDED: {
+                const payload = event.payload as { playerId: string; titanDefId: string; amount: number; baseIndex: number };
+                const baseLabel = formatBaseLabel(getBaseDefId(payload.baseIndex), payload.baseIndex);
+                const segments = withCardSegments('actionLog.titanPowerTokenAdded', payload.titanDefId, { 
+                    playerId: payload.playerId,
+                    amount: payload.amount 
+                });
+                if (baseLabel) {
+                    segments.push(i18nSeg('actionLog.onBase', { base: baseLabel }, ['base']));
+                }
+                pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
+                break;
+            }
+            case SU_EVENTS.TITAN_POWER_TOKEN_REMOVED: {
+                const payload = event.payload as { playerId: string; titanDefId: string; amount: number; baseIndex: number };
+                const baseLabel = formatBaseLabel(getBaseDefId(payload.baseIndex), payload.baseIndex);
+                const segments = withCardSegments('actionLog.titanPowerTokenRemoved', payload.titanDefId, { 
+                    playerId: payload.playerId,
+                    amount: payload.amount 
+                });
+                if (baseLabel) {
+                    segments.push(i18nSeg('actionLog.onBase', { base: baseLabel }, ['base']));
+                }
+                pushEntry(event.type, segments, payload.playerId, entryTimestamp, index);
+                break;
+            }
             default:
                 break;
         }

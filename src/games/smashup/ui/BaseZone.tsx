@@ -8,10 +8,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Paperclip } from 'lucide-react';
 import type { SmashUpCore, BaseInPlay, MinionOnBase } from '../domain/types';
 import { SU_COMMANDS } from '../domain/types';
-import { getTotalEffectivePowerOnBase, getEffectivePower, getEffectivePowerBreakdown, getEffectiveBreakpoint, getOngoingCardPowerContribution, getBasePowerModifiers } from '../domain/ongoingModifiers';
+import { getTotalEffectivePowerOnBase, getPlayerEffectivePowerOnBase, getEffectivePower, getEffectivePowerBreakdown, getEffectiveBreakpoint, getOngoingCardPowerContribution, getBasePowerModifiers } from '../domain/ongoingModifiers';
 import { getBaseDef, getMinionDef, getCardDef, resolveCardName, resolveCardText } from '../data/cards';
 import { isSpecialLimitBlocked } from '../domain/abilityHelpers';
 import { getScoringEligibleBaseIndices } from '../domain/ongoingModifiers';
+import { ENABLE_TITANS } from '../domain/config';
 import { getBaseRestrictions } from '../domain/ongoingEffects';
 import { matchesDefId } from '../domain/utils';
 import { getFactionMeta } from './factionMeta';
@@ -19,6 +20,7 @@ import { CardPreview } from '../../../components/common/media/CardPreview';
 import { PLAYER_CONFIG } from './playerConfig';
 import { UI_Z_INDEX } from '../../../core';
 import { getLayoutConfig } from './layoutConfig';
+import { TitanCard } from './TitanCard';
 
 // ============================================================================
 // Base Zone: The "Battlefield"
@@ -43,24 +45,34 @@ export const BaseZone: React.FC<{
     selectableOngoingUids?: Set<string>;
     isMyTurn: boolean;
     myPlayerId: string | null;
+    /** 选中的准备移动的泰坦 UID */
+    movingTitanUid?: string | null;
+    /** 交互驱动的卡牌/泰坦选择：只有这些 UID 的卡牌可被选中 */
+    selectableCardUids?: Set<string>;
+    /** 是否处于卡牌选择状态 */
+    isCardSelectPrompt?: boolean;
+    /** 内部使用的泰坦选中判断（兼容 Board.tsx 传参） */
+    isSelectedTitanCardPrompt?: boolean;
     dispatch: (type: string, payload?: unknown) => void;
     onClick: () => void;
     onMinionSelect?: (minionUid: string, baseIndex: number) => void;
     onOngoingSelect?: (ongoingUid: string) => void;
+    onTitanInPlayClick?: (titanUid: string) => void;
     onViewMinion: (defId: string) => void;
     onViewAction: (defId: string) => void;
     onViewBase: (defId: string) => void;
+    onViewTitan?: (defId: string) => void;
     tokenRef?: (el: HTMLDivElement | null) => void;
     isTutorialTargetAllowed?: (targetId: string) => boolean;
     /** 当前游戏阶段（用于限制 scoreBases 阶段的 special 高亮范围） */
     phase?: string;
-}> = ({ base, baseIndex, core, turnOrder, isDeployMode, isMinionSelectMode, selectableMinionUids, multiSelectedMinionUids, isSelectable, isDimmed, selectableOngoingUids, isMyTurn, myPlayerId, dispatch, onClick, onMinionSelect, onOngoingSelect, onViewMinion, onViewAction, onViewBase, tokenRef, isTutorialTargetAllowed, phase }) => {
+}> = ({ base, baseIndex, core, turnOrder, isDeployMode, isMinionSelectMode, selectableMinionUids, multiSelectedMinionUids, isSelectable, isDimmed, selectableOngoingUids, isMyTurn, myPlayerId, movingTitanUid, selectableCardUids, isCardSelectPrompt, isSelectedTitanCardPrompt, dispatch, onClick, onMinionSelect, onOngoingSelect, onTitanInPlayClick, onViewMinion, onViewAction, onViewBase, onViewTitan, tokenRef, isTutorialTargetAllowed, phase }) => {
     const { t } = useTranslation('game-smashup');
-    
+
     // 响应式布局配置
     const playerCount = turnOrder.length;
     const layout = getLayoutConfig(playerCount);
-    
+
     const baseDef = getBaseDef(base.defId);
     const baseName = resolveCardName(baseDef, t) || base.defId;
     const baseText = resolveCardText(baseDef, t);
@@ -80,6 +92,15 @@ export const BaseZone: React.FC<{
         minionsByController[m.controller].push(m);
     });
 
+    // 查找该基地上的泰坦
+    const titansOnBase = turnOrder.map(pid => {
+        const player = core.players[pid];
+        if (player?.activeTitan && player.activeTitan.baseIndex === baseIndex) {
+            return { playerId: pid, titan: player.activeTitan };
+        }
+        return null;
+    }).filter(Boolean) as { playerId: string; titan: NonNullable<typeof core.players[string]['activeTitan']> }[];
+
 
     return (
         <div 
@@ -89,7 +110,7 @@ export const BaseZone: React.FC<{
 
             {/* --- ONGOING EFFECTS (above base card, absolute positioned) --- */}
             {base.ongoingActions && base.ongoingActions.length > 0 && (
-                <div 
+                <div
                     className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[0.4vw] z-30"
                     style={{ top: `-${layout.ongoingTopOffset}vw` }}
                 >
@@ -100,7 +121,7 @@ export const BaseZone: React.FC<{
                         const actionTitle = actionText ? `${actionName}\n${actionText}` : actionName;
                         const pConf = PLAYER_CONFIG[parseInt(oa.ownerId) % PLAYER_CONFIG.length];
                         // ongoing 行动卡天赋判定
-                        const hasOngoingTalent = actionDef?.abilityTags?.includes('talent') ?? false;
+                        const hasOngoingTalent = actionDef && 'abilityTags' in actionDef ? actionDef.abilityTags?.includes('talent') : false;
                         const canUseOngoingTalent = hasOngoingTalent && !oa.talentUsed && isMyTurn && oa.ownerId === myPlayerId;
                         // 交互驱动的行动卡选择
                         const isSelectableOngoing = !!selectableOngoingUids?.has(oa.uid);
@@ -124,15 +145,15 @@ export const BaseZone: React.FC<{
                                     border-[0.12vw] ${isDimmedOngoing
                                         ? 'opacity-40 grayscale cursor-not-allowed'
                                         : isSelectableOngoing
-                                        ? 'border-purple-400 ring-2 ring-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.6)]'
-                                        : canUseOngoingTalent ? 'border-amber-400 ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : `${pConf.border} ${pConf.shadow}`}`}
+                                            ? 'border-purple-400 ring-2 ring-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.6)]'
+                                            : canUseOngoingTalent ? 'border-amber-400 ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : `${pConf.border} ${pConf.shadow}`}`}
                                 style={{ width: `${layout.ongoingCardWidth}vw` }}
                                 initial={{ y: 20, opacity: 0, scale: 0.6 }}
                                 animate={isSelectableOngoing
                                     ? { y: 0, opacity: 1, scale: 1, rotate: [-1, 1, -1], transition: { rotate: { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } } }
                                     : canUseOngoingTalent
-                                    ? { y: 0, opacity: 1, scale: 1, rotate: [-1, 1, -1], transition: { rotate: { repeat: Infinity, duration: 1.5, ease: 'easeInOut' } } }
-                                    : { y: 0, opacity: 1, scale: 1 }}
+                                        ? { y: 0, opacity: 1, scale: 1, rotate: [-1, 1, -1], transition: { rotate: { repeat: Infinity, duration: 1.5, ease: 'easeInOut' } } }
+                                        : { y: 0, opacity: 1, scale: 1 }}
                                 transition={{ type: 'spring', stiffness: 350, damping: 20, delay: idx * 0.06 }}
                             >
                                 <div className="w-full h-full overflow-hidden rounded-[0.1vw]">
@@ -174,6 +195,55 @@ export const BaseZone: React.FC<{
                 </div>
             )}
 
+            {/* --- TITANS (above base card, below ongoing actions) --- */}
+            {ENABLE_TITANS && titansOnBase.length > 0 && (
+                <div
+                    className="absolute left-1/2 -translate-x-1/2 flex items-center gap-[0.8vw] z-25"
+                    style={{ top: `-${layout.ongoingTopOffset + 6}vw` }}
+                >
+                    {titansOnBase.map(({ playerId, titan }) => {
+                        // 获取泰坦的 defId
+                        const player = core.players[playerId];
+                        const titanCard = player?.titanZone?.find(c => c.uid === titan.titanUid) ||
+                            (player?.activeTitan?.titanUid === titan.titanUid ?
+                                { uid: titan.titanUid, defId: player.activeTitan.defId, type: 'titan' as const, factionId: '' } : null);
+                        let titanDefId = titanCard?.defId;
+                        if (!titanDefId) {
+                            for (const pid of Object.keys(core.players)) {
+                                const p = core.players[pid];
+                                if (p.activeTitan?.titanUid === titan.titanUid) {
+                                    titanDefId = p.activeTitan.defId;
+                                    break;
+                                }
+                            }
+                        }
+
+                        return (
+                            <TitanCard
+                                key={titan.titanUid}
+                                titan={titan}
+                                ownerId={playerId}
+                                currentPlayerId={myPlayerId || '0'}
+                                core={core}
+                                clickable={isMyTurn && myPlayerId === playerId}
+                                isSelected={movingTitanUid === titan.titanUid}
+                                widthVw={layout.titanCardWidth}
+                                onClick={() => {
+                                    if (onTitanInPlayClick) {
+                                        onTitanInPlayClick(titan.titanUid);
+                                    }
+                                }}
+                                onMagnify={() => {
+                                    if (onViewTitan && titanDefId) {
+                                        onViewTitan(titanDefId);
+                                    }
+                                }}
+                            />
+                        );
+                    })}
+                </div>
+            )}
+
             {/* --- BASE CARD --- */}
             <div
                 onClick={onClick}
@@ -184,10 +254,10 @@ export const BaseZone: React.FC<{
                     ${isDimmed
                         ? 'opacity-40 grayscale cursor-not-allowed rotate-1'
                         : isSelectable
-                        ? 'cursor-pointer rotate-0 scale-105 shadow-[0_0_2.5vw_rgba(251,191,36,0.6)] ring-4 ring-amber-400'
-                        : isDeployMode && !isMinionSelectMode
-                        ? 'cursor-pointer rotate-0 scale-105 shadow-[0_0_2vw_rgba(255,255,255,0.4)] ring-4 ring-green-400'
-                        : 'rotate-1 hover:rotate-0 hover:shadow-xl cursor-zoom-in'}
+                            ? 'cursor-pointer rotate-0 scale-105 shadow-[0_0_2.5vw_rgba(251,191,36,0.6)] ring-4 ring-amber-400'
+                            : isDeployMode && !isMinionSelectMode
+                                ? 'cursor-pointer rotate-0 scale-105 shadow-[0_0_2vw_rgba(255,255,255,0.4)] ring-4 ring-green-400'
+                                : 'rotate-1 hover:rotate-0 hover:shadow-xl cursor-zoom-in'}
                 `}
                 style={{
                     width: `${layout.baseCardWidth}vw`,
@@ -204,22 +274,32 @@ export const BaseZone: React.FC<{
                         exit={{ opacity: 0, scale: 0.85 }}
                         transition={{ duration: 0.4, ease: 'easeInOut' }}
                     >
-                    <CardPreview
-                        previewRef={{ type: 'renderer', rendererId: 'smashup-card-renderer', payload: { defId: base.defId } }}
-                        className="w-full h-full"
-                        title={baseName}
-                    />
+                        <CardPreview
+                            previewRef={{ type: 'renderer', rendererId: 'smashup-card-renderer', payload: { defId: base.defId } }}
+                            className="w-full h-full"
+                            title={baseName}
+                        />
                     </motion.div>
                 </AnimatePresence>
 
-                {/* 基地可选时的脉冲发光叠层 */}
+                {/* 基地可选时的脉冲发光叠层 (Premium Glow) */}
                 {isSelectable && (
-                    <motion.div
-                        className="absolute inset-0 pointer-events-none z-25 rounded-sm"
-                        animate={{ opacity: [0.1, 0.3, 0.1] }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                        style={{ background: 'radial-gradient(circle, rgba(251,191,36,0.4) 0%, transparent 70%)' }}
-                    />
+                    <>
+                        <motion.div
+                            className="absolute inset-0 pointer-events-none z-20 rounded-sm border-4 border-amber-400/50 shadow-[0_0_30px_rgba(251,191,36,0.4)]"
+                            animate={{ opacity: [0.4, 0.8, 0.4] }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                        <motion.div
+                            className="absolute inset-0 pointer-events-none z-25 rounded-sm"
+                            animate={{ opacity: [0.2, 0.5, 0.2], scale: [1, 1.05, 1] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                            style={{
+                                background: 'radial-gradient(circle, rgba(251,191,36,0.3) 0%, transparent 70%)',
+                                mixBlendMode: 'screen'
+                            }}
+                        />
+                    </>
                 )}
 
                 {/* 放大镜按钮 - hover 时显示，部署模式下也能预览基地 */}
@@ -299,26 +379,23 @@ export const BaseZone: React.FC<{
             </div>
 
             {/* --- PLAYER COLUMNS CONTAINER --- */}
-            <div 
+            <div
                 className="flex items-start justify-center w-full pt-[0.5vw]"
                 style={{ gap: `${layout.playerColumnGap}vw` }}
             >
                 {turnOrder.map(pid => {
                     const minions = minionsByController[pid] || [];
 
-                    // Calc Power（使用 getEffectivePower 包含 ongoing 修正和临时修正 + ongoing 卡力量贡献 + 基地级力量修正）
-                    const minionTotal = minions.reduce((sum, m) => sum + getEffectivePower(core, m, baseIndex), 0);
-                    const ongoingBonus = getOngoingCardPowerContribution(base, pid);
-                    const basePowerBonus = getBasePowerModifiers(core, baseIndex, pid);
-                    const total = minionTotal + ongoingBonus + basePowerBonus;
+                    // Calc Power（统一使用 getPlayerEffectivePowerOnBase 以包含所有力量源：随从、持续行动、基地光环、泰坦等）
+                    const total = getPlayerEffectivePowerOnBase(core, base, baseIndex, pid);
                     const basePowerTotal = minions.reduce((sum, m) => sum + m.basePower, 0);
                     const modifierDelta = total - basePowerTotal;
 
                     const pConf = PLAYER_CONFIG[parseInt(pid) % PLAYER_CONFIG.length];
 
                     return (
-                        <div 
-                            key={pid} 
+                        <div
+                            key={pid}
                             className="flex flex-col items-center relative"
                             style={{ minWidth: `${layout.minionCardWidth}vw` }}
                         >
@@ -355,7 +432,7 @@ export const BaseZone: React.FC<{
                                 </div>
                             ) : (
                                 /* Empty Placeholder for Layout Stability */
-                                <div 
+                                <div
                                     className={`h-[2vw] rounded-sm border md-2 border-dashed border-slate-300/30 ${isDeployMode && isMyTurn ? 'animate-pulse bg-white/5' : ''}`}
                                     style={{ width: `${layout.minionCardWidth}vw` }}
                                 >
@@ -517,20 +594,20 @@ const MinionCard: React.FC<{
                 ${isDimmed
                     ? 'opacity-40 grayscale cursor-not-allowed'
                     : isMultiSelected
-                    ? 'cursor-pointer border-green-400 ring-2 ring-green-400 shadow-[0_0_15px_rgba(74,222,128,0.6),0_0_30px_rgba(74,222,128,0.3)]'
-                    : isSelectableMinion
-                    ? 'cursor-pointer border-purple-400 ring-2 ring-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.6),0_0_30px_rgba(168,85,247,0.3)]'
-                    : canActivate
-                    ? 'cursor-pointer border-amber-400 ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6),0_0_30px_rgba(251,191,36,0.3)]'
-                    : `cursor-zoom-in ${conf.border} ${conf.shadow}`}
+                        ? 'cursor-pointer border-green-400 ring-2 ring-green-400 shadow-[0_0_15px_rgba(74,222,128,0.6),0_0_30px_rgba(74,222,128,0.3)]'
+                        : isSelectableMinion
+                            ? 'cursor-pointer border-purple-400 ring-2 ring-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.6),0_0_30px_rgba(168,85,247,0.3)]'
+                            : canActivate
+                                ? 'cursor-pointer border-amber-400 ring-2 ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6),0_0_30px_rgba(251,191,36,0.3)]'
+                                : `cursor-zoom-in ${conf.border} ${conf.shadow}`}
             `}
             style={style}
             initial={{ scale: 0.3, y: -60, opacity: 0, rotate: -15 }}
             animate={isSelectableMinion
                 ? { scale: 1, y: 0, opacity: 1, rotate: [rotation - 1, rotation + 1, rotation - 1], transition: { rotate: { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } } }
                 : canActivate
-                ? { scale: 1, y: 0, opacity: 1, rotate: [rotation - 2, rotation + 2, rotation - 2], transition: { rotate: { repeat: Infinity, duration: 1.5, ease: 'easeInOut' } } }
-                : { scale: 1, y: 0, opacity: 1, rotate: rotation }
+                    ? { scale: 1, y: 0, opacity: 1, rotate: [rotation - 2, rotation + 2, rotation - 2], transition: { rotate: { repeat: Infinity, duration: 1.5, ease: 'easeInOut' } } }
+                    : { scale: 1, y: 0, opacity: 1, rotate: rotation }
             }
             transition={{ type: 'spring', stiffness: 350, damping: 20, delay: index * 0.05 }}
         >
@@ -576,11 +653,10 @@ const MinionCard: React.FC<{
             {/* 力量增幅徽章 - 增益绿色/减益红色（左上角），仅有变化时显示 */}
             {(effectivePower !== minion.basePower) && (
                 <div
-                    className={`absolute -top-[0.4vw] -left-[0.4vw] min-w-[1.2vw] h-[1.2vw] rounded-full flex items-center justify-center text-[0.7vw] font-black text-white shadow-sm border border-white px-[0.15vw] z-30 ${
-                        effectivePower > minion.basePower ? 'bg-green-600' :
+                    className={`absolute -top-[0.4vw] -left-[0.4vw] min-w-[1.2vw] h-[1.2vw] rounded-full flex items-center justify-center text-[0.7vw] font-black text-white shadow-sm border border-white px-[0.15vw] z-30 ${effectivePower > minion.basePower ? 'bg-green-600' :
                         effectivePower < minion.basePower ? 'bg-red-600' :
-                        'bg-slate-700'
-                    }`}
+                            'bg-slate-700'
+                        }`}
                     title={(() => {
                         const bd = getEffectivePowerBreakdown(core, minion, baseIndex);
                         const parts = [`基础: ${bd.basePower}`];
@@ -603,9 +679,8 @@ const MinionCard: React.FC<{
             {/* +1力量指示物徽章（左侧，力量增幅下方） */}
             {(minion.powerCounters ?? 0) > 0 && (
                 <motion.div
-                    className={`absolute -left-[0.4vw] min-w-[1.2vw] h-[1.2vw] rounded-full flex items-center justify-center text-[0.55vw] font-black text-amber-900 bg-gradient-to-br from-amber-300 to-amber-500 shadow-md border-[0.1vw] border-white px-[0.1vw] z-30 ${
-                        (effectivePower !== minion.basePower) ? 'top-[1vw]' : '-top-[0.4vw]'
-                    }`}
+                    className={`absolute -left-[0.4vw] min-w-[1.2vw] h-[1.2vw] rounded-full flex items-center justify-center text-[0.55vw] font-black text-amber-900 bg-gradient-to-br from-amber-300 to-amber-500 shadow-md border-[0.1vw] border-white px-[0.1vw] z-30 ${(effectivePower !== minion.basePower) ? 'top-[1vw]' : '-top-[0.4vw]'
+                        }`}
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 15 }}
@@ -653,7 +728,7 @@ const MinionCard: React.FC<{
                             const actionTitle = actionText ? `${actionName}\n${actionText}` : actionName;
                             const isSelectableAA = !!selectableOngoingUids?.has(aa.uid);
                             const isDimmedAA = !!selectableOngoingUids && !selectableOngoingUids.has(aa.uid);
-                            const hasAATalent = actionDef?.abilityTags?.includes('talent') ?? false;
+                            const hasAATalent = actionDef && 'abilityTags' in actionDef ? actionDef.abilityTags?.includes('talent') : false;
                             const canUseAATalent = hasAATalent && !aa.talentUsed && isMyTurn && aa.ownerId === myPlayerId;
                             return (
                                 <motion.div
@@ -673,10 +748,10 @@ const MinionCard: React.FC<{
                                         border-[0.08vw] ${isDimmedAA
                                             ? 'opacity-40 grayscale cursor-not-allowed border-slate-400'
                                             : isSelectableAA
-                                            ? 'border-purple-400 ring-2 ring-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.6)]'
-                                            : canUseAATalent
-                                            ? 'border-amber-400 ring-2 ring-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]'
-                                            : 'border-purple-400 ring-1 ring-purple-300/50'
+                                                ? 'border-purple-400 ring-2 ring-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.6)]'
+                                                : canUseAATalent
+                                                    ? 'border-amber-400 ring-2 ring-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.6)]'
+                                                    : 'border-purple-400 ring-1 ring-purple-300/50'
                                         }`}
                                     title={actionTitle}
                                 >

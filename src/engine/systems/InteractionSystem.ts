@@ -244,8 +244,8 @@ export interface SimpleChoiceConfig {
     sourceId?: string;
     timeout?: number;
     multi?: PromptMultiConfig;
-    /** 选择目标类型，决定 UI 渲染方式（'base' | 'minion' | 'hand' | 'ongoing' | 'player' | 'button' | 'discard_minion' | 'generic'） */
-    targetType?: SimpleChoiceTargetType;
+    /** 选择目标类型，决定 UI 渲染方式（'base' | 'minion' | 'hand' | 'ongoing' | 'card' | 'generic'） */
+    targetType?: 'base' | 'minion' | 'hand' | 'ongoing' | 'card' | 'generic';
     /** 单候选时是否自动解决，默认 true（强制效果自动跳过） */
     autoResolveIfSingle?: boolean;
     /**
@@ -954,5 +954,5 @@ function handleInteractionCancel<TCore>(
         timestamp,
     };
 
-    return { halt: false, state: newState, events: [event] };
+    return { halt: true, state: newState, events: [event] };
 }

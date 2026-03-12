@@ -19,9 +19,11 @@ import { SU_COMMANDS, HAND_LIMIT, getCurrentPlayerId } from './domain/types';
 import { FLOW_COMMANDS } from '../../engine/systems/FlowSystem';
 import { asSimpleChoice, INTERACTION_COMMANDS } from '../../engine/systems/InteractionSystem';
 import { getCardDef, getBaseDef, getMinionDef, resolveCardName, resolveCardText } from './data/cards';
+import { getTitanDef } from './data/titans';
 import { getPlayerEffectivePowerOnBase, getScoringEligibleBaseIndices } from './domain/ongoingModifiers';
 import { isOperationRestricted } from './domain/ongoingEffects';
 import { isSpecialLimitBlocked } from './domain/abilityHelpers';
+import { ENABLE_TITANS } from './domain/config';
 import { useGameAudio, playDeniedSound, playSound } from '../../lib/audio/useGameAudio';
 import { CardPreview } from '../../components/common/media/CardPreview';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -41,6 +43,7 @@ import { PromptOverlay, resolveI18nKeys } from './ui/PromptOverlay';
 import { getFactionMeta } from './ui/factionMeta';
 import { PLAYER_CONFIG } from './ui/playerConfig';
 import { BaseZone } from './ui/BaseZone';
+import { TitanZone } from './ui/TitanZone';
 import { MeFirstOverlay, type MeFirstPendingCard } from './ui/MeFirstOverlay';
 import { CardMagnifyOverlay, type CardMagnifyTarget } from './ui/CardMagnifyOverlay';
 import { GameButton as SmashUpGameButton } from './ui/GameButton';
@@ -1139,6 +1142,36 @@ const SmashUpBoardInner: React.FC<Props> = ({ G, dispatch, playerID: rawPlayerID
         }
     }, [isOngoingSelectPrompt, selectableOngoingUids, currentPrompt, dispatch]);
 
+    /** 泰坦卡点击回调：激活泰坦 Special 以出场 */
+    const handleTitanZoneClick = useCallback((titanUid: string) => {
+        if (!isMyTurn || phase !== 'playCards') {
+            toast(t('ui.not_your_turn', { defaultValue: '不是你的回合' }));
+            return;
+        }
+        // 发送 ACTIVATE_SPECIAL，如果满足条件将生成交互
+        dispatch(SU_COMMANDS.ACTIVATE_SPECIAL, { titanUid });
+    }, [isMyTurn, phase, dispatch, t]);
+
+    /** 场上泰坦点击回调 */
+    const handleTitanInPlaySelect = useCallback((titanUid: string) => {
+
+        const myTitan = myPlayer?.activeTitan;
+        if (isMyTurn && myTitan && myTitan.titanUid === titanUid) {
+            const titanDef = getTitanDef(myTitan.defId);
+            const hasTalent = titanDef?.abilities?.some(a => a.endsWith('_talent'));
+            if (hasTalent && !myTitan.talentUsed) {
+                dispatch(SU_COMMANDS.USE_TALENT, { titanUid });
+                return;
+            }
+
+            const hasSpecial = titanDef?.abilities?.some(a => a.includes('_special'));
+            if (hasSpecial) {
+                dispatch(SU_COMMANDS.ACTIVATE_SPECIAL, { titanUid });
+                return;
+            }
+        }
+    }, [dispatch, isMyTurn, myPlayer]);
+
     const handleViewCardDetail = useCallback((card: CardInstance) => {
         setViewingCard({ defId: card.defId, type: card.type === 'minion' ? 'minion' : 'action' });
     }, []);
@@ -1323,6 +1356,20 @@ const SmashUpBoardInner: React.FC<Props> = ({ G, dispatch, playerID: rawPlayerID
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                {/* 泰坦区域（右上角，不遮挡手牌） */}
+                {ENABLE_TITANS && myPlayer && myPlayer.titanZone && myPlayer.titanZone.length > 0 && (
+                    <div className="absolute top-[180px] right-4 z-40 pointer-events-auto max-w-[400px]">
+                        <TitanZone
+                            titanZone={myPlayer.titanZone}
+                            isCurrentPlayer={isMyTurn}
+                            onTitanClick={handleTitanZoneClick}
+                            isSelectHighlighted={() => false}
+                            onMagnify={(defId) => setViewingCard({ defId, type: 'titan' })}
+                        />
+                    </div>
+                )}
+
                 <div className="fixed right-[8vw] bottom-[28vh] z-50 flex pointer-events-none w-24 h-24" data-tutorial-id="su-end-turn-btn">
                     <AnimatePresence>
                         {isMyTurn && (phase === 'playCards' || (phase === 'scoreBases' && !G.sys.responseWindow?.current && !G.sys.interaction?.current)) && (
@@ -1701,6 +1748,8 @@ const SmashUpBoardInner: React.FC<Props> = ({ G, dispatch, playerID: rawPlayerID
                                 onViewMinion={(defId) => setViewingCard({ defId, type: 'minion' })}
                                 onViewAction={handleViewAction}
                                 onViewBase={(defId) => setViewingCard({ defId, type: 'base' })}
+                                onTitanInPlayClick={handleTitanInPlaySelect}
+                                onViewTitan={(defId) => setViewingCard({ defId, type: 'titan' })}
                                 isTutorialTargetAllowed={isTutorialTargetAllowed}
                                 phase={phase as string}
                                 tokenRef={(el) => {

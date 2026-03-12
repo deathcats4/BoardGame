@@ -121,6 +121,8 @@ addToWhitelist('vampire_summon_wolves', 'powerModifier'); // 通过 onTurnStart 
 // ── 持续效果中的力量修正通过 trigger+counter 实现而非静态 powerModifier ──
 addToWhitelist('giant_ant_the_show_must_go_on', 'powerModifier'); // 保护有指示物的随从，非静态 powerModifier
 addToWhitelist('giant_ant_the_show_must_go_on', 'ongoingProtection'); // 保护效果通过 trigger 实现
+addToWhitelist('giant_ant_the_show_must_go_on_pod', 'powerModifier'); // POD 复用基础版
+addToWhitelist('giant_ant_the_show_must_go_on_pod', 'ongoingProtection'); // POD 复用基础版
 addToWhitelist('giant_ant_we_will_rock_you', 'powerModifier'); // 基于力量指示物数量的临时+力量，通过 addTempPower 事件实现
 
 // ── ongoingTrigger_minionDestroyed 误报：描述中"被消灭后"指自身被消灭（onDestroy），非其他随从 ──

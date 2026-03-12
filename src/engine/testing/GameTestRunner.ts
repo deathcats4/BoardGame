@@ -108,7 +108,7 @@ export class GameTestRunner<
             return { sys, core };
         });
         const initialState = init(playerIds, random);
-        
+
         // 确保 sys 对象包含所有必需的系统状态
         if (!initialState.sys.undo) {
             initialState.sys.undo = {
@@ -121,7 +121,7 @@ export class GameTestRunner<
                 queue: [],
             };
         }
-        
+
         this.currentState = initialState;
     }
 
@@ -144,7 +144,7 @@ export class GameTestRunner<
             });
 
         let state = init(playerIds, random);
-        
+
         // 确保 sys 对象包含所有必需的系统状态
         if (!state.sys.undo) {
             state.sys.undo = {
@@ -184,6 +184,8 @@ export class GameTestRunner<
                 random,
                 playerIds
             );
+
+            console.log(`[GameTestRunner] Step ${stepNum} result: success=${result.success}, events=${result.events.length}, error=${result.error}`);
 
             const stepLog: StepLog = {
                 step: stepNum,
@@ -317,7 +319,7 @@ export class GameTestRunner<
      * 分发命令（测试辅助方法）
      * 基于当前状态执行命令并更新状态
      */
-    dispatch(commandType: string, payload: { playerId: string; [key: string]: unknown }): {
+    dispatch(commandType: string, payload: { playerId: string;[key: string]: unknown }): {
         success: boolean;
         error?: string;
         events: Array<{ type: string; payload: unknown; timestamp: number }>;
@@ -366,7 +368,7 @@ export class GameTestRunner<
     /**
      * 执行命令（别名，向后兼容）
      */
-    executeCommand(commandType: string, payload: { playerId: string; [key: string]: unknown }): {
+    executeCommand(commandType: string, payload: { playerId: string;[key: string]: unknown }): {
         success: boolean;
         error?: string;
         events: Array<{ type: string; payload: unknown; timestamp: number }>;

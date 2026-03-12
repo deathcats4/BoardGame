@@ -105,7 +105,12 @@
     "waiting_opponent": "Waiting for opponent",
     "power_counter": "Power Counter",
     "skip": "Skip",
-    "wait_for_your_turn": "Wait for your response turn"
+    "wait_for_your_turn": "Wait for your response turn",
+    "titan_zone": "Titan Zone",
+    "titan_zone_desc": "Powerful reinforcements waiting to be played",
+    "yourTitan": "Your Titan",
+    "opponentTitan": "Opponent Titan",
+    "powerTokens": "Power Tokens"
   },
   "feedback": {
     "deck_search_no_match": "No matching card found in deck. Deck reshuffled.",
@@ -1584,7 +1589,7 @@
     },
     "bear_cavalry_polar_commando_pod": {
       "name": "Polar Commando",
-      "abilityText": "Ongoing: If this is your only minion on this base, it has +2 power and cannot be destroyed."
+      "abilityText": "Talent: Place a +1 power counter on this minion or a minion with less power than this minion."
     },
     "bear_cavalry_bear_cavalry_pod": {
       "name": "Bear Cavalry",
@@ -2475,6 +2480,54 @@
     },
     "pirate_cut_lass": {
       "name": "Cut Lass"
+    },
+    "titan_the_kraken_special": {
+      "name": "Special 1",
+      "abilityText": "After a base scores where you had a minion while this card is not in play, you may play this titan on the base that replaces it."
+    },
+    "titan_the_kraken_talent": {
+      "name": "Talent",
+      "abilityText": "Move this titan to another base. Other players' minions there get -1 power until the start of your next turn."
+    },
+    "titan_the_kraken_ongoing": {
+      "name": "Special 2",
+      "abilityText": "After this base scores, move one of your minions from here to another base."
+    },
+    "titan_arcane_protector_special": {
+      "name": "Special",
+      "abilityText": "After you play your fifth or higher card in a turn, you may play this titan."
+    },
+    "titan_arcane_protector_ongoing": {
+      "name": "Ongoing",
+      "abilityText": "You have +1 power here for every two cards in your hand."
+    },
+    "titan_arcane_protector_talent": {
+      "name": "Talent",
+      "abilityText": "Draw a card."
+    },
+    "titan_invisible_ninja_special1": {
+      "name": "Special 1",
+      "abilityText": "On your turn, if this titan was not in play at the start of your turn, you may discard a card to play this titan at a base where you have a minion."
+    },
+    "titan_invisible_ninja_ongoing": {
+      "name": "Ongoing",
+      "abilityText": "Once per turn, after you destroy another player's card or return one of your minions to your hand, you may look at the top two cards of your deck, draw one, and shuffle the other into your deck."
+    },
+    "titan_invisible_ninja_special2": {
+      "name": "Special 2",
+      "abilityText": "At the start of your turn, you may destroy this titan to play an extra minion of power 3 or less."
+    },
+    "titan_fort_titanosaurus_special": {
+      "name": "Special",
+      "abilityText": "On your turn, if you have not played a minion, you may destroy one of your minions to play this titan on its base. Place +1 power counters on it equal to the power of the destroyed minion."
+    },
+    "titan_fort_titanosaurus_ongoing": {
+      "name": "Ongoing",
+      "abilityText": "Once per turn, after you play an action that directly affects one or more minions, you may place a +1 power counter on one of those minions and/or on this titan."
+    },
+    "titan_fort_titanosaurus_talent": {
+      "name": "Talent",
+      "abilityText": "If this titan has four or more +1 power counters on it, draw a card."
     }
   },
   "endgame": {
@@ -2484,5 +2537,51 @@
     "gameOver": "Game Over",
     "scoreTrack": "Score Track",
     "madnessPenalty": "Madness ×{{count}} (-{{penalty}})"
+  },
+  "titans": {
+    "titan_fort_titanosaurus": {
+      "name": "Fort Titanosaurus"
+    },
+    "titan_arcane_protector": {
+      "name": "Arcane Protector"
+    },
+    "titan_the_kraken": {
+      "name": "The Kraken"
+    },
+    "titan_invisible_ninja": {
+      "name": "Invisible Ninja"
+    },
+    "titan_killer_kudzu": {
+      "name": "Killer Kudzu"
+    },
+    "titan_creampuff_man": {
+      "name": "Creampuff Man"
+    },
+    "titan_major_ursa": {
+      "name": "Major Ursa"
+    },
+    "titan_dagon": {
+      "name": "Dagon"
+    },
+    "titan_cthulhu": {
+      "name": "Cthulhu"
+    },
+    "titan_big_funny_giant": {
+      "name": "Big Funny Giant"
+    },
+    "titan_great_wolf_spirit": {
+      "name": "Great Wolf Spirit"
+    },
+    "titan_the_bride": {
+      "name": "The Bride"
+    },
+    "titan_ancient_lord": {
+      "name": "Ancient Lord"
+    },
+    "titan_death_on_six_legs": {
+      "name": "Death on Six Legs"
+    },
+    "titan_attacker": "Attacker",
+    "titan_defender": "Defender"
   }
 }

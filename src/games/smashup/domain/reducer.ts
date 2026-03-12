@@ -61,6 +61,92 @@ import type { AbilityContext } from './abilityRegistry';
 import { triggerBaseAbility, triggerExtendedBaseAbility } from './baseAbilities';
 import { fireTriggers, isMinionProtected, getConsumableProtectionSource } from './ongoingEffects';
 import { canPlayFromDiscard } from './discardPlayability';
+import { createTitanSystem } from './systems/TitanSystem';
+
+// ============================================================================
+// 泰坦辅助函数：模拟状态变更（用于冲突检测）
+// ============================================================================
+
+/**
+ * 模拟泰坦出场后的状态（用于冲突检测）
+ * @param core 当前游戏状态
+ * @param playerId 玩家 ID
+ * @param titanUid 泰坦卡 UID
+ * @param baseIndex 目标基地索引
+ * @returns 模拟后的新状态（结构共享）
+ */
+function applyTitanPlaced(
+    core: SmashUpCore,
+    playerId: PlayerId,
+    titanUid: string,
+    baseIndex: number
+): SmashUpCore {
+    const player = core.players[playerId];
+    const titanCard = player.titanZone.find(t => t.uid === titanUid);
+    if (!titanCard) return core;
+
+    // 从 titanZone 移除泰坦
+    const newTitanZone = player.titanZone.filter(t => t.uid !== titanUid);
+
+    // 创建 activeTitan
+    const newActiveTitan = {
+        titanUid,
+        defId: titanCard.defId,
+        baseIndex,
+        powerTokens: 0,
+    };
+
+    // 使用结构共享更新玩家状态
+    const newPlayer = {
+        ...player,
+        titanZone: newTitanZone,
+        activeTitan: newActiveTitan,
+    };
+
+    return {
+        ...core,
+        players: {
+            ...core.players,
+            [playerId]: newPlayer,
+        },
+    };
+}
+
+/**
+ * 模拟泰坦移动后的状态（用于冲突检测）
+ * @param core 当前游戏状态
+ * @param playerId 玩家 ID
+ * @param toBaseIndex 目标基地索引
+ * @returns 模拟后的新状态（结构共享）
+ */
+function applyTitanMoved(
+    core: SmashUpCore,
+    playerId: PlayerId,
+    toBaseIndex: number
+): SmashUpCore {
+    const player = core.players[playerId];
+    if (!player.activeTitan) return core;
+
+    // 更新 activeTitan 的 baseIndex
+    const newActiveTitan = {
+        ...player.activeTitan,
+        baseIndex: toBaseIndex,
+    };
+
+    // 使用结构共享更新玩家状态
+    const newPlayer = {
+        ...player,
+        activeTitan: newActiveTitan,
+    };
+
+    return {
+        ...core,
+        players: {
+            ...core.players,
+            [playerId]: newPlayer,
+        },
+    };
+}
 
 // ============================================================================
 // execute：命令 → 事件
@@ -197,6 +283,7 @@ function executeCommand(
                     playerId: command.playerId,
                     cardUid: card.uid,
                     defId: card.defId,
+                    targetMinionUid: command.payload.targetMinionUid,
                 },
                 sourceCommandType: command.type,
                 timestamp: now,
@@ -242,11 +329,11 @@ function executeCommand(
             } else {
                 // standard / special 行动卡：执行效果
                 const isSpecial = def?.subtype === 'special';
-                
+
                 if (isSpecial) {
                     // Special 技能：根据 specialTiming 决定执行时机
                     const specialTiming = def.specialTiming ?? 'beforeScoring'; // 默认 beforeScoring
-                    
+
                     if (specialTiming === 'beforeScoring') {
                         // beforeScoring：立即执行（当前行为）
                         const executor = resolveSpecial(card.defId) ?? resolveOnPlay(card.defId);
@@ -272,7 +359,7 @@ function executeCommand(
                         // afterScoring：检查是否在响应窗口中
                         const responseWindow = state.sys.responseWindow?.current;
                         const isInAfterScoringWindow = responseWindow?.windowType === 'afterScoring';
-                        
+
                         if (isInAfterScoringWindow) {
                             // 在 afterScoring 响应窗口中：立即执行
                             const executor = resolveSpecial(card.defId) ?? resolveOnPlay(card.defId);
@@ -472,9 +559,50 @@ function executeCommand(
         }
 
         case SU_COMMANDS.USE_TALENT: {
-            const { minionUid, ongoingCardUid, baseIndex } = command.payload;
-            const base = core.bases[baseIndex];
+            const { minionUid, ongoingCardUid, titanUid, baseIndex } = command.payload;
             const events: SmashUpEvent[] = [];
+
+            // 泰坦天赋
+            if (titanUid) {
+                const player = core.players[command.playerId];
+                const activeTitan = player?.activeTitan;
+                if (!activeTitan || activeTitan.titanUid !== titanUid) return { events: [] };
+
+                const talentEvt: TalentUsedEvent = {
+                    type: SU_EVENTS.TALENT_USED,
+                    payload: {
+                        playerId: command.playerId,
+                        titanUid,
+                        defId: activeTitan.defId,
+                        baseIndex: activeTitan.baseIndex,
+                    },
+                    sourceCommandType: command.type,
+                    timestamp: now,
+                };
+                events.push(talentEvt);
+
+                const executor = resolveTalent(activeTitan.defId);
+                if (executor) {
+                    const ctx: AbilityContext = {
+                        state: core,
+                        matchState: state,
+                        playerId: command.playerId,
+                        cardUid: titanUid,
+                        defId: activeTitan.defId,
+                        baseIndex: activeTitan.baseIndex,
+                        random,
+                        now,
+                    };
+                    const result = executor(ctx);
+                    events.push(...result.events);
+                    if (result.matchState) {
+                        return { events, updatedState: result.matchState };
+                    }
+                }
+                return { events };
+            }
+
+            const base = baseIndex !== undefined ? core.bases[baseIndex] : undefined;
 
             // ongoing 行动卡天赋（基地上或随从附着）
             if (ongoingCardUid) {
@@ -509,7 +637,7 @@ function executeCommand(
                         playerId: command.playerId,
                         cardUid: ongoingCardUid,
                         defId: ongoing.defId,
-                        baseIndex,
+                        baseIndex: baseIndex!,
                         random,
                         now,
                     };
@@ -524,7 +652,7 @@ function executeCommand(
 
             // 随从天赋
             const minion = base?.minions.find(m => m.uid === minionUid);
-            if (!minion) return { events: [] };
+            if (!minion || minion.metadata?.abilitiesSuppressed) return { events: [] };
 
             const talentEvt: TalentUsedEvent = {
                 type: SU_EVENTS.TALENT_USED,
@@ -548,7 +676,7 @@ function executeCommand(
                     playerId: command.playerId,
                     cardUid: minionUid!,
                     defId: minion.defId,
-                    baseIndex,
+                    baseIndex: baseIndex!,
                     random,
                     now,
                 };
@@ -563,7 +691,47 @@ function executeCommand(
         }
 
         case SU_COMMANDS.ACTIVATE_SPECIAL: {
-            const { minionUid: spUid, baseIndex: spIdx } = command.payload;
+            const { minionUid: spUid, baseIndex: spIdx, titanUid } = command.payload;
+
+            // 泰坦 Special
+            if (titanUid) {
+                const player = core.players[command.playerId];
+                let titanDefId: string | undefined;
+                let titanBaseIndex = -1;
+
+                if (player?.activeTitan?.titanUid === titanUid) {
+                    titanDefId = player.activeTitan.defId;
+                    titanBaseIndex = player.activeTitan.baseIndex;
+                } else {
+                    const titanInZone = player?.titanZone?.find(t => t.uid === titanUid);
+                    if (titanInZone) {
+                        titanDefId = titanInZone.defId;
+                    }
+                }
+
+                if (!titanDefId) return { events: [] };
+
+                const executor = resolveSpecial(titanDefId);
+                if (!executor) return { events: [] };
+
+                const ctx: AbilityContext = {
+                    state: core,
+                    matchState: state,
+                    playerId: command.playerId,
+                    cardUid: titanUid,
+                    defId: titanDefId,
+                    baseIndex: Math.max(0, titanBaseIndex), // type requires number
+                    random,
+                    now,
+                };
+                const result = executor(ctx);
+                if (result.matchState) {
+                    return { events: result.events, updatedState: result.matchState };
+                }
+                return { events: result.events };
+            }
+
+            if (spIdx === undefined || !spUid) return { events: [] };
             const spBase = core.bases[spIdx];
             const spMinion = spBase?.minions.find(m => m.uid === spUid);
             if (!spMinion) return { events: [] };
@@ -586,6 +754,133 @@ function executeCommand(
                 return { events: result.events, updatedState: result.matchState };
             }
             return { events: result.events };
+        }
+
+        // ============================================================================
+        // 泰坦命令执行
+        // ============================================================================
+
+        case SU_COMMANDS.PLACE_TITAN: {
+            const { titanUid, baseIndex } = command.payload;
+            const player = core.players[command.playerId];
+            const titanCard = player.titanZone.find(t => t.uid === titanUid);
+            if (!titanCard) return { events: [] };
+
+            const events: SmashUpEvent[] = [];
+
+            // 生成泰坦出场事件
+            events.push({
+                type: SU_EVENTS.TITAN_PLACED,
+                payload: {
+                    playerId: command.playerId,
+                    titanUid,
+                    titanDefId: titanCard.defId,
+                    baseIndex,
+                },
+                timestamp: now,
+            });
+
+            // 模拟出场后的状态，检查冲突
+            const simulatedCore = applyTitanPlaced(core, command.playerId, titanUid, baseIndex);
+            const titanSystem = createTitanSystem();
+            const clashEvent = titanSystem.checkClash(simulatedCore, baseIndex, now);
+
+            if (clashEvent) {
+                // 发生冲突：添加冲突事件和失败方移除事件
+                events.push(clashEvent);
+                const loserPlayerId = clashEvent.payload.loser;
+                const removeEvent = titanSystem.removeTitan(simulatedCore, loserPlayerId, 'clash', now);
+                if (removeEvent) {
+                    events.push(removeEvent);
+                }
+            }
+
+            return { events };
+        }
+
+        case SU_COMMANDS.MOVE_TITAN: {
+            const { titanUid, fromBaseIndex, toBaseIndex } = command.payload;
+            const player = core.players[command.playerId];
+            const titanCard = player.titanZone.find(t => t.uid === titanUid);
+            if (!titanCard) return { events: [] };
+
+            const events: SmashUpEvent[] = [];
+
+            // 生成泰坦移动事件
+            events.push({
+                type: SU_EVENTS.TITAN_MOVED,
+                payload: {
+                    playerId: command.playerId,
+                    titanUid,
+                    titanDefId: titanCard.defId,
+                    fromBaseIndex,
+                    toBaseIndex,
+                },
+                timestamp: now,
+            });
+
+            // 模拟移动后的状态，检查冲突
+            const simulatedCore = applyTitanMoved(core, command.playerId, toBaseIndex);
+            const titanSystem = createTitanSystem();
+            const clashEvent = titanSystem.checkClash(simulatedCore, toBaseIndex, now);
+
+            if (clashEvent) {
+                // 发生冲突：添加冲突事件和失败方移除事件
+                events.push(clashEvent);
+                const loserPlayerId = clashEvent.payload.loser;
+                const removeEvent = titanSystem.removeTitan(simulatedCore, loserPlayerId, 'clash', now);
+                if (removeEvent) {
+                    events.push(removeEvent);
+                }
+            }
+
+            return { events };
+        }
+
+        case SU_COMMANDS.ADD_TITAN_POWER_TOKEN: {
+            const { titanUid, amount } = command.payload;
+            const player = core.players[command.playerId];
+            if (!player.activeTitan || player.activeTitan.titanUid !== titanUid) {
+                return { events: [] };
+            }
+
+            const newTotal = player.activeTitan.powerTokens + amount;
+
+            return {
+                events: [{
+                    type: SU_EVENTS.TITAN_POWER_TOKEN_ADDED,
+                    payload: {
+                        playerId: command.playerId,
+                        titanUid,
+                        amount,
+                        newTotal,
+                    },
+                    timestamp: now,
+                }],
+            };
+        }
+
+        case SU_COMMANDS.REMOVE_TITAN_POWER_TOKEN: {
+            const { titanUid, amount } = command.payload;
+            const player = core.players[command.playerId];
+            if (!player.activeTitan || player.activeTitan.titanUid !== titanUid) {
+                return { events: [] };
+            }
+
+            const newTotal = player.activeTitan.powerTokens - amount;
+
+            return {
+                events: [{
+                    type: SU_EVENTS.TITAN_POWER_TOKEN_REMOVED,
+                    payload: {
+                        playerId: command.playerId,
+                        titanUid,
+                        amount,
+                        newTotal,
+                    },
+                    timestamp: now,
+                }],
+            };
         }
 
         default:

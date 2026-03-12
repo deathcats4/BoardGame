@@ -10,7 +10,7 @@
  * 通过 event.params 传入屏幕坐标或 DOM 位置信息。
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FxRegistry, type FxRendererProps, type FeedbackPack } from '../../../engine/fx';
 import { getCardDef, resolveCardName, resolveCardText } from '../data/cards';
@@ -33,6 +33,8 @@ export const SU_FX = {
   BASE_SCORED: 'fx.base-scored',
   /** 持续效果/触发器激活 */
   ABILITY_TRIGGERED: 'fx.ability-triggered',
+  /** 泰坦冲突 */
+  TITAN_CLASH: 'fx.titan-clash',
 } as const;
 
 // ============================================================================
@@ -249,11 +251,6 @@ const BaseScoredRenderer: React.FC<FxRendererProps> = ({ event, onComplete, onIm
 // 渲染器：持续效果/触发器激活
 // ============================================================================
 
-/**
- * params:
- * - sourceDefId: string — 触发源卡牌 defId
- * - position: { left: number; top: number } | undefined — 屏幕坐标（可选）
- */
 /** 持续效果/触发器激活渲染器（导出供特效预览使用） */
 export const AbilityTriggeredRenderer: React.FC<FxRendererProps> = ({ event, onComplete, onImpact }) => {
   const stableComplete = useStableComplete(onComplete);
@@ -267,7 +264,7 @@ export const AbilityTriggeredRenderer: React.FC<FxRendererProps> = ({ event, onC
       impactFired.current = true;
       onImpact();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onImpact]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!shouldRender) return;
@@ -344,6 +341,154 @@ export const AbilityTriggeredRenderer: React.FC<FxRendererProps> = ({ event, onC
 };
 
 // ============================================================================
+// 渲染器：泰坦冲突
+// ============================================================================
+
+const TitanClashRenderer: React.FC<FxRendererProps> = ({ event, onComplete, onImpact }) => {
+  const stableComplete = useStableComplete(onComplete);
+  const p = event.params as any;
+
+  const impactFired = useRef(false);
+  const [showImpact, setShowImpact] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!impactFired.current) {
+        impactFired.current = true;
+        onImpact();
+        setShowImpact(true);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [onImpact]);
+
+  useEffect(() => {
+    const timer = setTimeout(stableComplete, 3000);
+    return () => clearTimeout(timer);
+  }, [stableComplete]);
+
+  if (!p || !p.attacker || !p.defender) { stableComplete(); return null; }
+
+  const t = i18next.getFixedT(null, 'game-smashup');
+
+  const attackerDef = getCardDef(p.attacker.titanDefId);
+  const defenderDef = getCardDef(p.defender.titanDefId);
+  const loserId = p.loser;
+
+  return React.createElement(motion.div, {
+    className: 'fixed inset-0 flex items-center justify-center pointer-events-none overflow-hidden',
+    style: { zIndex: UI_Z_INDEX.overlayRaised },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+  },
+    // 背景变暗并背景模糊
+    React.createElement(motion.div, { className: 'absolute inset-0 bg-slate-950/60 backdrop-blur-sm' }),
+
+    // 震动容器 (Shake on impact)
+    React.createElement(motion.div, {
+      className: 'relative flex items-center justify-center w-full h-full',
+      animate: showImpact ? { x: [0, -10, 10, -5, 5, 0], y: [0, 5, -5, 2, -2, 0] } : {},
+      transition: { duration: 0.4 }
+    },
+      // "VS" 标志 (Stylized)
+      React.createElement(motion.div, {
+        className: 'absolute z-30 flex flex-col items-center',
+        initial: { scale: 3, opacity: 0, rotate: -20 },
+        animate: { scale: 1, opacity: 1, rotate: 0 },
+        transition: { type: 'spring', stiffness: 300, damping: 15, delay: 0.2 },
+      },
+        React.createElement('span', { className: 'text-[8vw] font-black text-white italic tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.8)] mix-blend-difference' }, "VS"),
+        React.createElement(motion.div, {
+          className: 'h-1 bg-gradient-to-r from-red-500 via-amber-400 to-blue-500 w-[15vw] rounded-full shadow-[0_0_15px_rgba(251,191,36,0.6)]',
+          initial: { width: 0 },
+          animate: { width: '15vw' },
+          transition: { delay: 0.4, duration: 0.5 }
+        })
+      ),
+
+      // 进攻方（左侧）
+      React.createElement(motion.div, {
+        className: 'relative flex flex-col items-center gap-6',
+        style: { marginRight: '18vw' },
+        initial: { x: -600, rotate: -30, opacity: 0 },
+        animate: { x: [-600, 120, 0], rotate: [-30, 10, 0], opacity: 1 },
+        transition: { duration: 0.7, times: [0, 0.8, 1], ease: 'circOut' },
+      },
+        React.createElement(motion.div, {
+          className: 'px-4 py-1.5 bg-gradient-to-r from-red-700 to-red-500 rounded-lg shadow-xl border border-red-400/50 flex items-center gap-2',
+          initial: { y: -20, opacity: 0 },
+          animate: { y: 0, opacity: 1 },
+          transition: { delay: 0.5 }
+        },
+          React.createElement('span', { className: 'w-2 h-2 rounded-full bg-white animate-pulse' }),
+          React.createElement('span', { className: 'text-white text-[1vw] font-black uppercase tracking-widest' }, t('titans.titan_attacker') || 'ATTACKER')
+        ),
+        React.createElement(motion.div, {
+          className: `relative w-[14vw] aspect-[0.714] bg-slate-900 rounded-2xl shadow-2xl border-4 ${loserId === p.attacker.playerId ? 'border-slate-600' : 'border-red-500'} overflow-hidden`,
+          animate: loserId === p.attacker.playerId
+            ? { scale: [1, 1.1, 0.85], opacity: [1, 1, 0], filter: ['grayscale(0)', 'grayscale(0.5)', 'grayscale(1)'], transition: { delay: 1.2, duration: 1.2 } }
+            : { boxShadow: [null, '0 0 50px rgba(239,68,68,0.6)', '0 0 20px rgba(239,68,68,0.3)'] }
+        },
+          React.createElement(CardPreview, {
+            previewRef: attackerDef?.previewRef,
+            className: 'w-full h-full object-cover',
+          }),
+          // Power Badge
+          React.createElement('div', { className: 'absolute inset-x-0 bottom-0 bg-gradient-to-t from-red-950/90 to-transparent p-3 text-center' },
+            React.createElement('span', { className: 'text-[3.5vw] font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' }, p.attacker.totalPower)
+          )
+        )
+      ),
+
+      // 防守方（右侧）
+      React.createElement(motion.div, {
+        className: 'relative flex flex-col items-center gap-6',
+        style: { marginLeft: '18vw' },
+        initial: { x: 600, rotate: 30, opacity: 0 },
+        animate: { x: [600, -120, 0], rotate: [-30, 0], opacity: 1 },
+        transition: { duration: 0.7, times: [0, 0.8, 1], ease: 'circOut' },
+      },
+        React.createElement(motion.div, {
+          className: 'px-4 py-1.5 bg-gradient-to-r from-blue-700 to-blue-500 rounded-lg shadow-xl border border-blue-400/50 flex items-center gap-2',
+          initial: { y: -20, opacity: 0 },
+          animate: { y: 0, opacity: 1 },
+          transition: { delay: 0.5 }
+        },
+          React.createElement('span', { className: 'w-2 h-2 rounded-full bg-white animate-pulse' }),
+          React.createElement('span', { className: 'text-white text-[1vw] font-black uppercase tracking-widest' }, t('titans.titan_defender') || 'DEFENDER')
+        ),
+        React.createElement(motion.div, {
+          className: `relative w-[14vw] aspect-[0.714] bg-slate-900 rounded-2xl shadow-2xl border-4 ${loserId === p.defender.playerId ? 'border-slate-600' : 'border-blue-500'} overflow-hidden`,
+          animate: loserId === p.defender.playerId
+            ? { scale: [1, 1.1, 0.85], opacity: [1, 1, 0], filter: ['grayscale(0)', 'grayscale(0.5)', 'grayscale(1)'], transition: { delay: 1.2, duration: 1.2 } }
+            : { boxShadow: [null, '0 0 50px rgba(59,130,246,0.6)', '0 0 20px rgba(59,130,246,0.3)'] }
+        },
+          React.createElement(CardPreview, {
+            previewRef: defenderDef?.previewRef,
+            className: 'w-full h-full object-cover',
+          }),
+          // Power Badge
+          React.createElement('div', { className: 'absolute inset-x-0 bottom-0 bg-gradient-to-t from-blue-950/90 to-transparent p-3 text-center' },
+            React.createElement('span', { className: 'text-[3.5vw] font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' }, p.defender.totalPower)
+          )
+        )
+      ),
+
+      // 碰撞中心火花/能量球
+      showImpact && React.createElement(motion.div, {
+        className: 'absolute z-40 w-[20vw] h-[20vw] rounded-full pointer-events-none',
+        style: { background: 'radial-gradient(circle, white 0%, rgba(251,191,36,0.6) 40%, transparent 70%)', filter: 'blur(20px)' },
+        initial: { scale: 0, opacity: 1 },
+        animate: { scale: 4, opacity: 0 },
+        transition: { duration: 0.6, ease: 'easeOut' }
+      })
+    )
+  );
+};
+
+
+// ============================================================================
 // 音效 key 常量
 // ============================================================================
 
@@ -400,6 +545,13 @@ function createRegistry(): FxRegistry {
     timeoutMs: 2500,
     maxConcurrent: 1,
   }, ABILITY_TRIGGERED_FEEDBACK);
+
+  registry.register(SU_FX.TITAN_CLASH, TitanClashRenderer, {
+    timeoutMs: 3000,
+    maxConcurrent: 1,
+  }, {
+    sound: { key: 'magic.dark.32.dark_spell_01', timing: 'on-impact' },
+  });
 
   return registry;
 }

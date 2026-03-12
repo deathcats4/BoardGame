@@ -6,6 +6,7 @@
 
 import type { CardPreviewRef } from '../../../core';
 import { getCardDef, getBaseDef } from '../data/cards';
+import { getTitanDef } from '../data/titans';
 
 interface CardPreviewMeta {
     name: string;
@@ -45,6 +46,15 @@ export const getSmashUpCardPreviewMeta = (cardId: string): CardPreviewMeta | nul
             previewRef: baseDef.previewRef
                 ? { type: 'renderer', rendererId: 'smashup-card-renderer', payload: { defId } }
                 : null,
+        };
+    }
+
+    // 再查泰坦卡
+    const titanDef = getTitanDef(defId);
+    if (titanDef) {
+        return {
+            name: titanDef.name,
+            previewRef: titanDef.previewRef ?? null,
         };
     }
 

@@ -695,12 +695,28 @@ function registerFrankensteinOngoingEffects(): void {
         if (baseIndex === undefined || !triggerMinionUid) return [];
         const base = state.bases[baseIndex];
         if (!base) return [];
-        const hasGS = base.ongoingActions.some(a => matchesDefId(a.defId, 'frankenstein_grave_situation') && a.ownerId === playerId);
+        const hasGS = base.ongoingActions.some(a => (a.defId === 'frankenstein_grave_situation' || a.defId === 'frankenstein_grave_situation_pod') && a.ownerId === playerId);
         if (!hasGS) return [];
         // 将被消灭的随从从弃牌堆恢复到手牌
         return [{
             type: SU_EVENTS.CARD_RECOVERED_FROM_DISCARD,
             payload: { playerId, cardUids: [triggerMinionUid], reason: 'frankenstein_grave_situation' },
+            timestamp: now,
+        } as SmashUpEvent];
+    });
+
+    // POD 版 Grave Situation 使用相同的触发器
+    registerTrigger('frankenstein_grave_situation_pod', 'onMinionDestroyed', (ctx: TriggerContext) => {
+        const { state, baseIndex, triggerMinionUid, triggerMinionDefId, playerId, now } = ctx;
+        if (baseIndex === undefined || !triggerMinionUid) return [];
+        const base = state.bases[baseIndex];
+        if (!base) return [];
+        const hasGS = base.ongoingActions.some(a => (a.defId === 'frankenstein_grave_situation' || a.defId === 'frankenstein_grave_situation_pod') && a.ownerId === playerId);
+        if (!hasGS) return [];
+        // 将被消灭的随从从弃牌堆恢复到手牌
+        return [{
+            type: SU_EVENTS.CARD_RECOVERED_FROM_DISCARD,
+            payload: { playerId, cardUids: [triggerMinionUid], reason: 'frankenstein_grave_situation_pod' },
             timestamp: now,
         } as SmashUpEvent];
     });

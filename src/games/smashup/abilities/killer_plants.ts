@@ -71,16 +71,18 @@ function killerPlantDeepRootsChecker(ctx: ProtectionCheckContext): boolean {
  */
 function killerPlantWaterLilyTrigger(ctx: TriggerContext): SmashUpEvent[] {
     // 规则：每回合只能使用一次浇花睡莲的能力（多张在场也只触发一次）
+    const player = ctx.state.players[ctx.playerId];
+    if (!player || player.waterLilyUsedThisTurn) return [];
+
     for (const base of ctx.state.bases) {
         for (const m of base.minions) {
             if (!matchesDefId(m.defId, 'killer_plant_water_lily')) continue;
             if (m.controller !== ctx.playerId) continue;
-            const player = ctx.state.players[m.controller];
             if (!player || player.deck.length === 0) continue;
             const drawnUid = player.deck[0].uid;
             return [{
                 type: SU_EVENTS.CARDS_DRAWN,
-                payload: { playerId: m.controller, count: 1, cardUids: [drawnUid] },
+                payload: { playerId: m.controller, count: 1, cardUids: [drawnUid], reason: 'killer_plant_water_lily' },
                 timestamp: ctx.now,
             } as CardsDrawnEvent];
         }
@@ -103,7 +105,8 @@ function getSproutEligibleMinions(deck: CardInstance[]): CardInstance[] {
  * 正确流程：消灭自身 + CARDS_DRAWN + grantExtraMinion + MINION_PLAYED(到sprout所在基地) + 洗牌
  * 多候选时创建交互让玩家选择
  */
-function killerPlantSproutTrigger(ctx: TriggerContext): TriggerResult {
+export function killerPlantSproutTrigger(ctx: TriggerContext): TriggerResult {
+    console.log('[killerPlantSproutTrigger] START for player:', ctx.playerId);
     const events: SmashUpEvent[] = [];
     let matchState = ctx.matchState;
     const simulatedDecks = new Map<string, CardInstance[]>();
@@ -133,13 +136,20 @@ function killerPlantSproutTrigger(ctx: TriggerContext): TriggerResult {
                 simulatedDecks.set(m.controller, availableDeck.filter(deckCard => deckCard.uid !== card.uid));
                 const def = getMinionDef(card.defId);
                 const power = def?.power ?? 0;
-                events.push(
-                    { type: SU_EVENTS.CARDS_DRAWN, payload: { playerId: m.controller, count: 1, cardUids: [card.uid] }, timestamp: ctx.now } as CardsDrawnEvent,
-                    grantExtraMinion(m.controller, 'killer_plant_sprout', ctx.now),
-                );
+                events.push(grantExtraMinion(m.controller, 'killer_plant_sprout', ctx.now));
                 const playedEvt: MinionPlayedEvent = {
                     type: SU_EVENTS.MINION_PLAYED,
-                    payload: { playerId: m.controller, cardUid: card.uid, defId: card.defId, baseIndex: sproutBaseIndex, baseDefId: ctx.state.bases[sproutBaseIndex].defId, power },
+                    payload: {
+                        playerId: m.controller,
+                        cardUid: card.uid,
+                        defId: card.defId,
+                        baseIndex: sproutBaseIndex,
+                        baseDefId: ctx.state.bases[sproutBaseIndex].defId,
+                        power,
+                        fromDeck: true,
+                        triggerOnTurnStart: true, // 回合开始阶段的特招，应该触发 onTurnStart
+                        consumesNormalLimit: false, // 额外打出，不消耗正常出牌机会
+                    },
                     timestamp: ctx.now,
                 };
                 events.push(playedEvt);
@@ -165,6 +175,8 @@ function killerPlantSproutTrigger(ctx: TriggerContext): TriggerResult {
                 );
                 // 传递 sprout 所在基地索引，交互处理器需要用它来锁定目标基地
                 (interaction.data as any).continuationContext = { baseIndex: sproutBaseIndex };
+
+                console.log('[killerPlantSproutTrigger] Queueing search interaction:', interaction.id);
                 matchState = queueInteraction(matchState, interaction);
             } else {
                 // 无 matchState 回退：自动选第一个（测试环境等）
@@ -172,13 +184,19 @@ function killerPlantSproutTrigger(ctx: TriggerContext): TriggerResult {
                 simulatedDecks.set(m.controller, availableDeck.filter(deckCard => deckCard.uid !== card.uid));
                 const def = getMinionDef(card.defId);
                 const power = def?.power ?? 0;
-                events.push(
-                    { type: SU_EVENTS.CARDS_DRAWN, payload: { playerId: m.controller, count: 1, cardUids: [card.uid] }, timestamp: ctx.now } as CardsDrawnEvent,
-                    grantExtraMinion(m.controller, 'killer_plant_sprout', ctx.now),
-                );
+                events.push(grantExtraMinion(m.controller, 'killer_plant_sprout', ctx.now));
                 const playedEvt: MinionPlayedEvent = {
                     type: SU_EVENTS.MINION_PLAYED,
-                    payload: { playerId: m.controller, cardUid: card.uid, defId: card.defId, baseIndex: sproutBaseIndex, baseDefId: ctx.state.bases[sproutBaseIndex].defId, power },
+                    payload: {
+                        playerId: m.controller,
+                        cardUid: card.uid,
+                        defId: card.defId,
+                        baseIndex: sproutBaseIndex,
+                        baseDefId: ctx.state.bases[sproutBaseIndex].defId,
+                        power,
+                        fromDeck: true,
+                        consumesNormalLimit: false, // 额外打出，不消耗正常出牌机会
+                    },
                     timestamp: ctx.now,
                 };
                 events.push(playedEvt);
@@ -237,12 +255,19 @@ function killerPlantVenusManTrap(ctx: AbilityContext): AbilityResult {
         const power = def?.power ?? 0;
         const playedEvt: MinionPlayedEvent = {
             type: SU_EVENTS.MINION_PLAYED,
-            payload: { playerId: ctx.playerId, cardUid: card.uid, defId: card.defId, baseIndex: ctx.baseIndex, baseDefId: ctx.state.bases[ctx.baseIndex].defId, power },
+            payload: {
+                playerId: ctx.playerId,
+                cardUid: card.uid,
+                defId: card.defId,
+                baseIndex: ctx.baseIndex,
+                baseDefId: ctx.state.bases[ctx.baseIndex].defId,
+                power,
+                fromDeck: true,
+            },
             timestamp: ctx.now,
         };
         return {
             events: [
-                { type: SU_EVENTS.CARDS_DRAWN, payload: { playerId: ctx.playerId, count: 1, cardUids: [card.uid] }, timestamp: ctx.now } as CardsDrawnEvent,
                 grantExtraMinion(ctx.playerId, 'killer_plant_venus_man_trap', ctx.now),
                 playedEvt,
                 buildDeckReshuffle(player, ctx.playerId, [card.uid], ctx.now),
@@ -322,13 +347,19 @@ export function registerKillerPlantAbilities(): void {
     // 绽放（行动卡）：额外打出3个随从
     registerAbility('killer_plant_blossom', 'onPlay', killerPlantBlossom);
 
+    // === POD 专有逻辑 ===
+    // 野生食人花 POD: 力量修正逻辑在 ongoingModifiers 中实现
+    // 不需要 onPlay 效果，但需要注册它的 ID 以确保别名系统正确处理（阻止它继承基础版的 -2 onPlay 修正）
+    registerAbility('killer_plant_weed_eater_pod', 'none' as any, () => ({ events: [] }));
+
     // === ongoing 效果注册 ===
     // deep_roots: 保护随从不收回被移动
     registerProtection('killer_plant_deep_roots', 'move', killerPlantDeepRootsChecker);
     registerProtection('killer_plant_deep_roots_pod', 'move', killerPlantDeepRootsChecker);
     // water_lily: 回合开始时控制者抽1?
-    registerTrigger('killer_plant_water_lily', 'onTurnStart', killerPlantWaterLilyTrigger);
-    registerTrigger('killer_plant_water_lily_pod', 'onTurnStart', killerPlantWaterLilyTrigger);
+    registerTrigger('killer_plant_water_lily', 'onTurnStart', killerPlantWaterLilyTrigger, (state, playerId) => {
+        return !state.players[playerId].waterLilyUsedThisTurn;
+    });
     // sprout: 回合开始时消灭自身 + 搜索打出随从
     registerTrigger('killer_plant_sprout', 'onTurnStart', killerPlantSproutTrigger);
     registerTrigger('killer_plant_sprout_pod', 'onTurnStart', killerPlantSproutTrigger);
@@ -393,22 +424,16 @@ export function registerKillerPlantInteractionHandlers(): void {
         const power = def?.power ?? 0;
         const playedEvt: MinionPlayedEvent = {
             type: SU_EVENTS.MINION_PLAYED,
-            payload: {
-                playerId,
-                cardUid: selectedCard.uid,
-                defId: selectedCard.defId,
-                baseIndex,
-                baseDefId: state.core.bases[baseIndex]?.defId,
-                power,
-            },
+            payload: { playerId, cardUid, defId, baseIndex, power, fromDeck: true },
             timestamp,
         };
-        return { state, events: [
-            { type: SU_EVENTS.CARDS_DRAWN, payload: { playerId, count: 1, cardUids: [selectedCard.uid] }, timestamp } as CardsDrawnEvent,
-            grantExtraMinion(playerId, 'killer_plant_venus_man_trap', timestamp),
-            playedEvt,
-            buildDeckReshuffle(player, playerId, [selectedCard.uid], timestamp),
-        ] };
+        return {
+            state, events: [
+                grantExtraMinion(playerId, 'killer_plant_venus_man_trap', timestamp),
+                playedEvt,
+                buildDeckReshuffle(player, playerId, [cardUid], timestamp),
+            ]
+        };
     });
 
     registerInteractionHandler('killer_plant_sprout_search', (state, playerId, value, iData, _random, timestamp) => {
@@ -436,22 +461,16 @@ export function registerKillerPlantInteractionHandlers(): void {
         const power = def?.power ?? 0;
         const playedEvt: MinionPlayedEvent = {
             type: SU_EVENTS.MINION_PLAYED,
-            payload: {
-                playerId,
-                cardUid: sproutSelectedCard.uid,
-                defId: sproutSelectedCard.defId,
-                baseIndex,
-                baseDefId: state.core.bases[baseIndex]?.defId,
-                power,
-            },
+            payload: { playerId, cardUid, defId, baseIndex, power, fromDeck: true, triggerOnTurnStart: true, consumesNormalLimit: false },
             timestamp,
         };
-        return { state, events: [
-            { type: SU_EVENTS.CARDS_DRAWN, payload: { playerId, count: 1, cardUids: [sproutSelectedCard.uid] }, timestamp } as CardsDrawnEvent,
-            grantExtraMinion(playerId, 'killer_plant_sprout', timestamp),
-            playedEvt,
-            buildDeckReshuffle(player, playerId, [sproutSelectedCard.uid], timestamp),
-        ] };
+        return {
+            state, events: [
+                grantExtraMinion(playerId, 'killer_plant_sprout', timestamp),
+                playedEvt,
+                buildDeckReshuffle(player, playerId, [cardUid], timestamp),
+            ]
+        };
     });
 
     registerInteractionHandler('killer_plant_budding_choose', (state, playerId, value, _iData, _random, timestamp) => {

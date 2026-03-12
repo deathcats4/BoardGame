@@ -36,7 +36,7 @@ export function registerInnsmouthAbilities(): void {
     registerAbility('innsmouth_spreading_the_word', 'onPlay', innsmouthSpreadingTheWord);
 
     // === ongoing 效果注册 ===
-    // in_plain_sight: 力量的随从不收回受其他玩家影响
+    // in_plain_sight: 力量≤2的随从不受其他玩家影响
     registerProtection('innsmouth_in_plain_sight', 'affect', innsmouthInPlainSightChecker);
     registerProtection('innsmouth_in_plain_sight_pod', 'affect', innsmouthInPlainSightChecker);
 }
@@ -113,14 +113,24 @@ function innsmouthRecruitment(ctx: AbilityContext): AbilityResult {
 function innsmouthInPlainSightChecker(ctx: ProtectionCheckContext): boolean {
     const base = ctx.state.bases[ctx.targetBaseIndex];
     if (!base) return false;
-    // 检查基地上是否?in_plain_sight ongoing 行动?
-    const sight = base.ongoingActions.find(o => matchesDefId(o.defId, 'innsmouth_in_plain_sight'));
+    // 检查基地上是否有 in_plain_sight ongoing 行动
+    const sight = base.ongoingActions.find(o => o.defId.startsWith('innsmouth_in_plain_sight'));
     if (!sight) return false;
-    // 只保护?sight 拥有者的随从
+    // 只保护 sight 拥有者的随从
     if (ctx.targetMinion.controller !== sight.ownerId) return false;
-    // 只保护力量≤2的随从
-    const power = getMinionPower(ctx.state, ctx.targetMinion, ctx.targetBaseIndex);
-    return power <= 2 && ctx.sourcePlayerId !== sight.ownerId;
+
+    // 不受其他玩家影响
+    if (ctx.sourcePlayerId === sight.ownerId) return false;
+
+    // 逻辑判别
+    if (sight.defId === 'innsmouth_in_plain_sight_pod') {
+        // POD: 原始力量 (printed power)
+        return ctx.targetMinion.basePower <= 2;
+    } else {
+        // 原版: 当前力量 (power)
+        const power = getMinionPower(ctx.state, ctx.targetMinion, ctx.targetBaseIndex);
+        return power <= 2;
+    }
 }
 
 /**
@@ -135,14 +145,24 @@ function innsmouthReturnToTheSea(ctx: AbilityContext): AbilityResult {
     const triggerMinion = base.minions.find(m => m.uid === ctx.cardUid);
     if (!triggerMinion) return { events: [] };
 
-    // 找同基地上自己的同 defId 随从（包含触发随从自身）
-    const sameDefMinions = base.minions.filter(
-        m => m.controller === ctx.playerId && m.defId === triggerMinion.defId
-    );
-    if (sameDefMinions.length === 0) return { events: [] };
+    const isPod = ctx.defId.endsWith('_pod');
+
+    // 找符合条件的随从
+    const myMinions = base.minions.filter(m => m.controller === ctx.playerId);
+
+    let eligibleMinions: typeof myMinions;
+    if (isPod) {
+        // POD: 同名 (same defId)
+        eligibleMinions = myMinions.filter(m => m.defId === triggerMinion.defId);
+    } else {
+        // 原版: 任意数量自己的随从
+        eligibleMinions = myMinions;
+    }
+
+    if (eligibleMinions.length === 0) return { events: [] };
 
     // "任意数量"→创建多选交互让玩家选择返回哪些
-    const options = sameDefMinions.map((m, i) => {
+    const options = eligibleMinions.map((m, i) => {
         const def = getCardDef(m.defId);
         const name = def?.name ?? m.defId;
         return {
@@ -155,8 +175,8 @@ function innsmouthReturnToTheSea(ctx: AbilityContext): AbilityResult {
     });
     const interaction = createSimpleChoice<{ minionUid: string; minionDefId: string; owner: string; baseIndex: number }>(
         `innsmouth_return_to_the_sea_${ctx.now}`, ctx.playerId,
-        '选择要返回手牌的同名随从', options,
-        { sourceId: 'innsmouth_return_to_the_sea', targetType: 'minion', multi: { min: 0, max: sameDefMinions.length } },
+        isPod ? '选择要返回手牌的同名随从' : '选择要返回手牌的随从（任意数量）', options as any[], 'innsmouth_return_to_the_sea',
+        undefined, { min: 0, max: eligibleMinions.length },
     );
     return { events: [], matchState: ctx.matchState ? queueInteraction(ctx.matchState, interaction) : undefined };
 }
@@ -169,13 +189,13 @@ function innsmouthTheLocals(ctx: AbilityContext): AbilityResult {
         player: ctx.state.players[ctx.playerId],
         playerId: ctx.playerId,
         count: 3,
-        predicate: card => matchesDefId(card.defId, 'innsmouth_the_locals'),
+        predicate: card => card.defId.startsWith('innsmouth_the_locals'),
         maxPick: 3,
         revealTo: 'all', // 展示牌库顶给所有人看
         reason: 'innsmouth_the_locals',
         now: ctx.now,
     });
-    
+
     return { events };
 }
 
@@ -279,10 +299,12 @@ function innsmouthSpreadingTheWord(ctx: AbilityContext): AbilityResult {
 
     // 只有一个匹配名称时自动选择，多个时让玩家选
     const defIdArray = Array.from(matchingDefIds);
+    const isPod = ctx.defId.endsWith('_pod');
+
     if (defIdArray.length === 1) {
         const chosenDefId = defIdArray[0];
         const matchCount = player.hand.filter(c => c.type === 'minion' && c.defId === chosenDefId).length;
-        const grantCount = Math.min(2, matchCount);
+        const grantCount = isPod ? Math.min(2, matchCount) : 1;
         const events: SmashUpEvent[] = [];
         for (let i = 0; i < grantCount; i++) {
             events.push(grantExtraMinion(ctx.playerId, 'innsmouth_spreading_the_word', ctx.now, undefined, { sameNameOnly: true, sameNameDefId: chosenDefId }));
@@ -295,12 +317,11 @@ function innsmouthSpreadingTheWord(ctx: AbilityContext): AbilityResult {
         const def = getCardDef(defId);
         const name = def?.name ?? defId;
         const count = player.hand.filter(c => c.type === 'minion' && c.defId === defId).length;
-        return { id: `name-${i}`, label: `${name}（手牌中有 ${count} 张）`, value: { defId } };
+        return { id: `name-${i}`, label: `${name}（手牌中有 ${count} 张）`, value: { defId, isPod } };
     });
     const interaction = createSimpleChoice<{ defId: string }>(
         `innsmouth_spreading_the_word_${ctx.now}`, ctx.playerId,
-        '选择一个随从名（额外打出至多2个同名随从）', options,
-        { sourceId: 'innsmouth_spreading_the_word', targetType: 'generic' },
+        isPod ? '选择一个随从名（额外打出至多2个同名随从）' : '选择一个随从名（额外打出该同名随从）', options as any[], 'innsmouth_spreading_the_word',
     );
     return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
 }
@@ -313,10 +334,10 @@ function innsmouthSpreadingTheWord(ctx: AbilityContext): AbilityResult {
 export function registerInnsmouthInteractionHandlers(): void {
     // 散播谣言：玩家选择一个随从名后，授予额外同名随从额度
     registerInteractionHandler('innsmouth_spreading_the_word', (state, playerId, value, _iData, _random, timestamp) => {
-        const { defId } = value as { defId: string };
+        const { defId, isPod } = value as { defId: string; isPod: boolean };
         const player = state.core.players[playerId];
         const matchCount = player.hand.filter(c => c.type === 'minion' && c.defId === defId).length;
-        const grantCount = Math.min(2, matchCount);
+        const grantCount = isPod ? Math.min(2, matchCount) : 1;
         const events: SmashUpEvent[] = [];
         for (let i = 0; i < grantCount; i++) {
             events.push(grantExtraMinion(playerId, 'innsmouth_spreading_the_word', timestamp, undefined, { sameNameOnly: true, sameNameDefId: defId }));

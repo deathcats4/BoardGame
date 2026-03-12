@@ -10,10 +10,10 @@ import type { GameEvent } from '../../../engine/types';
 import type { EngineSystem, HookResult } from '../../../engine/systems/types';
 import { INTERACTION_EVENTS, resolveInteraction } from '../../../engine/systems/InteractionSystem';
 import type { SmashUpCore, SmashUpEvent, MinionPlayedEvent, PendingPostScoringAction } from './types';
-import { getInteractionHandler } from './abilityInteractionHandlers';
 import { buildValidatedMoveEvents } from './abilityHelpers';
 import { interceptEvent } from './ongoingEffects';
 import { SU_EVENT_TYPES } from './events';
+import { getInteractionHandler, getRegisteredInteractionHandlerIds } from './abilityInteractionHandlers';
 
 // ============================================================================
 // SmashUp 事件处理系统
@@ -87,7 +87,10 @@ export function createSmashUpEventSystem(): EngineSystem<SmashUpCore> {
         name: '大杀四方事件处理',
         priority: 24, // 必须在 FlowSystem(25) 之前执行，确保交互处理器先于 onAutoContinueCheck 运行
 
-        afterEvents: ({ state, events, random }): HookResult<SmashUpCore> | void => {
+        afterEvents: (ctx: any): HookResult<SmashUpCore> | void => {
+            const { state, events, random } = ctx;
+            console.log('[SmashUpEventSystem][afterEvents] START. Event count:', events.length);
+            const matchState = state; // Aliasing context state to matchState
             let newState = state;
             const nextEvents: GameEvent[] = [];
             const pendingReduceFlag = '_waitForPostScoringReduce';
@@ -106,8 +109,58 @@ export function createSmashUpEventSystem(): EngineSystem<SmashUpCore> {
             }
 
             for (const event of events) {
+                // Major Ursa Ongoing 已移至 postProcessSystemEvents 中 MINION_MOVED 处理
+                
+                // 监听 RESPONSE_WINDOW_CLOSED → 补发 afterScoring 延迟事件
+                if (event.type === RESPONSE_WINDOW_EVENTS.CLOSED) {
+                    // ... (省略部分逻辑以保持 replace_file_content 稳定，实际会替换整个循环体内容)
+                    if (newState.sys.afterScoringInitialPowers) {
+                        const { baseIndex: scoredBaseIndex } = newState.sys.afterScoringInitialPowers as any;
+                        const currentBase = newState.core.bases[scoredBaseIndex];
+
+                        if (currentBase) {
+                            // 发出 BASE_CLEARED 事件
+                            const clearEvt: BaseClearedEvent = {
+                                type: SU_EVENT_TYPES.BASE_CLEARED,
+                                payload: { baseIndex: scoredBaseIndex, baseDefId: currentBase.defId },
+                                timestamp: (event as any).timestamp || 0,
+                            };
+                            nextEvents.push(clearEvt);
+
+                            // 替换基地
+                            if (newState.core.baseDeck.length > 0) {
+                                const newBaseDefId = newState.core.baseDeck[0];
+                                const replaceEvt: BaseReplacedEvent = {
+                                    type: SU_EVENT_TYPES.BASE_REPLACED,
+                                    payload: {
+                                        baseIndex: scoredBaseIndex,
+                                        oldBaseDefId: currentBase.defId,
+                                        newBaseDefId,
+                                    },
+                                    timestamp: (event as any).timestamp || 0,
+                                };
+                                nextEvents.push(replaceEvt);
+
+                                // 触发新基地的 onBaseRevealed 扩展时机
+                                const revealCtx = {
+                                    state: newState.core,
+                                    matchState: newState,
+                                    baseIndex: scoredBaseIndex,
+                                    baseDefId: newBaseDefId,
+                                    playerId: newState.core.turnOrder[newState.core.currentPlayerIndex],
+                                    now: (event as any).timestamp || 0,
+                                };
+                                const revealResult = triggerExtendedBaseAbility(newBaseDefId, 'onBaseRevealed', revealCtx);
+                                nextEvents.push(...revealResult.events);
+                                if (revealResult.matchState) newState = revealResult.matchState;
+                            }
+                        }
+                    }
+                }
+
                 // 监听 SYS_INTERACTION_RESOLVED → 从 sourceId 查找处理函数 → 生成后续事件
                 if (event.type === INTERACTION_EVENTS.RESOLVED) {
+                    console.log('[SmashUpEventSystem][afterEvents] INTERACTION_RESOLVED detected:', event.payload);
                     const payload = event.payload as {
                         interactionId: string;
                         playerId: string;
@@ -120,7 +173,28 @@ export function createSmashUpEventSystem(): EngineSystem<SmashUpCore> {
 
 
                     if (payload.sourceId) {
-                        const handler = getInteractionHandler(payload.sourceId);
+                        const interactionId = payload.interactionId;
+                        const sourceId = payload.sourceId;
+
+                        // 检查该交互是否已经被处理过
+                        // 使用一个临时的 Set 来跟踪本次 afterEvents 调用中已处理的交互
+                        if (!(newState.sys as any)._processedInteractions) {
+                            (newState.sys as any)._processedInteractions = new Set<string>();
+                        }
+                        const processedSet = (newState.sys as any)._processedInteractions as Set<string>;
+                        
+                        if (processedSet.has(interactionId)) {
+                            console.log(`[SmashUpEventSystem][afterEvents] Skipping already processed interaction: ${interactionId}`);
+                            continue;
+                        }
+                        
+                        // 标记为已处理
+                        processedSet.add(interactionId);
+
+                        const registeredIds = getRegisteredInteractionHandlerIds();
+                        const handler = sourceId ? getInteractionHandler(sourceId) : undefined;
+                        console.log(`[SmashUpEventSystem][afterEvents] Handler lookup for: ${sourceId} Found: ${!!handler} Registered IDs: ${registeredIds.size}`);
+
                         if (handler) {
                             const result = handler(
                                 newState,
@@ -130,55 +204,38 @@ export function createSmashUpEventSystem(): EngineSystem<SmashUpCore> {
                                 random,
                                 eventTimestamp
                             );
-                            
+
                             if (result) {
-                                // 【关键修复】检查交互处理器是否创建了新交互
-                                // 如果没有创建新交互（如返回 ABILITY_FEEDBACK），则解决当前交互
-                                const hadInteractionBefore = !!newState.sys.interaction?.current;
-                                const hasInteractionAfter = !!result.state.sys.interaction?.current || (result.state.sys.interaction?.queue?.length ?? 0) > (newState.sys.interaction?.queue?.length ?? 0);
-                                
-                                newState = result.state;
-                                
-                                // 如果 handler 没有创建新交互，则解决当前交互
-                                if (hadInteractionBefore && !hasInteractionAfter) {
-                                    newState = resolveInteraction(newState);
-                                }
-                                
-                                // 【关键修复】交互处理函数返回的事件必须经过拦截器过滤
-                                // 原因：pipeline.reduceEventsToCore 只处理 execute() 返回的事件，
-                                // 而 SmashUpEventSystem.afterEvents 返回的事件走的是系统事件路径，
-                                // 不会自动经过 domain.interceptEvent。
-                                // 必须在这里手动调用拦截器，确保 tooth_and_claw 等保护机制生效。
+                                // 1. 将产生的事件合并到结果中
                                 const rawEvents = result.events as SmashUpEvent[];
-                                const interceptedEvents: SmashUpEvent[] = [];
-                                for (const evt of rawEvents) {
-                                    const interceptResult = interceptEvent(newState.core, evt);
-                                    if (interceptResult === null) {
-                                        // 事件被吞噬，跳过
-                                        continue;
-                                    } else if (interceptResult === undefined) {
-                                        // 无拦截器匹配，保持原事件
-                                        interceptedEvents.push(evt);
-                                    } else {
-                                        // 事件被替换（如 MINION_RETURNED → ONGOING_DETACHED）
-                                        const batch = Array.isArray(interceptResult) ? interceptResult : [interceptResult];
-                                        interceptedEvents.push(...batch as SmashUpEvent[]);
-                                    }
-                                }
-                                nextEvents.push(...interceptedEvents);
+                                console.log(`[SmashUpEventSystem][afterEvents] 🐻 Handler ${sourceId} rawEvents:`, rawEvents);
+
+                                // 2. 调用 postProcessSystemEvents 处理触发器、保护、去重等
+                                // 这会产生衍生的 trigger 事件，并进一步更新状态（如 Interaction 队列）
+                                const processResult = postProcessSystemEvents(
+                                    result.state.core,
+                                    rawEvents,
+                                    random,
+                                    result.state
+                                );
+
+                                console.log(`[SmashUpEventSystem][afterEvents] 🐻 processResult.events:`, processResult.events);
+                                console.log(`[SmashUpEventSystem][afterEvents] 🐻 processResult.events has undefined?`, processResult.events.some(e => e === undefined));
+
+                                newState = processResult.matchState ?? result.state;
+
+                                // 3. 将最终产生的事件（含原始事件 + 衍生事件）加入 nextEvents
+                                // 过滤掉 undefined 事件
+                                const validEvents = processResult.events.filter(e => e !== undefined);
+                                nextEvents.push(...validEvents);
+                                console.log(`[SmashUpEventSystem][afterEvents] Handler ${sourceId} produced ${validEvents.length} events:`, validEvents.map(e => e.type));
 
                                 // 补发延迟的 BASE_CLEARED/BASE_REPLACED 事件
-                                // afterScoring 基地能力创建交互时，清除事件被延迟到交互解决后发出，
-                                // 确保 targetType: 'minion' 的场上点选交互能看到随从
-                                const ctx = payload.interactionData?.continuationContext as Record<string, unknown> | undefined;
-                                const deferred = ctx?._deferredPostScoringEvents as { type: string; payload: unknown; timestamp: number }[] | undefined;
+                                const iData = payload.interactionData as any;
+                                const deferred = iData?.continuationContext?._deferredPostScoringEvents as any[];
                                 if (deferred && deferred.length > 0) {
-                                    // 【关键修复】无论是否有后续交互，都立即设置 flowHalted=true
-                                    // 防止 FlowSystem.afterEvents 在交互解决后重新进入 onPhaseExit('scoreBases')
-                                    // 导致同一个基地被重复计分（因为 BASE_CLEARED 还没有从 scoringEligibleBaseIndices 中移除基地）
                                     newState.sys.flowHalted = true;
-                                    
-                                    // 仅在没有后续交互时补发（链式交互需要等最后一个解决后再清除）
+
                                     if (!newState.sys.interaction?.current && (!newState.sys.interaction?.queue || newState.sys.interaction.queue.length === 0)) {
                                         const handlerAlreadyEmittedDeferred = deferred.every(d =>
                                             nextEvents.some(event => isSameDeferredEvent(event, d))
@@ -207,7 +264,6 @@ export function createSmashUpEventSystem(): EngineSystem<SmashUpCore> {
                                             } as typeof newState.sys,
                                         };
                                     } else {
-                                        // 还有后续交互：把 deferred events 传递到下一个交互的 continuationContext
                                         const nextInteraction = newState.sys.interaction.current ?? newState.sys.interaction.queue?.[0];
                                         if (nextInteraction?.data) {
                                             const nextData = nextInteraction.data as Record<string, unknown>;

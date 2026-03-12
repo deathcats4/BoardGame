@@ -21,6 +21,7 @@ import {
     makeMinion, makeCard, makePlayer, makeState, makeMatchState,
     getInteractionsFromMS, applyEvents,
 } from './helpers';
+import { runCommands } from './testRunner';
 import type { RandomFn } from '../../../engine/types';
 
 beforeAll(() => {
@@ -145,7 +146,7 @@ describe('ongoing 行动卡天赋 - 验证层', () => {
 // ============================================================================
 
 describe('miskatonic_lost_knowledge（通往超凡的门 ongoing talent）', () => {
-    it('触发天赋后生成 TALENT_USED + 抽疯狂卡 + 额外随从事件', () => {
+    it('触发天赋后生成 TALENT_USED + 抽疯狂卡，并创建「是否打出额外随从」交互', () => {
         const core = makeState({
             players: {
                 '0': makePlayer('0'),
@@ -169,12 +170,75 @@ describe('miskatonic_lost_knowledge（通往超凡的门 ongoing talent）', () 
         const types = events.map(e => e.type);
         expect(types).toContain(SU_EVENTS.TALENT_USED);
         expect(types).toContain(SU_EVENTS.MADNESS_DRAWN);
-        expect(types).toContain(SU_EVENTS.LIMIT_MODIFIED);
+        // LIMIT_MODIFIED 来自交互解决，不在初始事件中
 
-        // TALENT_USED 事件应包含 ongoingCardUid
+        // 应创建「是否打出额外随从」交互
+        const interactions = getInteractionsFromMS(ms);
+        expect(interactions.length).toBeGreaterThan(0);
+        expect(interactions[0].data?.sourceId).toBe('miskatonic_lost_knowledge_extra');
+
         const talentEvt = events.find(e => e.type === SU_EVENTS.TALENT_USED)!;
         expect((talentEvt as any).payload.ongoingCardUid).toBe('oa1');
         expect((talentEvt as any).payload.defId).toBe('miskatonic_lost_knowledge');
+    });
+
+    it('选择打出额外随从后产生 LIMIT_MODIFIED', () => {
+        const core = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [{
+                defId: 'base_a',
+                minions: [],
+                ongoingActions: [makeOngoing('oa1', 'miskatonic_lost_knowledge', '0')],
+            }],
+            madnessDeck: ['madness_0', 'madness_1'],
+        });
+        const ms = makeMatchState(core);
+        const result = runCommands(ms, [
+            { type: SU_COMMANDS.USE_TALENT, playerId: '0', payload: { ongoingCardUid: 'oa1', baseIndex: 0 } } as any,
+            { type: 'SYS_INTERACTION_RESPOND', playerId: '0', payload: { optionId: 'yes' } } as any,
+        ]);
+        expect(result.success).toBe(true);
+        expect(result.events.some((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED)).toBe(true);
+    });
+
+    it('选择跳过时不产生 LIMIT_MODIFIED', () => {
+        const core = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [{
+                defId: 'base_a',
+                minions: [],
+                ongoingActions: [makeOngoing('oa1', 'miskatonic_lost_knowledge', '0')],
+            }],
+            madnessDeck: ['madness_0', 'madness_1'],
+        });
+        const ms = makeMatchState(core);
+        const result = runCommands(ms, [
+            { type: SU_COMMANDS.USE_TALENT, playerId: '0', payload: { ongoingCardUid: 'oa1', baseIndex: 0 } } as any,
+            { type: 'SYS_INTERACTION_RESPOND', playerId: '0', payload: { optionId: 'skip' } } as any,
+        ]);
+        expect(result.success).toBe(true);
+        expect(result.events.some((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED)).toBe(false);
+    });
+
+    it('疯狂牌库为空时返回反馈不可用', () => {
+        const core = makeState({
+            players: { '0': makePlayer('0'), '1': makePlayer('1') },
+            bases: [{
+                defId: 'base_a',
+                minions: [],
+                ongoingActions: [makeOngoing('oa1', 'miskatonic_lost_knowledge', '0')],
+            }],
+            madnessDeck: [],
+        });
+        const ms = makeMatchState(core);
+        const events = execute(ms, {
+            type: SU_COMMANDS.USE_TALENT,
+            playerId: '0',
+            payload: { ongoingCardUid: 'oa1', baseIndex: 0 },
+        } as any, defaultRandom);
+        const feedbackEvt = events.find((e: any) => e.type === SU_EVENTS.ABILITY_FEEDBACK);
+        expect(feedbackEvt).toBeDefined();
+        expect((feedbackEvt as any)?.payload?.messageKey).toBe('feedback.condition_not_met');
     });
 
     it('reduce 后 talentUsed 标记为 true', () => {

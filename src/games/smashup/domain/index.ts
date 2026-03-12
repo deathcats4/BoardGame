@@ -23,6 +23,10 @@ import type {
     DeckReshuffledEvent,
     MinionPlayedEvent,
     MinionPowerBreakdown,
+    ActionCardDef,
+    AbilityFeedbackEvent,
+    PowerCounterAddedEvent,
+    PowerCounterRemovedEvent,
 } from './types';
 import {
     PHASE_ORDER,
@@ -33,14 +37,14 @@ import {
     VP_TO_WIN,
     getCurrentPlayerId,
 } from './types';
-import { getEffectivePower, getTotalEffectivePowerOnBase, getEffectiveBreakpoint, getEffectivePowerBreakdown, getPlayerEffectivePowerOnBase, getScoringEligibleBaseIndices } from './ongoingModifiers';
-import { fireTriggers, interceptEvent as ongoingInterceptEvent } from './ongoingEffects';
+import { getEffectivePower, getTotalEffectivePowerOnBase, getEffectiveBreakpoint, getEffectivePowerBreakdown, getOngoingCardPowerContribution, getScoringEligibleBaseIndices } from './ongoingModifiers';
+import { fireTriggers, fireSpecificTrigger, getEligibleTriggers, interceptEvent as ongoingInterceptEvent } from './ongoingEffects';
 import { validate } from './commands';
 import { execute, reduce } from './reducer';
 import { getAllBaseDefIds, getBaseDef, getCardDef } from '../data/cards';
 import { drawCards } from './utils';
 import { countMadnessCards, madnessVpPenalty, fireMinionPlayedTriggers } from './abilityHelpers';
-import { triggerAllBaseAbilities, triggerBaseAbility, triggerExtendedBaseAbility } from './baseAbilities';
+import { triggerAllBaseAbilities, triggerBaseAbility, triggerExtendedBaseAbility, getEligibleBaseAbilities, type BaseAbilityResult } from './baseAbilities';
 import { openMeFirstWindow, openAfterScoringWindow, buildBaseTargetOptions, isSpecialLimitBlocked } from './abilityHelpers';
 import type { PhaseExitResult } from '../../../engine/systems/FlowSystem';
 import { registerInteractionHandler } from './abilityInteractionHandlers';
@@ -49,6 +53,10 @@ import { RESPONSE_WINDOW_EVENTS } from '../../../engine/systems/ResponseWindowSy
 import { resolveSpecial } from './abilityRegistry';
 import type { AbilityContext } from './abilityRegistry';
 import type { SpecialAfterScoringConsumedEvent } from './types';
+import { createTitanSystem } from './systems/TitanSystem';
+
+// 创建泰坦系统实例（单例）
+const titanSystem = createTitanSystem();
 
 // ============================================================================
 // 基地记分辅助函数（供 FlowHooks 和 Prompt 继续函数共用）
@@ -123,18 +131,17 @@ export function scoreOneBase(
     let ms = matchState;
     const base = core.bases[baseIndex];
     const baseDef = getBaseDef(base.defId)!;
-    
+
     // 【修复】newBaseDeck 必须在函数顶部声明，避免 TDZ 错误
     // 问题：之前在两个不同的作用域中声明了 newBaseDeck（line 454 和 line 476）
     // 当函数在 afterScoring 窗口打开后提前返回，再次调用时会访问未初始化的外层 newBaseDeck
     let newBaseDeck = baseDeck;
     // 触发 ongoing beforeScoring（如 pirate_king 移动到该基地、cthulhu_chosen +2力量）
     // 先于基地能力执行，确保基地能力能看到 ongoing 效果的结果
-    
+
     // 检查是否已经触发过 beforeScoring（防止交互解决后重复触发）
     const alreadyTriggeredBeforeScoring = core.beforeScoringTriggeredBases?.includes(baseIndex) ?? false;
-    
-    
+
     if (!alreadyTriggeredBeforeScoring) {
         const beforeScoringEvents = fireTriggers(core, 'beforeScoring', {
             state: core,
@@ -146,7 +153,7 @@ export function scoreOneBase(
         });
         events.push(...beforeScoringEvents.events);
         if (beforeScoringEvents.matchState) ms = beforeScoringEvents.matchState;
-        
+
         // 发射事件标记此基地已触发过 beforeScoring
         const markEvent = {
             type: SU_EVENT_TYPES.BEFORE_SCORING_TRIGGERED,
@@ -154,7 +161,7 @@ export function scoreOneBase(
             timestamp: now,
         };
         events.push(markEvent as unknown as SmashUpEvent);
-        
+
         // ✅ 关键修复：立即将标记事件 reduce 到本地 core 副本
         // 
         // 问题：事件驱动架构中，事件的发射（emit）和归约（reduce）是分离的：
@@ -202,7 +209,7 @@ export function scoreOneBase(
         updatedCore = reduce(updatedCore, evt as SmashUpEvent);
     }
 
-    // 计算排名（使用 reduce 后的 core，包含 beforeScoring 的临时力量修正 + ongoing 卡力量贡献）
+    // 计算排名（使用 reduce 后的 core，包含 beforeScoring 的临时力量修正 + ongoing 卡力量贡献 + 泰坦力量指示物）
     const updatedBase = updatedCore.bases[baseIndex];
     const playerPowers = collectQualifiedPlayerPowers(updatedCore, updatedBase, baseIndex);
     const rankings = buildBaseRankings(baseDef, playerPowers);
@@ -231,6 +238,31 @@ export function scoreOneBase(
     };
     events.push(scoreEvt);
 
+    // 【泰坦 Ongoing / Special 2】The Kraken：
+    // 在本泰坦所在的基地计分后，可以将一个你的随从从该基地移动到另一个基地。
+    // 触发时机：BASE_SCORED 事件发出后、afterScoring 响应窗口和 BASE_CLEARED 之前。
+    for (const [pidForKraken, playerForKraken] of Object.entries(updatedCore.players)) {
+        const titan = playerForKraken.activeTitan;
+        if (!titan || titan.defId !== 'titan_the_kraken' || titan.baseIndex !== baseIndex) continue;
+
+        const { theKrakenOngoing } = require('./abilities/titans/theKraken');
+        if (theKrakenOngoing) {
+            const ctx: AbilityContext = {
+                state: updatedCore,
+                matchState: ms,
+                playerId: pidForKraken,
+                cardUid: titan.titanUid,
+                defId: 'titan_the_kraken',
+                baseIndex,
+                random: rng,
+                now,
+            };
+            const result = theKrakenOngoing(ctx);
+            events.push(...result.events);
+            if (result.matchState) ms = result.matchState;
+        }
+    }
+
     // 触发 onMinionDiscardedFromBase（基地结算弃置，非消灭）
     // 在 BASE_SCORED 后、afterScoring 前触发，此时随从仍在 core 中（reducer 尚未执行）
     for (const m of base.minions) {
@@ -246,6 +278,52 @@ export function scoreOneBase(
         });
         events.push(...discardResult.events);
         if (discardResult.matchState) ms = discardResult.matchState;
+
+        // Death on Six Legs Ongoing（基地清场路径）：
+        // 在随从即将因为基地记分而进入弃牌堆前，为拥有六足死神的玩家提供一次
+        // “是否转移 1 个 +1 指示物到泰坦上”的交互机会。
+        try {
+            const controllerId = m.controller;
+            const ownerPlayer = core.players[controllerId];
+            const titan = ownerPlayer?.activeTitan;
+            if (
+                controllerId &&
+                titan &&
+                titan.defId === 'titan_death_on_six_legs' &&
+                (m.powerCounters ?? 0) > 0 &&
+                ms
+            ) {
+                const interaction = createSimpleChoice(
+                    `death_on_six_legs_ongoing_discard_${now}_${m.uid}`,
+                    controllerId,
+                    '是否将该随从上的一个+1指示物转移到六足死神？',
+                    [
+                        {
+                            id: 'yes',
+                            label: '是，转移 1 个 +1 指示物',
+                            value: { accept: true },
+                        },
+                        {
+                            id: 'no',
+                            label: '否，直接进入弃牌堆',
+                            value: { accept: false },
+                        },
+                    ],
+                    {
+                        sourceId: 'giant_ants_death_on_six_legs_ongoing',
+                        targetType: 'generic',
+                        continuationContext: {
+                            kind: 'base_discard',
+                            minionUid: m.uid,
+                            baseIndex,
+                        },
+                    } as any
+                );
+                ms = queueInteraction(ms, interaction);
+            }
+        } catch {
+            // 防御性：任何错误都不应阻断基础记分流程
+        }
     }
 
     // 记录 afterScoring 前的交互状态，用于判断 afterScoring 是否新增了交互
@@ -261,7 +339,7 @@ export function scoreOneBase(
         const armedSpecials = (updatedCore.pendingAfterScoringSpecials ?? []).filter(
             s => s.baseIndex === baseIndex
         );
-        
+
         for (const armed of armedSpecials) {
             const executor = resolveSpecial(armed.sourceDefId);
             if (executor) {
@@ -278,7 +356,7 @@ export function scoreOneBase(
                 const result = executor(ctx);
                 events.push(...result.events);
                 if (result.matchState) ms = result.matchState;
-                
+
                 // 将 special 技能产生的事件 reduce 到 core
                 for (const evt of result.events) {
                     updatedCore = reduce(updatedCore, evt as SmashUpEvent);
@@ -296,7 +374,7 @@ export function scoreOneBase(
                 };
                 events.push(feedbackEvt);
             }
-            
+
             // 标记为已消费
             const consumedEvt: SpecialAfterScoringConsumedEvent = {
                 type: SU_EVENT_TYPES.SPECIAL_AFTER_SCORING_CONSUMED,
@@ -310,7 +388,7 @@ export function scoreOneBase(
             events.push(consumedEvt);
             updatedCore = reduce(updatedCore, consumedEvt);
         }
-        
+
         // 触发 afterScoring 基地能力（使用 reduce 后的 core，包含 beforeScoring 效果 + ARMED special 效果）
         const afterCtx = {
             state: updatedCore,
@@ -348,7 +426,7 @@ export function scoreOneBase(
 
     // 触发 ongoing afterScoring（如 pirate_first_mate 移动到其他基地）
     // 使用 reduce 后的 core，包含基地能力的效果（如随从已被放入牌库底）
-    
+
     const afterScoringEvents = fireTriggers(afterScoringCore, 'afterScoring', {
         state: afterScoringCore,
         playerId: pid,
@@ -409,19 +487,19 @@ export function scoreOneBase(
                 },
             };
         }
-        
+
         // 打开 afterScoring 响应窗口（在 BASE_CLEARED 之前）
         const afterScoringWindowEvt = openAfterScoringWindow('scoreBases', pid, afterScoringCore.turnOrder, now);
         events.push(afterScoringWindowEvt);
-        
+
         // 延迟发出 postScoringEvents（等响应窗口关闭后再发）
         // 将 postScoringEvents 存到响应窗口的 continuationContext 中
         // 注意：响应窗口关闭后，需要检查基地力量是否变化，如果变化则重新计分
         // 这个逻辑需要在 onPhaseExit 中处理
-        
+
         // 【修复】不需要在这里修改 newBaseDeck，因为还没有发出 BASE_REPLACED 事件
         // BASE_REPLACED 事件会在响应窗口关闭后、postScoringEvents 中发出
-        
+
         return { events, newBaseDeck, matchState: ms };
     }
 
@@ -466,7 +544,14 @@ export function scoreOneBase(
     // 关键：仅当 afterScoring 新增了交互时（如刚柔流寺庙平局选择、忍者道场消灭随从等），
     // 才延迟发出 BASE_CLEARED/BASE_REPLACED，确保 targetType: 'minion' 的场上点选交互能看到随从。
     // 不影响 beforeScoring/onBaseRevealed 等其他来源的交互。
-    
+    console.log('🔥 [scoreBase] 检查是否延迟 postScoringEvents:', {
+        afterScoringCreatedInteraction,
+        interactionBefore: interactionBeforeAfterScoring,
+        interactionAfter,
+        queueLenBefore: queueLenBeforeAfterScoring,
+        queueLenAfter,
+    });
+
     if (afterScoringCreatedInteraction) {
         // 把 postScoringEvents 序列化存到交互的 continuationContext 中
         // 【修复】如果有多个 afterScoring 交互（如母舰 + 侦察兵），必须存到第一个交互中
@@ -502,7 +587,7 @@ export function registerMultiBaseScoringInteractionHandler(): void {
         // resolveInteraction 会弹出下一个交互，所以 current 已经是下一个交互了（如果有的话）
 
         // 【修复】提取延迟的 BASE_CLEARED/BASE_REPLACED 事件（但不立即补发）
-        const deferredEvents = (_iData?.continuationContext as any)?._deferredPostScoringEvents as 
+        const deferredEvents = (_iData?.continuationContext as any)?._deferredPostScoringEvents as
             { type: string; payload: unknown; timestamp: number }[] | undefined;
         
         // 1. 计分玩家选择的基地
@@ -607,19 +692,12 @@ export function registerMultiBaseScoringInteractionHandler(): void {
                         buildBaseTargetOptions(candidates, updatedCore) as any[],
                         { sourceId: 'multi_base_scoring', targetType: 'base' },
                     );
-                    
-                    // 【关键修复】传递延迟事件到下一个交互
-                    // 如果当前交互有延迟事件，需要传递给新创建的 multi_base_scoring 交互
-                    // 这样延迟事件会在所有基地计分完成后统一补发
-                    if (deferredEvents && deferredEvents.length > 0) {
-                        const iData = interaction.data as Record<string, unknown>;
-                        const ctx = (iData.continuationContext ?? {}) as Record<string, unknown>;
-                        ctx._deferredPostScoringEvents = deferredEvents;
-                        iData.continuationContext = ctx;
-                    }
-                    
                     currentState = queueInteraction(currentState, interaction);
 
+                    // 【关键修复】将剩余基地标记为"计分中"，避免 onPhaseExit 重复计分
+                    // 这是多基地计分重复计分 bug 的根本原因：
+                    // 当创建 multi_base_scoring 交互后，onPhaseExit 重新进入时会发现剩余基地还没有被标记为"已计分"
+                    // 导致 onPhaseExit 直接计分，然后 multi_base_scoring 交互解决时又计分一次
                     for (const idx of remainingIndices) {
                         if (!currentState.sys.scoredBaseIndices!.includes(idx)) {
                             currentState = {
@@ -886,7 +964,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         break;
                     }
                 }
-                
+
                 // 如果力量变化，重新计分该基地
                 if (powerChanged && currentBase) {
                     const playerPowers = collectQualifiedPlayerPowers(core, currentBase, scoredBaseIndex);
@@ -909,7 +987,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                             ],
                         });
                     }
-                    
+
                     // 发出新的 BASE_SCORED 事件（重新计分结果）
                     const scoreEvt: BaseScoredEvent = {
                         type: SU_EVENTS.BASE_SCORED,
@@ -917,9 +995,13 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         timestamp: now,
                     };
                     events.push(scoreEvt);
-                    
+
+                    console.log('[onPhaseExit] 重新计分完成:', {
+                        baseIndex: scoredBaseIndex,
+                        rankings,
+                    });
                 }
-                
+
                 // ⚠️ 关键修复：无论力量是否变化，都需要发出 BASE_CLEARED 和 BASE_REPLACED 事件
                 // 原因：afterScoring 响应窗口打开时，这些事件被延迟发出
                 // 响应窗口关闭后，必须补发这些事件，否则基地不会被清除和替换
@@ -931,7 +1013,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         timestamp: now,
                     };
                     events.push(clearEvt);
-                    
+
                     // 替换基地
                     if (core.baseDeck.length > 0) {
                         const newBaseDefId = core.baseDeck[0];
@@ -945,7 +1027,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                             timestamp: now,
                         };
                         events.push(replaceEvt);
-                        
+
                         // 触发新基地的 onBaseRevealed 扩展时机（如绵羊神社：每位玩家可移动一个随从到此）
                         const revealCtx = {
                             state: core,
@@ -959,9 +1041,10 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         events.push(...revealResult.events);
                         if (revealResult.matchState) state = revealResult.matchState;
                     }
-                    
+
+                    console.log('[onPhaseExit] 补发 BASE_CLEARED 和 BASE_REPLACED 事件');
                 }
-                
+
                 // 标记该基地已记分，防止后续正常计分循环重复计分
                 if (!state.sys.scoredBaseIndices) {
                     state = {
@@ -977,7 +1060,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         },
                     };
                 }
-                
+
                 // 清理状态（不可变更新）
                 state = {
                     ...state,
@@ -1082,7 +1165,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                 // halt=true：等待交互解决
                 return { events: [], halt: true } as PhaseExitResult;
             }
-            
+
             let currentBaseDeck = core.baseDeck;
             let currentMatchState: MatchState<SmashUpCore> = state;
             let currentCore = core;  // ✅ 修复：维护一个本地 core 副本，每次计分后更新
@@ -1093,7 +1176,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                 const foundIndex = remainingIndices[iter];
 
                 const result = scoreOneBase(currentCore, foundIndex, currentBaseDeck, pid, now, random, currentMatchState);
-                
+
                 // ⚠️ 【关键修复】立即检查是否打开了响应窗口，如果打开了就立即 halt
                 // 问题：之前的代码先 push 所有事件，再检查响应窗口，导致多个基地同时计分时，
                 // 第一个基地打开响应窗口后，循环继续计分第二个基地，第二个基地的 BASE_CLEARED 被发送
@@ -1137,7 +1220,7 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                         updatedState: haltedState,
                     } as PhaseExitResult;
                 }
-                
+
                 // 没有打开响应窗口，正常 push 事件
                 events.push(...result.events);
                 currentBaseDeck = result.newBaseDeck;
@@ -1244,26 +1327,84 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
             };
             events.push(turnStarted);
 
-            // 触发基地 onTurnStart 能力（如拉莱耶：消灭随从获1VP、蘑菇王国：移动对手随从）
-            const baseResult = triggerAllBaseAbilities('onTurnStart', core, nextPlayerId, now, undefined, currentMatchState);
-            events.push(...baseResult.events);
-            // 不可变传播 matchState（onTurnStart 基地能力可能创建 Interaction）
-            if (baseResult.matchState) {
-                currentMatchState = baseResult.matchState;
-                hasSysUpdate = true;
-            }
+            // 收集所有可触发的“回合开始”能力（基地 + 持续效果）
+            // 注意：此时 handledIds 为空，因为是回合刚开始
+            const baseChoices = getEligibleBaseAbilities('onTurnStart', core, nextPlayerId);
+            const ongoingChoices = getEligibleTriggers(core, 'onTurnStart', nextPlayerId, []);
+            const totalChoices = baseChoices.length + ongoingChoices.length;
 
-            // 触发 ongoing 效果 onTurnStart
-            const onTurnStartEvents = fireTriggers(core, 'onTurnStart', {
-                state: core,
-                matchState: currentMatchState,
-                playerId: nextPlayerId,
-                random,
-                now,
-            });
-            events.push(...onTurnStartEvents.events);
-            if (onTurnStartEvents.matchState) {
-                currentMatchState = onTurnStartEvents.matchState;
+            if (totalChoices === 1) {
+                // 有且仅有一个能力：直接自动执行
+                if (baseChoices.length === 1) {
+                    const b = baseChoices[0];
+                    const baseResult = triggerBaseAbility(b.baseDefId, 'onTurnStart', {
+                        state: core,
+                        matchState: currentMatchState,
+                        baseIndex: b.baseIndex,
+                        baseDefId: b.baseDefId,
+                        playerId: nextPlayerId,
+                        now,
+                    });
+                    events.push(...baseResult.events);
+                    if (baseResult.matchState) currentMatchState = baseResult.matchState;
+                    events.push({
+                        type: SU_EVENTS.ON_TURN_START_ABILITY_HANDLED,
+                        payload: { playerId: nextPlayerId, sourceId: `base_${b.baseIndex}_${b.baseDefId}` },
+                        timestamp: now,
+                    } as SmashUpEvent);
+                    hasSysUpdate = true;
+                } else {
+                    const t = ongoingChoices[0];
+                    const triggerResult = fireSpecificTrigger(core, 'onTurnStart', t.sourceDefId, {
+                        state: core,
+                        matchState: currentMatchState,
+                        playerId: nextPlayerId,
+                        random,
+                        now,
+                    });
+                    events.push(...triggerResult.events);
+                    if (triggerResult.matchState) currentMatchState = triggerResult.matchState;
+                    events.push({
+                        type: SU_EVENTS.ON_TURN_START_ABILITY_HANDLED,
+                        payload: { playerId: nextPlayerId, sourceId: t.sourceDefId },
+                        timestamp: now,
+                    } as SmashUpEvent);
+                    hasSysUpdate = true;
+                }
+            } else if (totalChoices > 1) {
+                // 多个能力：弹窗提示 player 选择执行顺序
+                const options = [
+                    ...baseChoices.map(b => {
+                        const def = getBaseDef(b.baseDefId);
+                        return {
+                            id: `base-${b.baseIndex}`,
+                            label: `基地：${def?.name ?? b.baseDefId}`,
+                            value: { type: 'base', baseIndex: b.baseIndex, baseDefId: b.baseDefId }
+                        };
+                    }),
+                    ...ongoingChoices.map(t => {
+                        const realDefId = t.sourceDefId.endsWith('_pod') ? t.sourceDefId.replace('_pod', '') : t.sourceDefId;
+                        const def = getCardDef(realDefId);
+                        const suffix = t.sourceDefId.endsWith('_pod') ? ' (POD)' : '';
+                        return {
+                            id: t.sourceDefId,
+                            label: `卡牌：${def?.name ?? t.sourceDefId}${suffix}`,
+                            value: { type: 'ongoing', sourceDefId: t.sourceDefId }
+                        };
+                    })
+                ];
+
+                const interaction = {
+                    id: `start_turn_choice_${now}`,
+                    kind: 'simple-choice' as const,
+                    playerId: nextPlayerId,
+                    data: {
+                        title: '请选择要执行的回合开始能力',
+                        options,
+                        sourceId: 'su:match_start_turn_choice',
+                    }
+                };
+                currentMatchState = queueInteraction(currentMatchState, interaction);
                 hasSysUpdate = true;
             }
 
@@ -1375,23 +1516,6 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                 hasResponseWindow: !!state.sys.responseWindow?.current,
             });
 
-            // 关键守卫：只要响应窗口仍然打开，就必须继续停在 scoreBases 等待玩家响应。
-            // 不能先看 eligibleIndices，因为 afterScoring 窗口打开后基地可能已经被清除/替换，
-            // 此时 eligibleIndices 会变成空数组；如果先按“无 eligible 基地”自动推进，
-            // 就会错误地带着仍然打开的 afterScoring 窗口一路推进到后续阶段。
-            if (state.sys.responseWindow?.current) {
-                console.log('[onAutoContinueCheck] scoreBases: 响应窗口仍打开，等待响应');
-                return undefined;
-            }
-
-            // 最后一个 afterScoring 交互刚补发清场/换基地事件时，
-            // 这些事件要等本轮 afterEvents 结束后才会被 reduce 到 core。
-            // 这里必须先停一轮，避免 FlowSystem 用旧 core 重新进入 scoreBases，导致重复计分。
-            if ((state.sys as any)._waitForPostScoringReduce) {
-                console.log('[onAutoContinueCheck] scoreBases: 等待延迟的记分后事件 reduce 到 core');
-                return undefined;
-            }
-            
             // 情况1：flowHalted=true 且交互已解决且响应窗口已关闭 → 自动推进
             if (state.sys.flowHalted && !state.sys.interaction.current && !state.sys.responseWindow?.current) {
                 // 【关键修复】如果正在执行 multi_base_scoring handler，不要自动推进
@@ -1406,11 +1530,11 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                     console.log('[onAutoContinueCheck] scoreBases: 检测到 afterScoringInitialPowers，自动推进触发重新计分');
                     return { autoContinue: true, playerId: pid };
                 }
-                
+
                 console.log('[onAutoContinueCheck] scoreBases: flowHalted=true 且交互已解决且响应窗口已关闭，自动推进');
                 return { autoContinue: true, playerId: pid };
             }
-            
+
             // 情况2：没有 eligible 基地 → 自动推进
             const eligibleIndices = getScoringEligibleBaseIndices(core);
             console.log('[onAutoContinueCheck] scoreBases: eligibleIndices =', eligibleIndices);
@@ -1419,8 +1543,15 @@ export const smashUpFlowHooks: FlowHooks<SmashUpCore> = {
                 return { autoContinue: true, playerId: pid };
             }
 
-            console.log('[onAutoContinueCheck] scoreBases: 响应窗口已关闭，自动推进触发计分');
-            return { autoContinue: true, playerId: pid };
+            // 情况3：有 eligible 基地且响应窗口已关闭 → 自动推进（触发计分）
+            if (!state.sys.responseWindow?.current) {
+                console.log('[onAutoContinueCheck] scoreBases: 响应窗口已关闭，自动推进触发计分');
+                return { autoContinue: true, playerId: pid };
+            }
+
+            // 情况4：响应窗口仍打开 → 不自动推进（等待响应）
+            console.log('[onAutoContinueCheck] scoreBases: 响应窗口仍打开，等待响应');
+            return undefined;
         }
 
         // draw 阶段：手牌不超限则自动推进到 endTurn
@@ -1528,8 +1659,74 @@ function postProcessSystemEvents(
     let ms = matchState ?? { core: state, sys: { interaction: { current: undefined, queue: [] } } } as unknown as MatchState<SmashUpCore>;
 
     // 依次执行保护过滤 + trigger 后处理（链式传递 matchState）
+    // Death on Six Legs Ongoing（销毁路径）：
+    // 在随从因 MINION_DESTROYED 即将被弃置前，为拥有六足死神的玩家提供一次
+    // “是否转移 1 个 +1 指示物到泰坦上”的交互机会。
+    const preDeathOnSixLegs: SmashUpEvent[] = [];
+    for (const evt of events) {
+        if (evt.type !== SU_EVENTS.MINION_DESTROYED) {
+            preDeathOnSixLegs.push(evt);
+            continue;
+        }
+
+        const de = evt as MinionDestroyedEvent;
+        const { minionUid, fromBaseIndex } = de.payload;
+        const base = state.bases[fromBaseIndex];
+        const minion = base?.minions.find(m => m.uid === minionUid);
+        if (!minion) {
+            preDeathOnSixLegs.push(evt);
+            continue;
+        }
+
+        try {
+            const controllerId = minion.controller;
+            const player = state.players[controllerId];
+            const titan = player?.activeTitan;
+            if (
+                controllerId &&
+                titan &&
+                titan.defId === 'titan_death_on_six_legs' &&
+                (minion.powerCounters ?? 0) > 0 &&
+                ms
+            ) {
+                const interaction = createSimpleChoice(
+                    `death_on_six_legs_ongoing_destroy_${now}_${minionUid}`,
+                    controllerId,
+                    '是否将该随从上的一个+1指示物转移到六足死神？',
+                    [
+                        {
+                            id: 'yes',
+                            label: '是，转移 1 个 +1 指示物',
+                            value: { accept: true },
+                        },
+                        {
+                            id: 'no',
+                            label: '否，直接进入弃牌堆',
+                            value: { accept: false },
+                        },
+                    ],
+                    {
+                        sourceId: 'giant_ants_death_on_six_legs_ongoing',
+                        targetType: 'generic',
+                        continuationContext: {
+                            kind: 'destroy',
+                            originalEvent: evt,
+                        },
+                    } as any
+                );
+                ms = queueInteraction(ms, interaction);
+                // 原始 MINION_DESTROYED 事件延后到交互解析时再重新发射
+                continue;
+            }
+        } catch {
+            // 防御性：任何错误都不应阻断后续 destroy/move 处理
+        }
+
+        preDeathOnSixLegs.push(evt);
+    }
+
     // destroy ↔ move 循环直到稳定（move 触发器可能产生新的 MINION_DESTROYED）
-    const afterDestroyMove = processDestroyMoveCycle(events, ms, pid, random, now);
+    const afterDestroyMove = processDestroyMoveCycle(preDeathOnSixLegs, ms, pid, random, now);
     if (afterDestroyMove.matchState) ms = afterDestroyMove.matchState;
     // 返回手牌/放牌库底保护过滤（与 execute() 后处理对齐）
     const afterReturn = filterProtectedReturnEvents(afterDestroyMove.events, ms.core, pid);
@@ -1555,7 +1752,7 @@ function postProcessSystemEvents(
     const derivedEvents: SmashUpEvent[] = [];
     // 收集 MINION_PLAYED 之前的非 MINION_PLAYED 事件，用于临时 reduce
     const prePlayEvents: SmashUpEvent[] = [];
-    
+
     // 初始化已处理事件集合（如果不存在）
     // 使用 any 类型断言绕过 SystemState 类型限制（这是游戏特定的临时状态）
     // 【D45 修复】统一处理 MINION_PLAYED 和 ACTION_PLAYED 的去重
@@ -1564,9 +1761,13 @@ function postProcessSystemEvents(
         sysAny._processedPlayedEvents = new Set<string>();
     }
     const processedSet = sysAny._processedPlayedEvents as Set<string>;
-    
+
     // 【修复】清理返回手牌的随从的去重标记
     // 当随从返回手牌后再次打出时，应该重新触发 onPlay 能力
+    // Bride Ongoing：每回合一次，在你在你的随从上放置或移除力量指示物后抽 1 张牌
+    const extraBrideOngoingEvents: SmashUpEvent[] = [];
+    const brideTriggeredPlayers = new Set<string>();
+
     for (const event of afterAffect.events) {
         if (event.type === SU_EVENTS.MINION_RETURNED) {
             const returnedEvt = event as { type: string; payload: { minionUid: string; fromBaseIndex: number } };
@@ -1574,23 +1775,23 @@ function postProcessSystemEvents(
             processedSet.delete(eventKey);
         }
     }
-    
+
     for (const event of afterAffect.events) {
         if (event.type === SU_EVENTS.MINION_PLAYED) {
             const playedEvt = event as MinionPlayedEvent;
-            
+
             // 去重检查：构造事件唯一标识（MINION: + cardUid + baseIndex）
             const eventKey = `MINION:${playedEvt.payload.cardUid}@${playedEvt.payload.baseIndex}`;
-            
+
             // 如果已处理过，跳过（防止步骤 4.5 和步骤 5 重复处理）
             if (processedSet.has(eventKey)) {
                 prePlayEvents.push(event);
                 continue;
             }
-            
+
             // 标记为已处理
             processedSet.add(eventKey);
-            
+
             // 将之前积累的事件 reduce 到临时 core
             // 确保 onPlay 触发时看到的是最新状态（随从已在场上，牌库/手牌已更新）
             let tempCore = state;
@@ -1605,7 +1806,7 @@ function postProcessSystemEvents(
             if (payload.fromDeck) {
                 tempCore = reduce(tempCore, event);
             }
-            
+
             const triggers = fireMinionPlayedTriggers({
                 core: tempCore,
                 matchState: ms,
@@ -1620,25 +1821,350 @@ function postProcessSystemEvents(
             });
             derivedEvents.push(...triggers.events);
             if (triggers.matchState) ms = triggers.matchState;
+
+            // 每当玩家打出一张随从牌时，检查 Arcane Protector Special 触发条件
+            // 具体计数逻辑在 reducer 中维护（cardsPlayedThisTurn）。
+            {
+                const playerIdForSpecial = payload.playerId;
+                const playerForSpecial = ms.core.players[playerIdForSpecial];
+                if (playerForSpecial) {
+                    const cardsPlayed = playerForSpecial.cardsPlayedThisTurn ?? 0;
+                    if (cardsPlayed >= 5) {
+                        const { arcaneProtectorSpecial } = require('./abilities/titans/arcaneProtector');
+                        if (arcaneProtectorSpecial) {
+                            const ctx: AbilityContext = {
+                                state: ms.core,
+                                matchState: ms,
+                                playerId: playerIdForSpecial,
+                                cardUid: payload.cardUid,
+                                defId: 'titan_arcane_protector',
+                                baseIndex: payload.baseIndex,
+                                random,
+                                now: event.timestamp,
+                            };
+                            const result = arcaneProtectorSpecial(ctx);
+                            derivedEvents.push(...result.events);
+                            if (result.matchState) ms = result.matchState;
+                        }
+                    }
+                }
+            }
         } else if (event.type === SU_EVENTS.ACTION_PLAYED) {
             // 【D45 修复】ACTION_PLAYED 事件也需要去重，防止行动卡 onPlay 能力被触发两次
             // 典型场景：传送门创建交互，交互解决后 pipeline 重新进入 postProcessSystemEvents
-            const playedEvt = event as { type: string; payload: { playerId: string; cardUid: string; defId: string }; timestamp: number };
-            
+            const playedEvt = event as { type: string; payload: { playerId: string; cardUid: string; defId: string; targetMinionUid?: string }; timestamp: number };
+
             // 去重检查：构造事件唯一标识（ACTION: + cardUid + playerId）
             const eventKey = `ACTION:${playedEvt.payload.cardUid}@${playedEvt.payload.playerId}`;
-            
+
             // 如果已处理过，跳过（防止步骤 4.5 和步骤 5 重复处理）
             if (processedSet.has(eventKey)) {
                 prePlayEvents.push(event);
                 continue;
             }
-            
+
             // 标记为已处理
             processedSet.add(eventKey);
-            
+
+            // 【泰坦 Ongoing】Cthulhu: 你打出疯狂牌后，给泰坦放置 +1 指示物（需在场“见证”）
+            // 注意：即使疯狂牌选择“返回疯狂牌库”也属于“打出疯狂牌”
+            {
+                const { MADNESS_CARD_DEF_ID } = require('./types');
+                if (playedEvt.payload.defId === MADNESS_CARD_DEF_ID) {
+                    // 仅在该事件发生前泰坦已在场时触发（见证规则）
+                    let tempCore = state;
+                    for (const preEvt of prePlayEvents) {
+                        tempCore = reduce(tempCore, preEvt as any);
+                    }
+                    const p = tempCore.players[playedEvt.payload.playerId];
+                    const titan = p?.activeTitan;
+                    if (titan && titan.defId === 'titan_cthulhu') {
+                        derivedEvents.push({
+                            type: SU_EVENTS.TITAN_POWER_TOKEN_ADDED,
+                            payload: {
+                                playerId: playedEvt.payload.playerId,
+                                titanUid: titan.titanUid,
+                                amount: 1,
+                                newTotal: (titan.powerTokens ?? 0) + 1,
+                            },
+                            timestamp: event.timestamp,
+                        } as any);
+                    }
+                }
+            }
+
             // ACTION_PLAYED 的 onPlay 触发已在 execute() 中处理，这里只需要标记去重
             // 不需要额外触发逻辑（与 MINION_PLAYED 不同）
+            prePlayEvents.push(event);
+
+            // 【泰坦 Ongoing】Fort Titanosaurus: 打出影响随从的行动卡后，添加+1力量指示物（每回合一次）
+            // 判断"影响随从"：行动卡的目标是随从（需要从 execute 中传递 targetMinionUid）
+            if (playedEvt.payload.targetMinionUid) {
+                // 采用 require 解压避免跨文件循环引用问题：
+                const { fortTitanosaurusOngoing } = require('./abilities/titans/fortTitanosaurus');
+                if (fortTitanosaurusOngoing) {
+                    const ctx: AbilityContext = {
+                        state: ms.core, // 用最新 core 数据
+                        matchState: ms,
+                        playerId: playedEvt.payload.playerId,
+                        cardUid: playedEvt.payload.cardUid,
+                        defId: playedEvt.payload.defId,
+                        baseIndex: 0,
+                        targetMinionUid: playedEvt.payload.targetMinionUid,
+                        random,
+                        now: event.timestamp
+                    };
+                    const result = fortTitanosaurusOngoing(ctx);
+                    derivedEvents.push(...result.events);
+                    if (result.matchState) ms = result.matchState;
+                }
+            }
+
+            // 每当玩家打出一张行动牌时，检查 Arcane Protector Special 触发条件
+            {
+                const playerIdForSpecial = playedEvt.payload.playerId;
+                const playerForSpecial = ms.core.players[playerIdForSpecial];
+                if (playerForSpecial) {
+                    const cardsPlayed = playerForSpecial.cardsPlayedThisTurn ?? 0;
+                    if (cardsPlayed >= 5) {
+                        const { arcaneProtectorSpecial } = require('./abilities/titans/arcaneProtector');
+                        if (arcaneProtectorSpecial) {
+                            const ctx: AbilityContext = {
+                                state: ms.core,
+                                matchState: ms,
+                                playerId: playerIdForSpecial,
+                                cardUid: playedEvt.payload.cardUid,
+                                defId: 'titan_arcane_protector',
+                                baseIndex: 0,
+                                random,
+                                now: event.timestamp,
+                            };
+                            const result = arcaneProtectorSpecial(ctx);
+                            derivedEvents.push(...result.events);
+                            if (result.matchState) ms = result.matchState;
+                        }
+                    }
+                }
+            }
+        } else if (event.type === SU_EVENTS.MINION_RETURNED) {
+            // 【泰坦 Ongoing】Invisible Ninja: 将己方随从返回手牌时，触发 once per turn 抽牌
+            const returnedEvt = event as { type: string; payload: { ownerId: string } };
+            const ownerId = returnedEvt.payload.ownerId;
+            const player = state.players[ownerId];
+            if (player && player.activeTitan?.titanDefId === 'titan_invisible_ninja' && !player.invisibleNinjaOngoingUsedThisTurn) {
+                const { invisibleNinjaOngoing } = require('./abilities/titans/invisibleNinja');
+                if (invisibleNinjaOngoing) {
+                    const ctx: AbilityContext = {
+                        state: ms.core,
+                        matchState: ms,
+                        playerId: ownerId,
+                        cardUid: undefined as any,
+                        defId: 'titan_invisible_ninja',
+                        baseIndex: player.activeTitan.baseIndex,
+                        random,
+                        now: event.timestamp,
+                    };
+                    const result = invisibleNinjaOngoing(ctx);
+                    derivedEvents.push(...result.events);
+                    if (result.matchState) ms = result.matchState;
+                }
+            }
+            prePlayEvents.push(event);
+        } else if (event.type === SU_EVENTS.MADNESS_DRAWN) {
+            // 【泰坦 Ongoing】Cthulhu: 你抽到疯狂牌后，给泰坦放置 +1 指示物（需在场“见证”）
+            const drawnEvt = event as { type: string; payload: { playerId: string }; timestamp: number };
+            // 仅在该事件发生前泰坦已在场时触发（见证规则）
+            let tempCore = state;
+            for (const preEvt of prePlayEvents) {
+                tempCore = reduce(tempCore, preEvt as any);
+            }
+            const p = tempCore.players[drawnEvt.payload.playerId];
+            const titan = p?.activeTitan;
+            if (titan && titan.defId === 'titan_cthulhu') {
+                derivedEvents.push({
+                    type: SU_EVENTS.TITAN_POWER_TOKEN_ADDED,
+                    payload: {
+                        playerId: drawnEvt.payload.playerId,
+                        titanUid: titan.titanUid,
+                        amount: 1,
+                        newTotal: (titan.powerTokens ?? 0) + 1,
+                    },
+                    timestamp: event.timestamp,
+                } as any);
+            }
+            prePlayEvents.push(event);
+        } else if (event.type === SU_EVENTS.MINION_DESTROYED) {
+            // 【泰坦 Ongoing】Invisible Ninja: 当你消灭另一位玩家的随从时，触发 once per turn 抽牌
+            const destroyedEvt = event as MinionDestroyedEvent;
+            const { ownerId, destroyerId } = destroyedEvt.payload;
+            if (destroyerId && destroyerId === pid && ownerId !== pid) {
+                const player = state.players[pid];
+                if (player && player.activeTitan?.titanDefId === 'titan_invisible_ninja' && !player.invisibleNinjaOngoingUsedThisTurn) {
+                    const { invisibleNinjaOngoing } = require('./abilities/titans/invisibleNinja');
+                    if (invisibleNinjaOngoing) {
+                        const ctx: AbilityContext = {
+                            state: ms.core,
+                            matchState: ms,
+                            playerId: pid,
+                            cardUid: undefined as any,
+                            defId: 'titan_invisible_ninja',
+                            baseIndex: player.activeTitan.baseIndex,
+                            random,
+                            now: event.timestamp,
+                        };
+                        const result = invisibleNinjaOngoing(ctx);
+                        derivedEvents.push(...result.events);
+                        if (result.matchState) ms = result.matchState;
+                    }
+                }
+            }
+            prePlayEvents.push(event);
+        } else if (event.type === SU_EVENTS.MINION_MOVED) {
+            // 【泰坦 Ongoing】Major Ursa: 其他玩家的随从进出本基地时，可给泰坦放置+1指示物
+            const movedEvt = event as { type: string; payload: { minionUid: string; fromBaseIndex: number; toBaseIndex: number }; timestamp: number };
+            const { minionUid, fromBaseIndex, toBaseIndex } = movedEvt.payload;
+
+            // 将之前的事件 reduce 到临时 core，以获取移动前状态
+            let tempCore = state;
+            for (const preEvt of prePlayEvents) {
+                tempCore = reduce(tempCore, preEvt);
+            }
+            const minion = tempCore.bases[fromBaseIndex]?.minions.find((m: any) => m.uid === minionUid);
+            const controllerId = minion?.controller;
+
+            if (controllerId !== undefined) {
+                for (const [titanOwnerId, player] of Object.entries(tempCore.players)) {
+                    const titan = (player as any).activeTitan;
+                    if (!titan || titan.defId !== 'titan_major_ursa') continue;
+                    if (controllerId === titanOwnerId) continue; // 己方随从移动不触发
+                    const titanBaseIndex = titan.baseIndex;
+                    const affectsBase = titanBaseIndex === fromBaseIndex || titanBaseIndex === toBaseIndex;
+                    if (!affectsBase) continue;
+
+                    const { majorUrsaOngoing } = require('./abilities/titans/majorUrsa');
+                    if (majorUrsaOngoing) {
+                        const ctx: AbilityContext = {
+                            state: ms.core,
+                            matchState: ms,
+                            playerId: titanOwnerId,
+                            cardUid: titan.titanUid,
+                            defId: 'titan_major_ursa',
+                            baseIndex: titanBaseIndex,
+                            random,
+                            now: event.timestamp,
+                        };
+                        const result = majorUrsaOngoing(ctx);
+                        derivedEvents.push(...result.events);
+                        if (result.matchState) ms = result.matchState;
+                    }
+                }
+            }
+            prePlayEvents.push(event);
+        } else if (event.type === SU_EVENTS.BASE_SCORED) {
+            // 【泰坦 Special 1】The Kraken:
+            // 在一个有你随从的基地计分后，如果本泰坦不在场上，可以在替换后的新基地上打出本泰坦
+            const scoredEvt = event as BaseScoredEvent;
+            const { baseIndex: scoredBaseIndex, minionBreakdowns } = scoredEvt.payload;
+
+            // 遍历所有玩家，检查是否满足：
+            // 1) 该玩家在该基地上至少有一个随从参与计分（使用 minionBreakdowns 判定控制权）
+            // 2) 该玩家当前没有在场泰坦（activeTitan 为空），Kraken 在 titanZone 中
+            for (const [pid, player] of Object.entries(state.players)) {
+                const breakdownsForPlayer = minionBreakdowns?.[pid];
+                const hasMinionOnBase = !!(breakdownsForPlayer && breakdownsForPlayer.length > 0);
+                if (!hasMinionOnBase) continue;
+
+                const hasKrakenInZone = player.titanZone?.some(c => c.defId === 'titan_the_kraken');
+                const active = player.activeTitan;
+                const krakenNotInPlay = !active || active.defId !== 'titan_the_kraken';
+
+                if (!hasKrakenInZone || !krakenNotInPlay) continue;
+
+                // 触发 The Kraken Special：为该玩家创建“是否要在新基地上打出 Kraken”的交互
+                const { theKrakenSpecial } = require('./abilities/titans/theKraken');
+                if (theKrakenSpecial) {
+                    const ctx: AbilityContext = {
+                        state: ms.core,
+                        matchState: ms,
+                        playerId: pid,
+                        cardUid: undefined as any,
+                        defId: 'titan_the_kraken',
+                        baseIndex: scoredBaseIndex,
+                        random,
+                        now: event.timestamp,
+                    };
+                    const result = theKrakenSpecial(ctx);
+                    derivedEvents.push(...result.events);
+                    if (result.matchState) ms = result.matchState;
+                }
+            }
+
+            prePlayEvents.push(event);
+        } else if (
+            event.type === SU_EVENTS.POWER_COUNTER_ADDED ||
+            event.type === SU_EVENTS.POWER_COUNTER_REMOVED
+        ) {
+            const pe = event as PowerCounterAddedEvent | PowerCounterRemovedEvent;
+            const { minionUid, baseIndex } = pe.payload as { minionUid: string; baseIndex: number };
+            const base = state.bases[baseIndex];
+            const minion = base?.minions.find(m => m.uid === minionUid);
+            if (!minion) {
+                prePlayEvents.push(event);
+                continue;
+            }
+
+            const ownerId = minion.controller;
+            const player = state.players[ownerId];
+            const titan = player?.activeTitan;
+
+            if (
+                titan &&
+                titan.defId === 'titan_the_bride' &&
+                !brideTriggeredPlayers.has(ownerId) &&
+                !player.brideOngoingUsedThisTurn
+            ) {
+                // 使用当前 core 状态抽一张牌
+                const { drawnUids } = drawCards(player, 1, random);
+                if (drawnUids.length > 0) {
+                    extraBrideOngoingEvents.push({
+                        type: SU_EVENTS.CARDS_DRAWN,
+                        payload: {
+                            playerId: ownerId,
+                            count: 1,
+                            cardUids: drawnUids,
+                            reason: 'titan_the_bride_ongoing',
+                        },
+                        timestamp: now,
+                    } as CardsDrawnEvent);
+                    brideTriggeredPlayers.add(ownerId);
+                }
+            }
+
+            prePlayEvents.push(event);
+        } else if (event.type === SU_EVENTS.TITAN_REMOVED) {
+            // Killer Kudzu Ongoing：泰坦离场后触发二选一效果
+            const removedEvt = event as SmashUpEvent & {
+                payload: { playerId: string; titanDefId: string; titanUid: string; baseIndex: number };
+            };
+            const { playerId, titanDefId } = removedEvt.payload;
+            if (titanDefId === 'titan_killer_kudzu') {
+                const { killerKudzuOngoing } = require('./abilities/titans/killerKudzu');
+                if (killerKudzuOngoing) {
+                    const ctx: AbilityContext = {
+                        state: ms.core,
+                        matchState: ms,
+                        playerId,
+                        cardUid: removedEvt.payload.titanUid,
+                        defId: titanDefId,
+                        baseIndex: removedEvt.payload.baseIndex,
+                        random,
+                        now: event.timestamp,
+                    };
+                    const result = killerKudzuOngoing(ctx);
+                    derivedEvents.push(...result.events);
+                    if (result.matchState) ms = result.matchState;
+                }
+            }
             prePlayEvents.push(event);
         } else {
             prePlayEvents.push(event);
@@ -1658,7 +2184,29 @@ function postProcessSystemEvents(
         finalDerived = afterDerivedAffect.events;
     }
 
-    return { events: [...afterAffect.events, ...finalDerived], matchState: ms };
+    const allEvents = [...afterAffect.events, ...extraBrideOngoingEvents, ...finalDerived];
+
+    // 标记已触发 Bride Ongoing 的玩家（每回合一次）
+    if (brideTriggeredPlayers.size > 0) {
+        const newPlayers: typeof state.players = { ...state.players };
+        for (const pid of brideTriggeredPlayers) {
+            const p = newPlayers[pid];
+            if (!p) continue;
+            newPlayers[pid] = {
+                ...p,
+                brideOngoingUsedThisTurn: true,
+            } as any;
+        }
+        ms = {
+            ...ms,
+            core: {
+                ...ms.core,
+                players: newPlayers,
+            },
+        };
+    }
+
+    return { events: allEvents, matchState: ms };
 }
 
 // ============================================================================

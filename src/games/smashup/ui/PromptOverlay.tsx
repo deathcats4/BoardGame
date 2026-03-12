@@ -22,6 +22,7 @@ import type { PlayerId } from '../../../engine/types';
 import { UI_Z_INDEX } from '../../../core';
 import { CardPreview } from '../../../components/common/media/CardPreview';
 import { getCardDef, getBaseDef, resolveCardName } from '../data/cards';
+import { getTitanDef } from '../data/titans';
 import type { CardPreviewRef } from '../../../core';
 import { useHorizontalDragScroll } from '../../../hooks/ui/useHorizontalDragScroll';
 import { useToast } from '../../../contexts/ToastContext';
@@ -308,8 +309,10 @@ export const PromptOverlay: React.FC<Props> = ({ interaction, dispatch, playerID
                         {/* 注意：不能用 justify-center，flex + justify-center + overflow 会导致左侧内容不可达 */}
                         <div ref={revealScrollRef} className="flex gap-4 overflow-x-auto max-w-[90vw] mx-auto px-4 py-3 smashup-h-scrollbar [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto">
                             {displayCards.cards.map((card, idx) => {
-                                const def = getCardDef(card.defId);
-                                const name = def ? resolveCardName(def, t) : card.defId;
+                                const cardDef = getCardDef(card.defId);
+                                const titanDef = getTitanDef(card.defId);
+                                const def = cardDef ?? titanDef;
+                                const name = cardDef ? resolveCardName(cardDef, t) : (titanDef ? titanDef.name : card.defId);
                                 const isSel = card.uid === selUid;
                                 const isPlayable = playableDefIds?.has(card.defId) ?? false;
                                 
@@ -341,7 +344,7 @@ export const PromptOverlay: React.FC<Props> = ({ interaction, dispatch, playerID
                                         }`}>
                                             <div className="rounded shadow-xl overflow-hidden">
                                                 <CardPreview
-                                                    previewRef={{ type: 'renderer', rendererId: 'smashup-card-renderer', payload: { defId: card.defId } }}
+                                                    previewRef={previewRef}
                                                     className="w-[8.5vw] aspect-[0.714] bg-slate-900 rounded"
                                                     alt={name}
                                                 />
@@ -349,7 +352,7 @@ export const PromptOverlay: React.FC<Props> = ({ interaction, dispatch, playerID
                                         </div>
                                         <button
                                             className={`absolute top-[0.3vw] right-[0.3vw] w-[2vw] h-[2vw] flex items-center justify-center bg-black/70 hover:bg-amber-500/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-[opacity,background-color] duration-200 shadow-xl border-2 border-white/30 z-50 cursor-zoom-in`}
-                                            onClick={(e) => { e.stopPropagation(); setMagnifyTarget({ defId: card.defId, type: def?.type ?? 'action' }); }}
+                                            onClick={(e) => { e.stopPropagation(); setMagnifyTarget({ defId: card.defId, type: titanDef ? 'titan' : (def?.type ?? 'action') }); }}
                                         >
                                             <svg className="w-[1.1vw] h-[1.1vw] fill-current" viewBox="0 0 20 20">
                                                 <path fillRule="evenodd" d="M8 4a4 4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -640,12 +643,13 @@ export const PromptOverlay: React.FC<Props> = ({ interaction, dispatch, playerID
                         >
                             {cardOptions.map((option, idx) => {
                                 const defId = extractDefId(option.value);
-                                const def = defId ? (getCardDef(defId) ?? getBaseDef(defId)) : undefined;
+                                const def = defId ? (getCardDef(defId) ?? getBaseDef(defId) ?? getTitanDef(defId)) : undefined;
                                 const previewRef = def?.previewRef;
-                                const name = def ? resolveCardName(def, t) : option.label;
+                                const name = def ? ('type' in def && def.type === 'titan' ? (def as { name: string }).name : resolveCardName(def, t)) : option.label;
                                 const isSelected = selectedIds.includes(option.id);
                                 const isBase = !!getBaseDef(defId ?? '');
-                                // 基地使用场上基地尺寸 14vw，行动卡/随从使用手牌尺寸 8.5vw
+                                const isTitan = !!defId && !!getTitanDef(defId);
+                                // 基地使用场上基地尺寸 14vw，行动卡/随从/泰坦使用手牌尺寸 8.5vw
                                 const cardWidth = isBase ? 'w-[14vw]' : 'w-[8.5vw]';
                                 const cardAspect = isBase ? 'aspect-[1.43]' : 'aspect-[0.714]';
 
@@ -699,7 +703,7 @@ export const PromptOverlay: React.FC<Props> = ({ interaction, dispatch, playerID
                                                 className={`absolute top-[0.3vw] right-[0.3vw] w-[2vw] h-[2vw] flex items-center justify-center bg-black/70 hover:bg-amber-500/90 text-white rounded-full opacity-0 group-hover:opacity-100 transition-[opacity,background-color] duration-200 shadow-xl border-2 border-white/30 z-50 cursor-zoom-in`}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const cardType = getBaseDef(defId) ? 'base' as const : (def && 'type' in def ? def.type : 'action' as const);
+                                                    const cardType = getBaseDef(defId) ? 'base' as const : (isTitan ? 'titan' as const : (def && 'type' in def ? def.type : 'action' as const));
                                                     setMagnifyTarget({ defId, type: cardType });
                                                 }}
                                             >

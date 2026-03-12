@@ -105,7 +105,25 @@
     "waiting_opponent": "等待对方操作",
     "power_counter": "力量指示物",
     "skip": "跳过",
-    "wait_for_your_turn": "等待你的响应回合"
+    "wait_for_your_turn": "等待你的响应回合",
+    "titan_zone": "泰坦区域",
+    "titan_place": "出场泰坦",
+    "titan_move": "移动泰坦",
+    "titan_clash": "泰坦冲突",
+    "titan_power_tokens": "力量指示物",
+    "titanZone_desc": "未上场的强大援军",
+    "yourTitan": "你的泰坦",
+    "opponentTitan": "对方泰坦",
+    "powerTokens": "力量指示物",
+    "select_titan_hint": "点击泰坦卡以选择出场",
+    "select_base_for_titan": "选择一个基地出场泰坦",
+    "select_base_to_move_titan": "选择目标基地移动泰坦",
+    "titan_clash_winner": "{{winner}}的泰坦获胜！",
+    "titan_removed": "泰坦被移除",
+    "no_titan_in_zone": "泰坦区域为空",
+    "titan_already_placed": "泰坦已在场上",
+    "click_to_magnify": "点击放大",
+    "release_the_kraken": "海怪出现！"
   },
   "feedback": {
     "deck_search_no_match": "牌库中未找到符合条件的卡牌，已重洗牌库",
@@ -189,7 +207,14 @@
     "abilityTriggered": "触发能力（{{triggerType}}）：",
     "baseCleared": "清空{{base}}",
     "deckReordered": "{{playerId}} 重排牌库",
-    "factionSelected": "{{playerId}} 选择派系：{{faction}}"
+    "factionSelected": "{{playerId}} 选择派系：{{faction}}",
+    "titanPlaced": "{{playerId}} 出场泰坦：",
+    "titanMoved": "{{playerId}} 移动泰坦：",
+    "titanClash": "泰坦冲突！",
+    "titanClashDetails": "{{winnerPlayerId}}的泰坦（力量{{winnerPower}}）击败{{loserPlayerId}}的泰坦（力量{{loserPower}}）",
+    "titanRemoved": "{{playerId}}的泰坦被移除：",
+    "titanPowerTokenAdded": "{{playerId}}的泰坦获得{{amount}}个力量指示物：",
+    "titanPowerTokenRemoved": "{{playerId}}的泰坦失去{{amount}}个力量指示物："
   },
   "factions": {
     "pirates": {
@@ -494,7 +519,7 @@
     },
     "cthulhu_altar": {
       "name": "克苏鲁祭坛",
-      "effectText": "打出到基地上。任何时候当你打出一个随从到这时，你在本回合可以额外打出一个战术。"
+      "effectText": "打出到基地上。持续：在你在此处打出一个随从后，你可以额外打出一个战术。"
     },
     "cthulhu_recruit_by_force": {
       "name": "强制招募",
@@ -502,7 +527,7 @@
     },
     "cthulhu_complete_the_ritual": {
       "name": "完成仪式",
-      "effectText": "打出到一个你至少拥有一个随从的基地上。在你的回合开始时，将所有在基地上的随从和战术放回其拥有者的牌库底并将该基地同基地牌库最顶部的卡交换。"
+      "effectText": "打出到一个你至少拥有一张随从的基地上。持续：在你的回合开始时，消灭此处的所有卡牌，并在基地牌库顶搜寻一个基地替换此基地。"
     },
     "cthulhu_furthering_the_cause": {
       "name": "深化目标",
@@ -689,7 +714,7 @@
     },
     "innsmouth_return_to_the_sea": {
       "name": "重返深海",
-      "effectText": "特殊：在一个基地计分后，将任意数量在这里的你的同名随从返回到手中而不是弃牌堆。"
+      "effectText": "特殊：在一个基地计分后，将该基地上任意数量你的随从返回手牌。"
     },
     "innsmouth_new_acolytes": {
       "name": "新人",
@@ -701,11 +726,11 @@
     },
     "innsmouth_spreading_the_word": {
       "name": "散播谣言",
-      "effectText": "额外打出至多两个与场中一个随从同名的随从。"
+      "effectText": "选择一个在场随从。额外打出一个与其同名的随从。"
     },
     "innsmouth_in_plain_sight": {
       "name": "一目了然",
-      "effectText": "打出到一个基地上。你在这里的力量为2或以下的随从不会被对手的卡牌影响。"
+      "effectText": "打出到基地上。持续：你在这里当前力量为2或更低的随从不受对手卡牌的影响。"
     },
     "innsmouth_the_deep_ones": {
       "name": "深潜者",
@@ -1592,7 +1617,7 @@
     },
     "bear_cavalry_cub_scout_pod": {
       "name": "幼熊斥候",
-      "abilityText": "持续：当其他玩家的随从移动到本随从所在的基地之后，如果它的力量低于本随从，则消灭它。"
+      "abilityText": "持续能力：在另一名玩家移动一张随从后，如果其战斗力低于此随从，你可以将其消灭以便选择你控制的一张牌面战斗力为3或更低的随从移动到此基地。"
     },
     "bear_cavalry_bear_hug_pod": {
       "name": "黑熊擒抱",
@@ -1640,7 +1665,7 @@
     },
     "cthulhu_altar_pod": {
       "name": "克苏鲁祭坛",
-      "effectText": "打出到基地上。任何时候当你打出一个随从到这时，你在本回合可以额外打出一个战术。"
+      "effectText": "打出到基地上。持续：每回合一次，在你在此处打出一个随从后，你可以打出一个额外战术。"
     },
     "cthulhu_recruit_by_force_pod": {
       "name": "强制招募",
@@ -1931,7 +1956,7 @@
     },
     "innsmouth_return_to_the_sea_pod": {
       "name": "重返深海",
-      "effectText": "特殊：在一个基地计分后，将任意数量在这里的你的同名随从返回到手中而不是弃牌堆。"
+      "effectText": "特殊：在一个基地计分后，将该基地上任意数量你的同名随从返回手牌。"
     },
     "innsmouth_new_acolytes_pod": {
       "name": "新人",
@@ -1943,11 +1968,11 @@
     },
     "innsmouth_spreading_the_word_pod": {
       "name": "散播谣言",
-      "effectText": "额外打出至多两个与场中一个随从同名的随从。"
+      "effectText": "选择一个在场随从。额外打出至多两个与其同名的随从。"
     },
     "innsmouth_in_plain_sight_pod": {
       "name": "一目了然",
-      "effectText": "打出到一个基地上。你在这里的力量为2或以下的随从不会被对手的卡牌影响。"
+      "effectText": "打出到基地上。持续：你在这里印制力量为2或更低的随从不受对手卡牌的影响。"
     },
     "innsmouth_the_deep_ones_pod": {
       "name": "深潜者",
@@ -2427,55 +2452,714 @@
     },
     "zombie_lord_pod": {
       "name": "僵尸领主",
-      "abilityText": "你可以从弃牌堆在每个没有你随从的基地额外打出一个力量为2或以下的随从。"
+      "abilityText": "在每个你没有随从的基地上，你可以从弃牌堆额外打出一个战斗力为2或更低的随从。"
     },
     "zombie_grave_digger_pod": {
       "name": "掘墓者",
-      "abilityText": "你可以将一个随从从你的弃牌堆置入你的手牌中。"
+      "abilityText": "你可以将弃牌堆中的一个随从加入手牌。"
     },
     "zombie_tenacious_z_pod": {
       "name": "顽强丧尸",
-      "abilityText": "异能：在你的回合中你可以从弃牌堆中把本随从作为额外随从打出，你每回合只能使用一个顽强丧尸的能力。"
+      "abilityText": "特殊能力：在你的回合，你可以从弃牌堆将该卡作为额外随从打出。每回合只能使用一次顽强丧尸的特殊能力。"
     },
     "zombie_walker_pod": {
       "name": "行尸",
-      "abilityText": "查看你牌库顶的一张牌，弃掉它或将其返回你的牌库顶。"
+      "abilityText": "查看你牌库顶的牌。你可以将其弃掉或放回牌库顶。"
     },
     "zombie_grave_robbing_pod": {
       "name": "掘墓",
-      "effectText": "将一张卡从你的弃牌堆置入你的手牌中。"
+      "effectText": "将弃牌堆中的一张卡加入你的手牌。"
     },
     "zombie_they_keep_coming_pod": {
       "name": "它们不断来临",
-      "effectText": "从你的弃牌堆中额外打出一个随从。"
+      "effectText": "从弃牌堆额外打出一个随从。"
     },
     "zombie_lend_a_hand_pod": {
       "name": "借把手",
-      "effectText": "将任意数量的牌从你的弃牌堆洗回你的牌库中。"
+      "effectText": "将弃牌堆中任意数量的卡洗回牌库。"
     },
     "zombie_overrun_pod": {
       "name": "泛滥横行",
-      "effectText": "打出到基地上。持续：其他玩家不能打出随从到此基地。在你的回合开始的时候消灭本战术。"
+      "effectText": "打出到基地上。持续能力：其他玩家无法在该基地打出随从。在你的回合开始时，消灭该卡。"
     },
     "zombie_theyre_coming_to_get_you_pod": {
       "name": "它们为你而来",
-      "effectText": "打出到基地上。持续：在你的回合，你可以从你的弃牌堆而不是你的手中打出一个随从到此基地。"
+      "effectText": "打出到基地上。持续能力：在你的回合，你可以从弃牌堆打出随从到该基地，而不是从手牌打出。"
     },
     "zombie_not_enough_bullets_pod": {
       "name": "子弹不够",
-      "effectText": "将任意数量的同名随从从你的弃牌堆置入你的手牌中。"
+      "effectText": "将弃牌堆中任意数量的同名随从加入你的手牌。"
     },
     "zombie_outbreak_pod": {
       "name": "爆发",
-      "effectText": "在一个没有你随从的基地额外打出一个随从。"
+      "effectText": "在一个你没有随从的基地上额外打出一个随从。"
     },
     "zombie_mall_crawl_pod": {
       "name": "进发商场",
-      "effectText": "从你的牌库搜寻任意数量的同名的卡牌并将它们置入你的弃牌堆。之后重洗牌库。"
+      "effectText": "搜索你的牌库，将任意数量的同名卡放入弃牌堆。洗混你的牌库。"
     },
     "pirate_cut_lass": {
       "name": "女剑客"
+    },
+    "miskatonic_eldritch_gate_pod": {
+      "name": "打出到基地上。天赋能力",
+      "effectText": "打出到基地上。天赋能力：抓一张疯狂卡。你可以额外打出一个随从到这里。"
+    },
+    "miskatonic_jinkies_pod": {
+      "name": "将你手牌或弃牌堆中至多两张疯狂卡返回疯狂牌库。",
+      "effectText": "将你手牌或弃牌堆中至多两张疯狂卡返回疯狂牌库。"
+    },
+    "base_miskatonic_university_base_pod": {
+      "name": "米斯卡塔尼克大学",
+      "abilityText": "(24, VP 4-3-2) 每回合一次，在你在这里打出一个随从后，你可以抓两张疯狂卡，或者从手牌弃置一张疯狂卡来额外打出一张战术。"
+    },
+    "base_the_asylum_pod": {
+      "name": "庇护所",
+      "abilityText": "(16, VP 3-1-1) 在你在这里打出一个随从后，你可以将一张手牌移出游戏（放入盒子），在一个随从上放置一个+1战斗力标记。"
+    },
+    "base_ninja_dojo_pod": {
+      "name": "忍者道场",
+      "abilityText": "(18, VP 2-3-2) 无特殊能力。"
+    },
+    "base_temple_of_goju_pod": {
+      "name": "刚柔会神庙",
+      "abilityText": "(16, VP 4-3-2) 每当这里有一个随从被消灭时，将其置于其持有者的牌库底。"
+    },
+    "base_the_grey_opal_pod": {
+      "name": "灰色欧泊号",
+      "abilityText": "(17, VP 3-1-1) 在本基地计分后，除了获胜者外的所有玩家可以将这里的一个随从移动到另一个基地。"
+    },
+    "base_tortuga_pod": {
+      "name": "托尔图加",
+      "abilityText": "(21, VP 4-3-2) 在本基地计分并被取代后，亚军可以将另一个基地上的一个随从移动到新替换的基地上。"
+    },
+    "base_factory_436_1337_pod": {
+      "name": "当该基地计分时，获胜者每拥有5点战斗力则获得1点VP。",
+      "abilityText": "(25, VP 2-2-1) 当该基地计分时，获胜者每拥有5点战斗力则获得1点VP。"
+    },
+    "base_the_central_brain_pod": {
+      "name": "中央大脑",
+      "abilityText": "(19, VP 4-2-1) 这里的每个随从获得+1战斗力。"
+    },
+    "base_inventors_salon_pod": {
+      "name": "发明家沙龙",
+      "abilityText": "(22, VP 4-2-1) 在该基地计分后，获胜者可以从弃牌堆拿回一张战术。"
+    },
+    "base_the_workshop_pod": {
+      "name": "工坊",
+      "abilityText": "(20, VP 4-2-1) 每当有一名玩家将战术打出到该基地时，该玩家可以额外打出一个战术。"
+    },
+    "alien_homeworld_base_pod": {
+      "name": "家园",
+      "abilityText": "每回合一次，在你在此处打出一张随从后，你可以打出一张战斗力为 2 或更低的额外随从。"
+    },
+    "alien_mothership_base_pod": {
+      "name": "宇宙母舰",
+      "abilityText": "在该基地计分后，冠军玩家可以将自己在这里的一张战斗力为 3 或更低的随从返回手牌。"
+    },
+    "bear_cavalry_field_of_honor_pod": {
+      "name": "决斗场",
+      "abilityText": "在每回合中，你第一次在此处消灭另一名玩家的随从后，获得 1 VP。"
+    },
+    "bear_cavalry_tsars_palace_pod": {
+      "name": "沙皇宫殿",
+      "abilityText": "若你在此处的战斗力并非最高，你不可在此处打出战斗力为 2 或更低的随从。"
+    },
+    "bear_cavalry_major_ursa_pod": {
+      "name": "大熊座战将",
+      "abilityText": "特殊能力：可以打出此泰坦以替代你本回合的常规随从打出。持续能力：当其他玩家的随从移动或离开该基地后，你可以放置一个+1战斗力标记到本泰坦上。天赋能力：在此基地的一张随从上放置一个+1战斗力标记，或移动此泰坦。"
+    },
+    "dino_jungle_oasis_base_pod": {
+      "name": "欧亚西斯丛林",
+      "abilityText": "(无能力描述)"
+    },
+    "dino_fort_titanosaurus_pod": {
+      "name": "泰坦龙要塞龙",
+      "abilityText": "特殊能力：在你的回合中，如果你尚未打出随从，你可以消灭你的一个随从以在其所在的基地打出此泰坦。在其上放置等同于被消灭随从战斗力数值的+1战斗力标记。持续能力：每回合一次，在打出一张直接影响一或多张随从的战术后，可以在其中一张随从上和/或此泰坦上放置一个+1战斗力标记。天赋能力：如果此泰坦上有4个以上+1战斗力标记，摸一张牌。"
+    },
+    "elder_thing_eldest_thing_pod": {
+      "name": "古老者",
+      "abilityText": "消灭你的其他两张随从，或者将本随从放入你的牌库底。（无法消灭两张随从时，则必须放入牌库底）持续能力：本随从不会被其他玩家的卡牌影响。"
+    },
+    "elder_thing_mi-go_pod": {
+      "name": "米·戈",
+      "abilityText": "每名其他玩家可以抓取一张疯狂牌。对于每名没有这么做的其他玩家，你可以摸一张牌。如果没有玩家抓取疯狂牌，你可以在一个随从上放置一个 +1 战斗力标记。"
+    },
+    "elder_thing_antarctic_base_pod": {
+      "name": "南极基地",
+      "abilityText": "计分点 24 - VP: 5 3 2 - 每个回合，所有玩家不能在此打出多于一张随从（从基本。"
+    },
+    "elder_thing_plateau_of_leng_pod": {
+      "name": "冷之高原",
+      "abilityText": "计分点 18 - VP: 3 2 1 - 玩家每个回合第一次打从本随从开始后，可以打出一张名称相同的额外随从到这里。"
+    },
+    "ghost_séance_pod": {
+      "name": "通灵会",
+      "abilityText": "如果你的手牌数量为 2 或更少，摸牌直到你的手牌数量为 5 张。"
+    },
+    "ghost_haunted_house_pod": {
+      "name": "鬼屋",
+      "abilityText": "在一名玩家在此处打出一张随从后，该玩家必须丢弃一张卡牌。"
+    },
+    "ghost_the_dread_gazebo_pod": {
+      "name": "恐怖凉亭",
+      "effectText": "玩家不可在此基地上打出战术牌。"
+    },
+    "ghost_creampuff_man_pod": {
+      "name": "奶油泡芙人",
+      "abilityText": "特殊能力：在你的回合中，如果你没有手牌，可以打出此泰坦。持续能力：增加你在这里的战斗力，其数值为5减去你的手牌数量（增加的战斗力不会低于0）。天赋能力：弃掉一张手牌以从你的弃牌堆中选择一张标准战术作为额外战术打出，然后将该战术放进你的牌库底，而非进入弃牌堆。"
+    },
+    "mad_scientist_herr_doktor_pod": {
+      "name": "黑尔博士",
+      "abilityText": "天赋能力：在你的另一张随从上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_the_monster_pod": {
+      "name": "科学怪人",
+      "abilityText": "天赋能力：从此随从上移除一个 +1 战斗力标记以打出一张额外随从。"
+    },
+    "mad_scientist_lab_assistant_pod": {
+      "name": "实验室助手",
+      "abilityText": "在你的另一张随从上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_igor_pod": {
+      "name": "科学小怪蛋",
+      "abilityText": "持续：在本随从被消灭或者被弃掉之后，在你的一张随从上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_angry_mob_pod": {
+      "name": "愤怒的暴民",
+      "abilityText": "选择你的一张随从。将你手牌中任意数量的卡牌放置于你的牌库底。每放置一张卡牌，就在该随从上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_blitzed_pod": {
+      "name": "闪电袭击",
+      "abilityText": "从你的随从上移除任意数量的 +1 战斗力标记。消灭一张战斗力小于或等于所移除标记数量的随从。"
+    },
+    "mad_scientist_body_shop_pod": {
+      "name": "尸体商店",
+      "abilityText": "消灭你的一张随从。将等同于该随从战斗力数量的 +1 战斗力标记分配至你的随从上。"
+    },
+    "mad_scientist_german_engineering_pod": {
+      "name": "德国智造",
+      "abilityText": "打出到基地上。持续能力：在你在此处打出一张随从后，在其上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_grave_situation_pod": {
+      "name": "死亡境地",
+      "abilityText": "打出到基地上。持续能力：若你在此处的随从将被消灭，改为将其返回你的手牌。"
+    },
+    "mad_scientist_its_alive_pod": {
+      "name": "它活过来了！",
+      "abilityText": "打出一张额外随从，并在其上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_jolt_pod": {
+      "name": "震撼",
+      "abilityText": "在你的每一张随从上放置一个 +1 战斗力标记。"
+    },
+    "mad_scientist_überserum_pod": {
+      "name": "身体改造",
+      "abilityText": "打出到随从上。持续能力：在你的回合开始时，在此随从上放置一个 +1 战斗力标记。此随从不可被消灭。"
+    },
+    "mad_scientist_the_alpha_pod": {
+      "name": "阿尔法",
+      "effectText": "特殊能力：在你的回合开始时，你可以通过执行以下任意两项（顺序自选，须针对不同随从）来打出此泰坦：将你的一张随从牌移出游戏；消灭你的一张随从；从你的一张随从上移除一个 +1 战斗力标记。持续能力：每回合一次，在你放置或移除随从上的战斗力标记后，摸一张牌。天赋能力：在此处的一张随从上放置一个 +1 战斗力标记；或从你的随从上共移除两个 +1 战斗力标记以打出一张额外战术。"
+    },
+    "cthulhu_star-spawn_of_cthulu_pod": {
+      "name": "星之眷族",
+      "abilityText": "天赋能力：将你手牌中的一张疯狂牌放入另一名玩家的手牌。"
+    },
+    "cthulhu_cthulus_chosen_pod": {
+      "name": "克苏鲁的神选者",
+      "abilityText": "特殊能力：在一个基地计分前，你可以摸一张疯狂牌，令此随从获得 +2 战斗力，直到回合结束。"
+    },
+    "cthulhu_servitor_of_cthulu_pod": {
+      "name": "克苏鲁的随从",
+      "effectText": "天赋能力：消灭此随从，然后将你弃牌堆中的一张战术牌放置于你的牌库顶。"
+    },
+    "cthulhu_altar_to_cthulu_pod": {
+      "name": "克苏鲁祭坛",
+      "effectText": "打出到基地上。持续能力：每回合一次，在你在此处打出一张随从后，你可以打出一张额外战术。"
+    },
+    "cthulhu_cthulu_fhtagn_pod": {
+      "name": "克苏鲁发狂",
+      "effectText": "展示你牌库顶的卡牌，直到展示出两张战术牌。将这两张战术牌加入你的手牌，其余卡牌放置于牌库底。"
+    },
+    "cthulhu_the_seal_is_broken_pod": {
+      "name": "破除封印",
+      "effectText": "摸一张疯狂牌。获得 1 VP。"
+    },
+    "cthulhu_mountains_of_madness_pod": {
+      "name": "疯狂山脉",
+      "abilityText": "在此处每打出一张随从后，其控制者摸一张疯狂牌。"
+    },
+    "cthulhu_rlyeh_pod": {
+      "name": "拉莱耶",
+      "abilityText": "在每位玩家的回合开始时，该玩家可以消灭其在此处的一张随从。若如此做，该玩家获得 1 VP。"
+    },
+    "cthulhu_cthulu_pod": {
+      "name": "克苏鲁",
+      "effectText": "特殊能力：你可以摸两张疯狂牌，在拥有你随从的基地上打出此泰坦，以替代你本回合的常规战术打出。持续能力：在你打出或摸一张疯狂牌后，在此泰坦上放置一个 +1 战斗力标记。天赋能力：摸一张疯狂牌；或将你手牌中的一张疯狂牌放入另一名玩家的手牌。"
+    },
+    "giant_ant_gimme_the_prize_pod": {
+      "name": "夺取奖励",
+      "effectText": "在至多三张你的随从上各放置一个 +1 战斗力标记。"
+    },
+    "giant_ant_death_on_six_legs_pod": {
+      "name": "六足死神",
+      "abilityText": "特殊能力：在你的回合中，如果你的随从身上总共有六个或更多+1战斗力标记，你可以弃一张牌来打出本泰坦。持续能力：在一个随从进入弃牌堆前，你可以将其身上的一个+1战斗力标记转移给本泰坦。天赋能力：打出一张额外的战术。"
+    },
+    "innsmouth_innsmouth_pod": {
+      "name": "印斯茅斯",
+      "abilityText": "每在此处打出一张随从后，其控制者可以从任意玩家的弃牌堆中选择一张卡牌放置于其拥有者的牌库底。"
+    },
+    "innsmouth_ritual_site_pod": {
+      "name": "祭祀遗址",
+      "abilityText": "在该基地计分后，该基地上的所有随从被洗入其拥有者的牌库。"
+    },
+    "innsmouth_dagon_pod": {
+      "name": "大衮",
+      "abilityText": "特殊能力：在你的回合中，由于你在某基地拥有两张或更多同名随从，你可以打出此泰坦。持续能力：在此基地上且与此处其他随从同名的每一张随从，为你在此处提供 +1 战斗力。天赋能力：在此处打出一张额外随从。"
+    },
+    "killer_plant_insta-grow_pod": {
+      "name": "速生",
+      "abilityText": "打出一个额外随从。"
+    },
+    "killer_plant_secret_grove_pod": {
+      "name": "秘密树林",
+      "abilityText": "在你的回合中，你可以额外打出一张力量为 2 或更低的随从在此基地。"
+    },
+    "killer_plant_the_greenhouse_pod": {
+      "name": "温室",
+      "abilityText": "在该基地计分并被替换后，获胜玩家可以从牌库搜寻一张随从并打出到新基地上。"
+    },
+    "killer_plant_killer_kudzu_pod": {
+      "name": "杀手葛藤",
+      "abilityText": "特殊能力：在你的回合开始时，若此泰坦不在场，其上放置一个 +1 战斗力标记。在你的回合中，若此泰坦拥有三个或更多标记，你可以打出此泰坦以替代你的常规随从权。离场时最多保留 6 个标记。持续能力：在此泰坦离场后，将你弃牌堆中至多两张随从洗入牌库；或摸两张牌。天赋能力：消灭此泰坦以从弃牌堆打出一张额外随从，其战斗力须小于或等于此泰坦离场时的标记数量。"
+    },
+    "dino_jungle_oasis_pod": {
+      "name": "欧亚西斯丛林",
+      "abilityText": "(无能力描述)"
+    },
+    "cthulhu_star_spawn_of_cthulu_pod": {
+      "name": "星之眷族",
+      "abilityText": "天赋能力：将你手牌中的一张疯狂牌放入另一名玩家的手牌。"
+    },
+    "ninja_ninja_master_pod": {
+      "name": "忍者大师",
+      "abilityText": "你可以消灭本基地的一个随从。"
+    },
+    "ninja_ninja_acolyte_pod": {
+      "name": "忍者侍从",
+      "abilityText": "天赋能力：如果你在本回合尚未打出过随从，你可以将该随从返回你的手牌，并立即在这里额外打出一个随从。"
+    },
+    "ninja_assassin_pod": {
+      "name": "刺客",
+      "effectText": "打出到随从上。持续能力：在回合结束时消灭该随从。"
+    },
+    "pirate_pirate_king_pod": {
+      "name": "海盗王",
+      "abilityText": "特殊能力：在基地计分前，你可以移动该随从到那里。"
+    },
+    "miskatonic_it_just_might_work_pod": {
+      "name": "弃置至多两张疯狂卡。每弃置一张，直到回合结束前你的每个随从获得+1战斗力。",
+      "effectText": "弃置至多两张疯狂卡。每弃置一张，直到回合结束前你的每个随从获得+1战斗力。"
+    },
+    "base_invader_pod": {
+      "name": "入侵者",
+      "abilityText": "获得 1 VP。"
+    },
+    "alien_homeworld_pod": {
+      "name": "家园",
+      "abilityText": "每回合一次，在你在此处打出一张随从后，你可以打出一张战斗力为 2 或更低的额外随从。"
+    },
+    "alien_mothership_pod": {
+      "name": "宇宙母舰",
+      "abilityText": "在该基地计分后，冠军玩家可以将自己在这里的一张战斗力为 3 或更低的随从返回手牌。"
+    },
+    "base_field_of_honor_pod": {
+      "name": "决斗场",
+      "abilityText": "(VP 3-2-1) 在每回合中，你第一次在此处消灭另一名玩家的随从后，获得 1 VP。"
+    },
+    "dino_titan_pod": {
+      "name": "泰坦龙要塞龙",
+      "effectText": "特殊能力：在你的回合中，如果你尚未打出随从，你可以消灭你的一个随从以在其所在的基地打出此泰坦。在其上放置等同于被消灭随从战斗力数值的+1战斗力标记。持续能力：每回合一次，在打出一张直接影响一或多张随从的战术后，可以在其中一张随从上和/或此泰坦上放置一个+1战斗力标记。天赋能力：如果此泰坦上有4个以上+1战斗力标记，摸一张牌。"
+    },
+    "base_antarctic_base_pod": {
+      "name": "南极基地",
+      "abilityText": "(24, VP 5-3-2) 每个回合，所有玩家不能在此打出多于一张随从。"
+    },
+    "base_plateau_of_leng_pod": {
+      "name": "冷之高原",
+      "abilityText": "(18, VP 3-2-1) 玩家每个回合第一次打出随从后，可以打出一张名称相同的额外随从到这里。"
+    },
+    "base_shady_deal_pod": {
+      "name": "肮脏交易",
+      "abilityText": "如果你的手牌数量为两张或更少，获得 1 VP。"
+    },
+    "frankenstein_the_alpha_pod": {
+      "name": "阿尔法",
+      "abilityText": "特殊能力：在你的回合开始时，你可以通过执行以下任意两项（顺序自选，须针对不同随从）来打出此泰坦：将你的一张随从牌移出游戏；消灭你的一张随从；从你的一张随从上移除一个 +1 战斗力标记。持续能力：每回合一次，在你放置或移除随从上的战斗力标记后，摸一张牌。天赋能力：在此处的一张随从上放置一个 +1 战斗力标记；或从你的随从上共移除两个 +1 战斗力标记以打出一张额外战术。"
+    },
+    "base_furthering_the_cause_pod": {
+      "name": "深化目标",
+      "abilityText": "打出到基地上。持续能力：在每回合结束时，若另一名玩家在此处的随从被消灭，获得 1 VP。"
+    },
+    "base_the_seal_is_broken_pod": {
+      "name": "破除封印",
+      "abilityText": "摸一张疯狂牌。获得 1 VP。"
+    },
+    "base_rlyeh_pod": {
+      "name": "拉莱耶",
+      "abilityText": "在每位玩家的回合开始时，该玩家可以消灭其在此处的一张随从。若如此做，该玩家获得 1 VP。"
+    },
+    "base_the_hill_pod": {
+      "name": "蚁丘",
+      "abilityText": "(VP 4-2-1) 在你的回合开始时，你可以将你的一张随从移动至此基地。"
+    },
+    "base_egg_chamber_pod": {
+      "name": "育卵室",
+      "abilityText": "(17, VP 3-1-1) 持有 +1 战斗力标记的随从在此处不可被消灭。"
+    },
+    "base_innsmouth_pod": {
+      "name": "印斯茅斯",
+      "abilityText": "(VP 5-3-2) 每在此处打出一张随从后，其控制者可以从任意玩家的弃牌堆中选择一张卡牌放置于其拥有者的牌库底。"
+    },
+    "base_ritual_site_pod": {
+      "name": "祭祀遗址",
+      "abilityText": "(VP 4-2-2) 在该基地计分后，该基地上的所有随从被洗入其拥有者的牌库。"
+    },
+    "base_secret_grove_pod": {
+      "name": "秘密树林",
+      "abilityText": "(VP 3-2-1) 在你的回合中，你可以额外打出一张力量为 2 或更低的随从在此基地。"
+    },
+    "base_the_greenhouse_pod": {
+      "name": "温室",
+      "abilityText": "(24, VP 4-2-1) 在该基地计分并被替换后，获胜玩家可以从牌库搜寻一张随从并打出到新基地上。"
+    },
+    "base_arkham_university_pod": {
+      "name": "阿卡姆大学",
+      "abilityText": "(24, VP 4-3-2) 每回合一次，在你在这里打出一个随从后，你可以抓两张疯狂卡，或者从手牌弃置一张疯狂卡来额外打出一张战术。"
+    },
+    "base_asylum_pod": {
+      "name": "疯人院",
+      "abilityText": "(16, VP 3-1-1) 在你在这里打出一个随从后，你可以将一张手牌移出游戏（放入盒子），在一个随从上放置一个+1战斗力标记。"
+    },
+    "ninja_titan_pod": {
+      "name": "特殊能力",
+      "abilityText": "特殊能力：在你的回合，若该泰坦不在场上，你可以弃置一张牌来打出该泰坦到一个你拥有随从的基地。持续能力：每回合一次，在你消灭了其他玩家的一张牌或将你的随从返回手牌后，可查看牌库顶两张牌，抓一张并将另一张洗回。特殊能力：在你的回合开始时，你可以消灭该泰坦来额外打出一个战斗力为3或更低的随从。"
+    },
+    "pirate_titan_pod": {
+      "name": "特殊能力",
+      "abilityText": "特殊能力：在基地计分后且该卡不在场上，若你在那里拥有随从，可大声宣布（或通过其他方式告知）“释放克拉肯！”来将其打出到替换的基地。天赋能力：移动该泰坦。那里的其他随从获得-1战斗力，直到你下个回合开始。特殊能力：在计分后，移动你的一个随从从这里到另一基地。"
+    },
+    "base_workshop_pod": {
+      "name": "工作室",
+      "abilityText": "(20, VP 4-2-1) 每当有一名玩家将战术打出到该基地时，该玩家可以额外打出一个战术。"
+    },
+    "trickster_pixie_pod": {
+      "name": "精灵",
+      "abilityText": "随从：若你的手牌数多于至少一名其他玩家，在你这里的任意数量随从上各放置一个+1战斗力标记。",
+      "effectText": "战术：消灭一个战术，在你的随从之间分配两个+1战斗力标记。"
+    },
+    "base_mushroom_kingdom_pod": {
+      "name": "蘑菇王国",
+      "abilityText": "(19, VP 4-3-2) 在你的回合开始时，如果你的手牌数量多于任何其他玩家，你可以移动一个随从到此基地或离开此基地。"
+    },
+    "base_big_funny_giant_pod": {
+      "name": "特殊能力",
+      "abilityText": "特殊能力：你可以打出此泰坦以替代你本回合的常规随从打出。持续能力：在另一名玩家在此基地打出一个随从后，其必须丢弃一张牌。在每名其他玩家的回合结束时，若其在此基地没有随从，你可以在此泰坦上放置一个+1战斗力标记。特殊能力：当此基地计分时，若你是获胜者且至少有一名其他玩家在此没有随从，获得 1 VP。"
+    },
+    "vampire_wolf_pact_pod": {
+      "name": "狼群之约",
+      "abilityText": "随从：你可以令一个随从战斗力-1（直到你的下个回合开始），以在你这里的另一个随从上放置一个+1战斗力标记。",
+      "effectText": "战术：将你弃牌堆的一张牌洗入牌库。"
+    },
+    "vampire_stakeout_pod": {
+      "name": "蹲守",
+      "effectText": "打出到基地上。天赋能力：若另一名玩家在此基地的战斗力在本回合有所下降，其他玩家直到你的下个回合开始前无法在此打出战斗力为3或更高的随从。"
+    },
+    "base_castle_blood_pod": {
+      "name": "血堡",
+      "abilityText": "(17, VP 3-1-1) 每回合一次，在你消灭了另一个基地的一个随从后，你可以将其埋伏在这里。每有一张卡牌埋伏在此，该基地的爆破临界点降低2点。"
+    },
+    "base_crypt_pod": {
+      "name": "地穴",
+      "abilityText": "(20, VP 4-2-2) 在你消灭了一个或多个随从后，你可以向你在此基地的一张随从上放置一个+1战斗力标记。"
+    },
+    "base_moot_site_pod": {
+      "name": "集会场",
+      "abilityText": "(15, VP 2-1-0) 每回合第一次在此基地打出随从后，该随从获得+2战斗力直到回合结束。"
+    },
+    "base_standing_stones_pod": {
+      "name": "巨石阵",
+      "abilityText": "(20, VP 4-2-1) 在你的回合中，你在这里的一个随从可以执行两次其天赋能力。"
+    },
+    "base_school_of_wizardry_pod": {
+      "name": "巫师学校",
+      "abilityText": "(20, VP 3-2-1) 在基地计分后，获胜者查看基地牌库顶的三张牌，选择其中一个替换此基地，并按任意顺序将其余牌放回。"
+    },
+    "base_the_great_library_pod": {
+      "name": "大图书馆",
+      "abilityText": "(22, VP 4-2-1) 在基地计分后，所有在此基地拥有随从的玩家可以抓一张牌。"
+    },
+    "zombie_zombie_lord_pod": {
+      "name": "在每个你本没有随从的基地，你可以各从你的弃牌堆额外打出一个战斗力为2或更低的随从。",
+      "abilityText": "在每个你本没有随从的基地，你可以各从你的弃牌堆额外打出一个战斗力为2或更低的随从。"
+    },
+    "base_evans_city_cemetery_pod": {
+      "name": "伊万斯堡公墓",
+      "abilityText": "(20, VP 5-3-2) 所有战败的在这里拥有一张丧尸随从的人获取一枚 VP 补偿。"
+    },
+    "base_rhodes_plaza_mall_pod": {
+      "name": "当此基地计分时，每名玩家在这里每有一个随从就获得",
+      "abilityText": "(24, VP 0-0-0) 当此基地计分时，每名玩家在这里每有一个随从就获得 1 VP。"
+    },
+    "zombie_titan_pod": {
+      "name": "(本种族没有泰坦卡。)",
+      "abilityText": "(本种族没有泰坦卡。)"
+    },
+    "wizard_arcane_protector_pod": {
+      "name": "奥术守护者",
+      "abilityText": "特殊能力：在你于本回合中打出第五张或更多卡牌后，你可以打出此泰坦。持续能力：你手中每有两张牌，在此处就拥有+1战斗力。天赋能力：抓一张牌。"
+    },
+    "base_golem_schloss_pod": {
+      "name": "魔像古堡",
+      "abilityText": "(VP 4-2-1) 在此基地计分后，冠军玩家在每一张属于其的随从上放置一个 +1 战斗力标记。"
+    },
+    "base_laboratorium_pod": {
+      "name": "实验室",
+      "abilityText": "(VP 4-2-1) 每回合第一次在此处打出随从后，其控制者在该随从上放置一个 +1 战斗力标记。"
+    },
+    "werewolf_great_wolf_spirit_pod": {
+      "name": "巨狼灵魂",
+      "abilityText": "特殊能力：在你的回合，如果你在两个或更多基地拥有最高战斗力，你可以打出此泰坦到其中一个基地。持续能力：你在这里的卡牌可以在你的回合执行第二次天赋能力。在你的回合开始时，你可以移动此泰坦到一个你拥有最高战斗力的基地。天赋能力：令你的一个随从获得+1战斗力直到回合结束。"
+    },
+    "base_fields_of_the_dead_pod": {
+      "name": "死者原野",
+      "abilityText": "(18, VP 3-2-1) 清算得分时，场上的人强制送其最好随从进入他人弃牌。"
+    },
+    "base_the_crypt_pod": {
+      "name": "地穴",
+      "abilityText": "(18, VP 3-2-1) 在此基地计分后，所有在此有随从的玩家可以选择将一张手牌放入牌库底以抓一张牌。"
+    },
+    "vampire_ancient_lord_pod": {
+      "name": "远古领主",
+      "abilityText": "特殊能力：当你将要在随从上放置一个或多个+1战斗力标记且此泰坦不在场时，你可以改为将其中一个放置在此泰坦上。若此泰坦上拥有至少三个标记，你可以移除所有标记以打出它。持续能力：当你向你这里一个原本没有标记的随从放置标记后，在其上额外放置一个标记。天赋能力：向你一个已拥有标记的随从放置一个+1战斗力标记。"
+    },
+    "base_cave_of_shinies_pod": {
+      "name": "宝物洞穴",
+      "abilityText": "(23, VP 4-2-1) 每回合一次，在你在这里的一个随从被消灭后，获得 1 VP。"
+    },
+    "trickster_big_funny_giant_pod": {
+      "name": "大滑稽巨人",
+      "abilityText": "特殊能力：你可以打出此泰坦以替代你本回合的常规随从打出。持续能力：在另一名玩家在此基地打出一个随从后，其必须丢弃一张牌。在每名其他玩家的回合结束时，若其在此基地没有随从，你可以在此泰坦上放置一个+1战斗力标记。特殊能力：当此基地计分时，若你是获胜者且至少有一名其他玩家在此没有随从，获得 1 VP。"
+    },
+    "ninja_invisible_ninja_pod": {
+      "name": "潜影忍者",
+      "abilityText": "特殊能力：在你的回合，若该泰坦不在场上，你可以弃置一张牌来打出该泰坦到一个你拥有随从的基地。持续能力：每回合一次，在你消灭了其他玩家的一张牌或将你的随从返回手牌后，可查看牌库顶两张牌，抓一张并将另一张洗回。特殊能力：在你的回合开始时，你可以消灭该泰坦来额外打出一个战斗力为 3 或更低的随从。"
+    },
+    "pirate_the_kraken_pod": {
+      "name": "克拉肯",
+      "abilityText": "特殊能力：在基地计分后且该卡不在场上，若你在那里拥有随从，可大声宣布“释放克拉肯！”来将其打出到替换的基地。天赋能力：移动该泰坦。那里的其他随从获得 -1 战斗力，直到你下个回合开始。特殊能力：在计分后，移动你的一个随从从这里到另一基地。"
+    },
+    "cthulhu_star_spawn_of_cthulhu_pod": {
+      "name": "星之眷族",
+      "abilityText": "天赋能力：将你手牌中的一张疯狂牌放入另一名玩家的手牌。"
+    },
+    "cthulhu_cthulhu_s_chosen_pod": {
+      "name": "克苏鲁的神选者",
+      "abilityText": "特殊能力：在一个基地计分前，你可以摸一张疯狂牌，令此随从获得 +2 战斗力，直到回合结束。"
+    },
+    "cthulhu_servitor_of_cthulhu_pod": {
+      "name": "克苏鲁的随从",
+      "abilityText": "天赋能力：消灭此随从，然后将你弃牌堆中的一张战术牌放置于你的牌库顶。"
+    },
+    "cthulhu_altar_to_cthulhu_pod": {
+      "name": "克苏鲁祭坛",
+      "effectText": "打出到基地上。持续能力：每回合一次，在你在此处打出一张随从后，你可以打出一张额外战术。"
+    },
+    "cthulhu_cthulhu_fhtagn_pod": {
+      "name": "克苏鲁发狂",
+      "effectText": "展示你牌库顶的卡牌，直到展示出两张战术牌。将这两张战术牌加入你的手牌，其余卡牌放置于牌库底。"
+    },
+    "base_mountains_of_madness_pod": {
+      "name": "疯狂山脉",
+      "abilityText": "(VP 3-1-1) 在此处每打出一张随从后，其控制者摸一张疯狂牌。"
+    },
+    "base_r_lyeh_pod": {
+      "name": "拉莱耶",
+      "abilityText": "(VP 5-3-2) 在每位玩家的回合开始时，该玩家可以消灭其在此处的一张随从。若如此做，该玩家获得 1 VP。"
+    },
+    "cthulhu_cthulhu_pod": {
+      "name": "克苏鲁",
+      "abilityText": "特殊能力：你可以摸两张疯狂牌，在拥有你随从的基地上打出此泰坦，以替代你本回合的常规战术打出。持续能力：在你打出或摸一张疯狂牌后，在此泰坦上放置一个 +1 战斗力标记。天赋能力：摸一张疯狂牌；或将你手牌中的一张疯狂牌放入另一名玩家的手牌。"
+    },
+    "base_tsar_s_palace_pod": {
+      "name": "沙皇宫殿",
+      "abilityText": "(VP 4-2-1) 若你在此处的战斗力并非最高，你不可在此处打出战斗力为 2 或更低的随从。"
+    },
+    "bear_major_ursa_pod": {
+      "name": "大熊座战将",
+      "abilityText": "特殊能力：可以打出此泰坦以替代你本回合的常规随从打出。持续能力：当其他玩家的随从移动或离开该基地后，你可以放置一个+1战斗力标记到本泰坦上。天赋能力：在此基地的一张随从上放置一个+1战斗力标记，或移动此泰坦。"
+    },
+    "dino_lasertops_pod": {
+      "name": "激光三角龙",
+      "abilityText": "你可以消灭此基地上一张牌面战斗力为 2 或更低的随从。"
+    },
+    "dino_tooth_and_claw_and_guns_pod": {
+      "name": "尖牙，利爪...快枪",
+      "effectText": "打出到随从上。持续能力：此随从不受其他玩家卡牌的影响。"
+    },
+    "base_jungle_oasis_pod": {
+      "name": "欧亚西斯丛林",
+      "abilityText": "(VP 3-2-1) (无能力描述)"
+    },
+    "base_tar_pits_pod": {
+      "name": "焦油坑",
+      "abilityText": "(VP 4-2-1) 每回合第一次有随从在此处将被消灭时，改为将其放置于其拥有者的牌库底。"
+    },
+    "elder_eldest_thing_pod": {
+      "name": "古老者",
+      "abilityText": "消灭你的其他两张随从，或者将本随从放入你的牌库底。（无法消灭两张随从时，则必须放入牌库底）持续能力：本随从不会被其他玩家的卡牌影响。"
+    },
+    "elder_shoggoth_pod": {
+      "name": "修格斯",
+      "abilityText": "每名其他玩家可以抓取一张疯狂牌。对于每名没有这么做的其他玩家，你可以消灭其一个在本基地的随从。然后，如果你在本基地的总战斗力低于12点，抓取两张疯狂牌。"
+    },
+    "elder_migo_pod": {
+      "name": "米·戈",
+      "abilityText": "每名其他玩家可以抓取一张疯狂牌。对于每名没有这么做的其他玩家，你可以摸一张牌。如果没有玩家抓取疯狂牌，你可以在一个随从上放置一个 +1 战斗力标记。"
+    },
+    "elder_byakhee_pod": {
+      "name": "拜亚基",
+      "abilityText": "每位在该基地拥有随从的其他玩家，抓取一张疯狂牌。"
+    },
+    "elder_begin_the_summoning_pod": {
+      "name": "开始召唤",
+      "effectText": "从你的弃牌堆将一张随从牌放入你的牌库顶。你本回合可以额外打出一张战术。"
+    },
+    "elder_dunwich_horror_pod": {
+      "name": "敦威治恐怖事件",
+      "effectText": "打出到随从上。持续能力：本随从获得 +5 战斗力。特殊能力：在本基地计分前，本随从的控制者必须选择一项：抓取两张疯狂牌，或消灭本随从。"
+    },
+    "elder_insanity_pod": {
+      "name": "精神错乱",
+      "effectText": "每名其他玩家抓取两张疯狂牌。将本战术移出游戏（放入盒子）。"
+    },
+    "elder_power_of_madness_pod": {
+      "name": "疯狂之力",
+      "effectText": "为每名其他玩家：宣告一个战术名称并展示其手牌。他们必须丢弃所有的同名战术牌，然后将其弃牌堆洗入牌库。"
+    },
+    "elder_spreading_horror_pod": {
+      "name": "传播恐惧",
+      "effectText": "每名其他玩家可以弃掉两张非疯狂牌。对于每名没有这么做的玩家，你可以从弃牌堆中打出一张战力为 3 或更低的随从打到一个不同的基地。"
+    },
+    "elder_the_price_of_power_pod": {
+      "name": "力量的代价",
+      "effectText": "每名其他玩家展示其手牌。每展示一张疯狂牌，就在你的一张随从上放置一个 +1 战斗力标记。特殊能力：在一个基地计分前打出，改为展示在该基地拥有随从的所有其他玩家的手牌。"
+    },
+    "elder_touch_of_madness_pod": {
+      "name": "触碰疯狂",
+      "effectText": "每名其他玩家抓取一张疯狂牌。你摸一张牌并打出一张额外战术。"
+    },
+    "elder_unfathomable_goals_pod": {
+      "name": "深不可测的目标",
+      "effectText": "每名其他玩家展示其手牌。如果有一名玩家展示了至少两张疯狂牌，打出一个额外的随从。如果总共展示了至少四张疯狂牌，打出一个额外的战术。"
+    },
+    "base_haunted_house_pod": {
+      "name": "鬼屋",
+      "abilityText": "(VP 3-3-2) 在一名玩家在此处打出一张随从后，该玩家必须丢弃一张卡牌。"
+    },
+    "base_the_dread_gazebo_pod": {
+      "name": "恐怖凉亭",
+      "abilityText": "(VP 2-3-2) 玩家不可在此基地上打出战术牌。"
     }
+  },
+  "titans": {
+    "titan_fort_titanosaurus": {
+      "name": "泰坦堡垒龙",
+      "special": "在本泰坦所在的基地计分后，你可以将你在这里的一个随从移动到另一个基地。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。你可以将你的一个随从移动到本泰坦所在的基地。"
+    },
+    "titan_arcane_protector": {
+      "name": "奥术守护者",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从不能被其他玩家的行动卡影响。",
+      "talent": "将本泰坦移动到另一个基地。打出一张额外的行动卡。"
+    },
+    "titan_the_kraken": {
+      "name": "巨妖",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以大喊\"海怪出现！\"然后将本泰坦打出到新基地上。",
+      "ongoing": "在本泰坦所在的基地计分后，将你在这里的一个随从移动到另一个基地。",
+      "talent": "将本泰坦移动到另一个基地。其他玩家在那里的所有随从战斗力-1直到你的下回合开始。"
+    },
+    "titan_invisible_ninja": {
+      "name": "隐形忍者",
+      "special1": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从不能被其他玩家的随从能力影响。",
+      "special2": "在本泰坦所在的基地计分后，你可以将本泰坦移动到另一个基地。"
+    },
+    "titan_killer_kudzu": {
+      "name": "杀手葛藤",
+      "special1": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "special2": "在本泰坦所在的基地计分后，你可以消灭这里的一个随从。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。消灭那里的一个战斗力为2或更低的随从。"
+    },
+    "titan_creampuff_man": {
+      "name": "奶油泡芙人",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从不能被消灭。",
+      "talent": "将本泰坦移动到另一个基地。将一个随从收回其拥有者手牌。"
+    },
+    "titan_major_ursa": {
+      "name": "大熊少校",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。将一个随从移动到本泰坦所在的基地。"
+    },
+    "titan_dagon": {
+      "name": "达贡",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。展示所有其他玩家的手牌。"
+    },
+    "titan_cthulhu": {
+      "name": "克苏鲁",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。每名其他玩家抽取一张疯狂卡。"
+    },
+    "titan_big_funny_giant": {
+      "name": "大搞笑巨人",
+      "special1": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "special2": "在本泰坦所在的基地计分后，你可以将本泰坦移动到另一个基地。"
+    },
+    "titan_great_wolf_spirit": {
+      "name": "伟大狼灵",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。在本泰坦上放置一个力量指示物。"
+    },
+    "titan_the_bride": {
+      "name": "新娘",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。从你的弃牌堆打出一个战斗力为2或更低的随从到本泰坦所在的基地。"
+    },
+    "titan_ancient_lord": {
+      "name": "古代领主",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。消灭那里的一个随从。"
+    },
+    "titan_death_on_six_legs": {
+      "name": "六足死神",
+      "special": "在一个有你随从的基地计分后，如果本泰坦不在场上，你可以将本泰坦打出到新基地上。",
+      "ongoing": "你在这里的随从获得+1战斗力。",
+      "talent": "将本泰坦移动到另一个基地。在本泰坦上放置一个力量指示物。"
+    },
+    "titan_attacker": "进攻方",
+    "titan_defender": "防守方"
   },
   "endgame": {
     "victory": "胜利",

@@ -5,7 +5,7 @@
  * （在 initAllAbilities() 中调用）
  */
 
-import { registerPowerModifier, registerOngoingPowerModifier, registerBasePowerModifier } from '../domain/ongoingModifiers';
+import { registerPowerModifier, registerOngoingPowerModifier, registerBasePowerModifier, registerBreakpointModifier } from '../domain/ongoingModifiers';
 import type { PowerModifierContext } from '../domain/ongoingModifiers';
 import type { MinionOnBase, SmashUpCore } from '../domain/types';
 import { getBaseDef } from '../data/cards';
@@ -200,15 +200,40 @@ function registerSteampunkModifiers(): void {
 
 function registerBearCavalryModifiers(): void {
     // 极地突击队：基地上唯一己方随从时 +2 力量（不可消灭，后者需要 ongoing 保护系统）
+    // 注意：POD 版本没有这个效果，只有 Talent 效果
     registerPowerModifier('bear_cavalry_polar_commando', (ctx: PowerModifierContext) => {
-        // 处理 POD 版本：检查基础 defId
-        const baseDefId = ctx.minion.defId.replace(/_pod$/, '');
-        if (baseDefId !== 'bear_cavalry_polar_commando') return 0;
+        // POD 版本没有 ongoing 效果，直接返回 0
+        if (ctx.minion.defId === 'bear_cavalry_polar_commando_pod') return 0;
+        // 原版：检查是否是极地突击队员
+        if (ctx.minion.defId !== 'bear_cavalry_polar_commando') return 0;
         const myMinionCount = ctx.base.minions.filter(
             m => m.controller === ctx.minion.controller
         ).length;
         return myMinionCount === 1 ? 2 : 0;
-    }, { handlesPodInternally: true }); // 标记已处理 POD
+    });
+
+    // 你们已经完蛋 POD（ongoing 行动卡附着在基地上）：动态调整爆破点
+    // 规则：每个在此基地有随从的玩家 +2 爆破点，如果本回合移动过对手随从到此基地则改为 -2
+    registerBreakpointModifier('bear_cavalry_youre_screwed_pod', (ctx) => {
+        // 检查基地上是否有"你们已经完蛋 POD"
+        const card = ctx.base.ongoingActions.find(
+            a => a.defId === 'bear_cavalry_youre_screwed_pod'
+        );
+        if (!card) return 0;
+
+        // 计算在此基地有随从的玩家数量
+        const playersWithMinions = new Set(
+            ctx.base.minions.map(m => m.controller)
+        ).size;
+
+        // 检查本回合是否移动过对手随从到此基地
+        const movedThisTurn = ctx.state.movedToBasesThisTurn?.[ctx.baseIndex] ?? false;
+
+        // 每个玩家 +2 或 -2
+        const modifier = playersWithMinions * 2;
+
+        return movedThisTurn ? -modifier : modifier;
+    });
 }
 
 // ============================================================================

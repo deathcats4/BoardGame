@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 大杀四方 (Smash Up) - ID 常量定义
  */
 
@@ -12,6 +12,7 @@ export const SMASHUP_ATLAS_IDS = {
     CARDS3: 'smashup:cards3',
     CARDS4: 'smashup:cards4',
     CARDS5: 'smashup:cards5',
+    TITANS: 'smashup:titans',
 } as const;
 
 export const SMASHUP_CARD_BACK = {
@@ -108,3 +109,66 @@ export const FACTION_DISPLAY_NAMES: Record<string, string> = {
     [SMASHUP_FACTION_IDS.GIANT_ANTS_POD]: '巨蚁 (POD版)',
     [SMASHUP_FACTION_IDS.NINJAS_POD]: '忍者 (POD版)',
 };
+
+// ============================================================================
+// 泰坦能力 ID 常量
+// ============================================================================
+
+/** 泰坦能力 ID（用于能力注册表） */
+export const TITAN_ABILITY_IDS = {
+    // Fort Titanosaurus (恐龙)
+    FORT_TITANOSAURUS_SPECIAL: 'titan_fort_titanosaurus_special',
+    FORT_TITANOSAURUS_ONGOING: 'titan_fort_titanosaurus_ongoing',
+    FORT_TITANOSAURUS_TALENT: 'titan_fort_titanosaurus_talent',
+    
+    // Arcane Protector (巫师)
+    ARCANE_PROTECTOR_SPECIAL: 'titan_arcane_protector_special',
+    ARCANE_PROTECTOR_ONGOING: 'titan_arcane_protector_ongoing',
+    ARCANE_PROTECTOR_TALENT: 'titan_arcane_protector_talent',
+    
+    // The Kraken (海盗)
+    THE_KRAKEN_SPECIAL: 'titan_the_kraken_special',
+    THE_KRAKEN_ONGOING: 'titan_the_kraken_ongoing',
+    THE_KRAKEN_TALENT: 'titan_the_kraken_talent',
+    
+    // Invisible Ninja (忍者)
+    INVISIBLE_NINJA_SPECIAL1: 'titan_invisible_ninja_special1',
+    INVISIBLE_NINJA_ONGOING: 'titan_invisible_ninja_ongoing',
+    INVISIBLE_NINJA_SPECIAL2: 'titan_invisible_ninja_special2',
+    
+    // Killer Kudzu (食人花)
+    KILLER_KUDZU_SPECIAL1: 'titan_killer_kudzu_special1',
+    KILLER_KUDZU_SPECIAL2: 'titan_killer_kudzu_special2',
+    KILLER_KUDZU_ONGOING: 'titan_killer_kudzu_ongoing',
+    KILLER_KUDZU_TALENT: 'titan_killer_kudzu_talent',
+    
+    // Creampuff Man (幽灵)
+    CREAMPUFF_MAN_SPECIAL: 'titan_creampuff_man_special',
+    CREAMPUFF_MAN_ONGOING: 'titan_creampuff_man_ongoing',
+    CREAMPUFF_MAN_TALENT: 'titan_creampuff_man_talent',
+    
+    // Major Ursa (传奇熊骑兵)
+    MAJOR_URSA_SPECIAL: 'titan_major_ursa_special',
+    MAJOR_URSA_ONGOING: 'titan_major_ursa_ongoing',
+    MAJOR_URSA_TALENT: 'titan_major_ursa_talent',
+    
+    // Dagon (达贡)
+    DAGON_SPECIAL: 'titan_dagon_special',
+    DAGON_ONGOING: 'titan_dagon_ongoing',
+    DAGON_TALENT: 'titan_dagon_talent',
+    
+    // Cthulhu (克苏鲁)
+    CTHULHU_SPECIAL: 'titan_cthulhu_special',
+    CTHULHU_ONGOING: 'titan_cthulhu_ongoing',
+    CTHULHU_TALENT: 'titan_cthulhu_talent',
+    
+    // Ancient Lord (古代领主)
+    ANCIENT_LORD_SPECIAL: 'titan_ancient_lord_special',
+    ANCIENT_LORD_ONGOING: 'titan_ancient_lord_ongoing',
+    ANCIENT_LORD_TALENT: 'titan_ancient_lord_talent',
+    
+    // Death on Six Legs (六足死神)
+    DEATH_ON_SIX_LEGS_SPECIAL: 'titan_death_on_six_legs_special',
+    DEATH_ON_SIX_LEGS_ONGOING: 'titan_death_on_six_legs_ongoing',
+    DEATH_ON_SIX_LEGS_TALENT: 'titan_death_on_six_legs_talent',
+} as const;

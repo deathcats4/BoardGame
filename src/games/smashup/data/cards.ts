@@ -42,6 +42,7 @@ import { VAMPIRE_POD_CARDS } from './factions/vampires_pod';
 import { GIANT_ANT_CARDS } from './factions/giant-ants';
 import { GIANT_ANT_CARDS as GIANT_ANT_POD_CARDS } from './factions/giant-ants_pod';
 import { NINJA_POD_CARDS } from './factions/ninjas_pod';
+import { TITAN_CARDS, getTitanByFaction, getTitanDef } from './titans';
 
 // ============================================================================
 // 注册表
@@ -114,6 +115,7 @@ registerCards(GIANT_ANT_CARDS);
 registerCards(GIANT_ANT_POD_CARDS);
 // POD 版本阵营（最新英文 POD 版本）
 registerCards(NINJA_POD_CARDS);
+registerCards(TITAN_CARDS);
 
 // ============================================================================
 // 基础基地卡（基础版）

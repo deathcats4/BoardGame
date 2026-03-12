@@ -22,8 +22,7 @@ import { initAllAbilities, resetAbilityInit } from '../abilities';
 import { clearRegistry, resolveAbility } from '../domain/abilityRegistry';
 import { clearBaseAbilityRegistry } from '../domain/baseAbilities';
 import { clearInteractionHandlers, getInteractionHandler } from '../domain/abilityInteractionHandlers';
-import { applyEvents as _applyEventsHelper } from './helpers';
-import { runCommand } from './testRunner';
+import { applyEvents as _applyEventsHelper, callHandler } from './helpers';
 import type { MatchState, RandomFn } from '../../../engine/types';
 
 beforeAll(() => {
@@ -427,6 +426,46 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             expect(actionLimits.length).toBe(1);
         });
 
+        it('只影响当前在场随从：本回合后续打出的随从不获得+1', () => {
+            const state = makeStateWithMadness({
+                players: {
+                    '0': makePlayer('0', {
+                        hand: [
+                            makeCard('a1', 'miskatonic_psychological_profiling', 'action', '0'),
+                            makeCard('m-new', 'test_new_minion', 'minion', '0'),
+                        ],
+                    }),
+                    '1': makePlayer('1'),
+                },
+                bases: [{
+                    defId: 'base_test', ongoingActions: [],
+                    minions: [
+                        makeMinion('mine1', 'test_a', '0', 2),
+                    ],
+                }],
+            });
+
+            const events = execPlayAction(state, '0', 'a1');
+            const afterAction = applyEvents(state, events);
+            expect(afterAction.bases[0].minions.find(m => m.uid === 'mine1')?.tempPowerModifier).toBe(1);
+
+            const afterPlayMinion = reduce(afterAction, {
+                type: SU_EVENTS.MINION_PLAYED,
+                payload: {
+                    playerId: '0',
+                    cardUid: 'm-new',
+                    defId: 'test_new_minion',
+                    baseIndex: 0,
+                    power: 4,
+                },
+                timestamp: Date.now(),
+            } as any);
+
+            const newMinion = afterPlayMinion.bases[0].minions.find(m => m.uid === 'm-new');
+            expect(newMinion).toBeDefined();
+            expect(newMinion!.tempPowerModifier).toBe(0);
+        });
+
         it('无己方随从时仍抽疯狂卡和获得额外战术', () => {
             const state = makeStateWithMadness({
                 players: {
@@ -559,8 +598,8 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             const madnessEvents = result.events.filter(e => e.type === SU_EVENTS.MADNESS_DRAWN);
             expect(madnessEvents.length).toBe(1);
             expect((madnessEvents[0] as any).payload.count).toBe(2);
-            // 随从获得+4力量（2张×2力量）- 使用永久力量修正
-            const powerEvents = result.events.filter(e => e.type === SU_EVENTS.PERMANENT_POWER_ADDED);
+            // 随从获得+4力量（2张×2力量）- 使用临时力量修正（直到回合结束）
+            const powerEvents = result.events.filter(e => e.type === SU_EVENTS.TEMP_POWER_ADDED);
             expect(powerEvents.length).toBe(1);
             expect((powerEvents[0] as any).payload.minionUid).toBe('m1');
             expect((powerEvents[0] as any).payload.amount).toBe(4);
@@ -591,7 +630,7 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             const result = handler!(ms, '0', { count: 3, minionUid: 'm1', baseIndex: 0 }, undefined, defaultRandom, 0);
             const newState = applyEvents(state, result.events);
             expect(newState.players['0'].hand.filter(c => c.defId === MADNESS_CARD_DEF_ID).length).toBe(3);
-            expect(newState.bases[0].minions[0].powerModifier).toBe(6);
+            expect(newState.bases[0].minions[0].tempPowerModifier).toBe(6);
             expect(newState.madnessDeck!.length).toBe(MADNESS_DECK_SIZE - 3);
         });
 
@@ -629,7 +668,7 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             });
         }
 
-        it('抽1张疯狂卡并获得额外随从到此基地', () => {
+        it('抽1张疯狂卡，选择打出额外随从后产生 LIMIT_MODIFIED', () => {
             const state = makeStateWithMadness({
                 players: { '0': makePlayer('0'), '1': makePlayer('1') },
                 bases: [{ defId: 'base_test', ongoingActions: [], minions: [makeMinion('m1', 'test', '0', 3)] }],
@@ -639,12 +678,25 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             const madnessEvents = result.events.filter((e: any) => e.type === SU_EVENTS.MADNESS_DRAWN);
             expect(madnessEvents.length).toBe(1);
             expect((madnessEvents[0] as any).payload.count).toBe(1);
-            const limitEvents = result.events.filter((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED);
+
+            // 通过 handler 解析「打出额外随从」交互
+            const handler = getInteractionHandler('miskatonic_lost_knowledge_extra');
+            expect(handler).toBeDefined();
+            const updatedCore = applyEvents(state, result.events);
+            const handlerEvents = callHandler(handler!, {
+                state: updatedCore,
+                playerId: '0',
+                selectedValue: { extra: true },
+                data: { baseIndex: 0 },
+                random: defaultRandom,
+                now: Date.now(),
+            });
+            const limitEvents = handlerEvents.filter((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED);
             expect(limitEvents.length).toBe(1);
             expect((limitEvents[0] as any).payload.limitType).toBe('minion');
         });
 
-        it('疯狂牌库为空时仍给额外随从', () => {
+        it('疯狂牌库为空时返回反馈不可用', () => {
             const state = makeStateWithMadness({
                 players: { '0': makePlayer('0'), '1': makePlayer('1') },
                 bases: [{ defId: 'base_test', ongoingActions: [], minions: [] }],
@@ -652,10 +704,10 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             });
 
             const result = execTalent(state, '0', 0);
-            const madnessEvents = result.events.filter((e: any) => e.type === SU_EVENTS.MADNESS_DRAWN);
-            expect(madnessEvents.length).toBe(0);
-            const limitEvents = result.events.filter((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED);
-            expect(limitEvents.length).toBe(1);
+            const feedbackEvt = result.events.find((e: any) => e.type === SU_EVENTS.ABILITY_FEEDBACK);
+            expect(feedbackEvt).toBeDefined();
+            expect((feedbackEvt as any)?.payload?.messageKey).toBe('feedback.condition_not_met');
+            expect(result.events.some((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED)).toBe(false);
         });
 
         it('状态正确（reduce 验证）', () => {
@@ -665,20 +717,29 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
             });
 
             const result = execTalent(state, '0', 0);
-            const newState = applyEvents(state, result.events);
+            const handler = getInteractionHandler('miskatonic_lost_knowledge_extra');
+            expect(handler).toBeDefined();
+            const handlerEvents = callHandler(handler!, {
+                state: applyEvents(state, result.events),
+                playerId: '0',
+                selectedValue: { extra: true },
+                data: { baseIndex: 0 },
+                random: defaultRandom,
+                now: Date.now(),
+            });
+            const newState = applyEvents(applyEvents(state, result.events), handlerEvents);
             expect(newState.players['0'].hand.filter(c => c.defId === MADNESS_CARD_DEF_ID).length).toBe(1);
-            // 额外随从限定到基地0（baseLimitedMinionQuota），minionLimit 不变
             expect(newState.players['0'].minionLimit).toBe(1);
             expect((newState.players['0'] as any).baseLimitedMinionQuota?.[0]).toBe(1);
             expect(newState.madnessDeck!.length).toBe(MADNESS_DECK_SIZE - 1);
         });
 
-        it('无 baseIndex 时仍给额外随从（不限定基地）', () => {
+        it('无 baseIndex 时选择打出仍给额外随从（不限定基地）', () => {
             const executor = resolveAbility('miskatonic_lost_knowledge', 'talent');
             expect(executor).toBeDefined();
             const state = makeStateWithMadness({
                 players: { '0': makePlayer('0'), '1': makePlayer('1') },
-                bases: [],
+                bases: [{ defId: 'base_test', ongoingActions: [], minions: [] }],
             });
             const ms = makeMatchState(state);
             const result = executor!({
@@ -686,8 +747,18 @@ describe('米斯卡塔尼克大学 - 疯狂卡能力', () => {
                 cardUid: 'ongoing-card', defId: 'miskatonic_lost_knowledge',
                 baseIndex: undefined as any, random: defaultRandom, now: Date.now(),
             });
-            const limitEvents = result.events.filter((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED);
-            expect(limitEvents.length).toBe(1);
+            const handler = getInteractionHandler('miskatonic_lost_knowledge_extra');
+            expect(handler).toBeDefined();
+            const updatedCore = applyEvents(state, result.events);
+            const handlerEvents = callHandler(handler!, {
+                state: updatedCore,
+                playerId: '0',
+                selectedValue: { extra: true },
+                data: { baseIndex: undefined },
+                random: defaultRandom,
+                now: Date.now(),
+            });
+            expect(handlerEvents.some((e: any) => e.type === SU_EVENTS.LIMIT_MODIFIED)).toBe(true);
         });
     });
 });

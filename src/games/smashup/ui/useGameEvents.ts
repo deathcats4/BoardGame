@@ -92,7 +92,7 @@ export function useGameEvents({ G, fxBus, baseRefs }: UseGameEventsParams) {
       const event = entry.event;
 
       // 触发器动画检测：检查事件 reason 是否匹配已注册的触发器
-      if (TRIGGER_CARRIER_EVENTS.has(event.type)) {
+      if (TRIGGER_CARRIER_EVENTS.has(event.type as any)) {
         const reason = (event.payload as { reason?: string })?.reason;
         if (reason && triggerDefIds.has(reason) && !triggeredThisBatch.has(reason)) {
           triggeredThisBatch.add(reason);
@@ -157,6 +157,11 @@ export function useGameEvents({ G, fxBus, baseRefs }: UseGameEventsParams) {
             messageParams: p.messageParams,
             tone: p.tone ?? 'info',
           }]);
+          break;
+        }
+
+        case SU_EVENTS.TITAN_CLASH: {
+          fxBus.push(SU_FX.TITAN_CLASH, { space: 'screen' }, event.payload as any);
           break;
         }
       }

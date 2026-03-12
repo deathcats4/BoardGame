@@ -186,11 +186,11 @@ export function registerOngoingPowerModifier(
     registerPowerModifier(defId, (ctx: PowerModifierContext) => {
         // 处理 POD 版本：检查基础 defId
         const baseDefId = defId.replace(/_pod$/, '');
-        
+
         if (location === 'minion') {
             // 附着在随从上：只对被附着的随从生效
             // 检查基础版和 POD 版
-            const count = ctx.minion.attachedActions.filter(a => 
+            const count = ctx.minion.attachedActions.filter(a =>
                 a.defId === baseDefId || a.defId === baseDefId + '_pod'
             ).length;
             if (count === 0) return 0;
@@ -200,7 +200,7 @@ export function registerOngoingPowerModifier(
 
         // 附着在基地上
         // 检查基础版和 POD 版
-        const cards = ctx.base.ongoingActions.filter(a => 
+        const cards = ctx.base.ongoingActions.filter(a =>
             a.defId === baseDefId || a.defId === baseDefId + '_pod'
         );
         if (cards.length === 0) return 0;
@@ -271,7 +271,7 @@ export function clearPowerModifierRegistry(): void {
 export function registerPodPowerModifierAliases(): void {
     let mappedCount = 0;
     let skippedCount = 0;
-    
+
     // 1. 随从力量修正（modifierRegistry）
     const powerModsToAdd: ModifierEntry[] = [];
     for (const entry of modifierRegistry) {
@@ -290,7 +290,7 @@ export function registerPodPowerModifierAliases(): void {
         }
     }
     modifierRegistry.push(...powerModsToAdd);
-    
+
     // 2. 临界点修正（breakpointModifierRegistry）
     const breakpointModsToAdd: BreakpointModifierEntry[] = [];
     for (const entry of breakpointModifierRegistry) {
@@ -303,7 +303,7 @@ export function registerPodPowerModifierAliases(): void {
         }
     }
     breakpointModifierRegistry.push(...breakpointModsToAdd);
-    
+
     // 3. 基地级别力量修正（basePowerModifiers）
     const basePowerModsToAdd: Array<[string, BasePowerModifierFn]> = [];
     for (const [defId, modifier] of basePowerModifiers.entries()) {
@@ -318,7 +318,7 @@ export function registerPodPowerModifierAliases(): void {
     for (const [podId, modifier] of basePowerModsToAdd) {
         basePowerModifiers.set(podId, modifier);
     }
-    
+
     // 映射完成（已自动映射 POD 版本的力量修正）
 }
 
@@ -471,7 +471,22 @@ export function getOngoingCardPowerContribution(
 }
 
 /**
- * 获取玩家在基地上的总有效力量（含持续修正 + ongoing 卡力量贡献 + 基地级别力量修正）
+ * 获取玩家在基地上泰坦的力量贡献（来自泰坦上的力量指示物）
+ */
+export function getTitanPowerContribution(
+    state: SmashUpCore,
+    baseIndex: number,
+    playerId: PlayerId
+): number {
+    const player = state.players[playerId];
+    if (player?.activeTitan?.baseIndex === baseIndex) {
+        return player.activeTitan.powerTokens || 0;
+    }
+    return 0;
+}
+
+/**
+ * 获取玩家在基地上的总有效力量（含持续修正 + ongoing 卡力量贡献 + 基地级别力量修正 + 泰坦指示物贡献）
  */
 export function getPlayerEffectivePowerOnBase(
     state: SmashUpCore,
@@ -484,11 +499,12 @@ export function getPlayerEffectivePowerOnBase(
         .reduce((sum, m) => sum + getEffectivePower(state, m, baseIndex), 0);
     const ongoingCardPower = getOngoingCardPowerContribution(base, playerId);
     const basePowerBonus = getBasePowerModifiers(state, baseIndex, playerId);
-    return minionPower + ongoingCardPower + basePowerBonus;
+    const titanPower = getTitanPowerContribution(state, baseIndex, playerId);
+    return minionPower + ongoingCardPower + basePowerBonus + titanPower;
 }
 
 /**
- * 获取基地上的总有效力量（含持续修正 + ongoing 卡力量贡献 + 基地级别力量修正）
+ * 获取基地上的总有效力量（含持续修正 + ongoing 卡力量贡献 + 基地级别力量修正 + 泰坦指示物贡献）
  */
 export function getTotalEffectivePowerOnBase(
     state: SmashUpCore,
@@ -501,11 +517,13 @@ export function getTotalEffectivePowerOnBase(
     // 修复 Bug：只有 ongoing 卡但没有随从的玩家，其力量贡献也应该计入总力量
     let ongoingBonus = 0;
     let basePowerBonus = 0;
+    let titanBonus = 0;
     for (const pid of Object.keys(state.players)) {
         ongoingBonus += getOngoingCardPowerContribution(base, pid);
         basePowerBonus += getBasePowerModifiers(state, baseIndex, pid);
+        titanBonus += getTitanPowerContribution(state, baseIndex, pid);
     }
-    return minionPower + ongoingBonus + basePowerBonus;
+    return minionPower + ongoingBonus + basePowerBonus + titanBonus;
 }
 
 /**

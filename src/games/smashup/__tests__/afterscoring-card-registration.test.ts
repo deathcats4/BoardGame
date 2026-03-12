@@ -29,6 +29,12 @@ describe('afterScoring 卡牌注册验证', () => {
         expect(typeof executor).toBe('function');
     });
 
+    it('giant_ant_under_pressure_pod 应该已注册为 special 能力（复用基础版）', () => {
+        const executor = resolveSpecial('giant_ant_under_pressure_pod');
+        expect(executor).toBeDefined();
+        expect(typeof executor).toBe('function');
+    });
+
     it('giant_ant_we_are_the_champions 应该已注册为 special 能力', () => {
         const executor = resolveSpecial('giant_ant_we_are_the_champions');
         expect(executor).toBeDefined();

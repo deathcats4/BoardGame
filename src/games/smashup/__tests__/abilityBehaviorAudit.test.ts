@@ -249,6 +249,7 @@ describe('SmashUp 能力行为审计', () => {
                 'vampire_opportunist',             // onMinionDestroyed 触发放指示物
                 'vampire_summon_wolves',            // onTurnStart 触发放指示物（在卡上）
                 'giant_ant_the_show_must_go_on',    // 巨蚁：持续保护语义，非静态 powerModifier
+                'giant_ant_the_show_must_go_on_pod',   // POD 复用基础版
             ]);
             const entities = buildEntities();
             const { powerModifierIds } = getRegisteredModifierIds();

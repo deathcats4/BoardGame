@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { reduce } from '../domain/reducer';
-import { SU_COMMANDS, SU_EVENTS } from '../domain/types';
+import { SU_COMMANDS, SU_EVENTS, MADNESS_CARD_DEF_ID } from '../domain/types';
 import type {
     SmashUpCore,
     SmashUpEvent,
@@ -278,6 +278,38 @@ describe('印斯茅斯派系能力', () => {
 
 describe('米斯卡塔尼克大学派系能力', () => {
     describe('miskatonic_those_meddling_kids（多管闲事的小鬼：消灭基地上行动卡）', () => {
+        it('无行动卡但疯狂牌库非空时：抽1张疯狂卡并获得1次额外战术（OR 分支）', () => {
+            const state = makeState({
+                players: {
+                    '0': makePlayer('0', {
+                        hand: [makeCard('a1', 'miskatonic_those_meddling_kids', 'action', '0')],
+                        actionLimit: 1,
+                    }),
+                    '1': makePlayer('1'),
+                },
+                bases: [{
+                    defId: 'b1',
+                    minions: [makeMinion('m1', 'test', '1', 3)],
+                    ongoingActions: [],
+                }],
+                madnessDeck: ['mad0', 'mad1'],
+            });
+
+            const { events, matchState } = execPlayAction(state, '0', 'a1');
+            // 不应创建点击式链交互
+            const interaction = (matchState.sys as any)?.interaction;
+            expect(interaction?.current).toBeUndefined();
+
+            expect(events.some(e => e.type === SU_EVENTS.MADNESS_DRAWN)).toBe(true);
+            const limitEvents = events.filter(e => e.type === SU_EVENTS.LIMIT_MODIFIED) as any[];
+            const actionLimits = limitEvents.filter(e => e.payload.limitType === 'action');
+            expect(actionLimits.length).toBe(1);
+
+            const newState = applyEvents(state, events);
+            expect(newState.players['0'].actionLimit).toBe(2);
+            expect(newState.players['0'].hand.filter(c => c.defId === MADNESS_CARD_DEF_ID).length).toBe(1);
+        });
+
         it('单基地有行动卡时也创建 Prompt 选择', () => {
             const state = makeState({
                 players: {

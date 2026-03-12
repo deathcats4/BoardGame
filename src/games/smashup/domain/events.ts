@@ -22,6 +22,8 @@ const POWER_GAIN_KEY = 'status.general.player_status_sound_fx_pack_vol.positive_
 const POWER_LOSE_KEY = 'status.general.player_status_sound_fx_pack_vol.positive_buffs_and_cures.purged_a';
 const TALENT_KEY = 'magic.general.modern_magic_sound_fx_pack_vol.arcane_spells.arcane_spells_arcane_ripple_001';
 const MADNESS_KEY = 'magic.dark.32.dark_spell_01';
+const TITAN_PLACE_KEY = 'magic.general.modern_magic_sound_fx_pack_vol.arcane_spells.arcane_spells_arcane_ripple_001';
+const TITAN_CLASH_KEY = 'magic.dark.32.dark_spell_01';
 
 /**
  * 大杀四方事件音频配置
@@ -69,7 +71,8 @@ export const SU_EVENTS = defineEvents({
   'su:ongoing_attached': { audio: 'immediate', sound: ACTION_PLAY_KEY },
   'su:ongoing_detached': { audio: 'immediate', sound: CARD_DISCARD_KEY },
   'su:ongoing_card_counter_changed': { audio: 'immediate', sound: POWER_GAIN_KEY },
-  
+  'su:action_boxed': { audio: 'immediate', sound: CARD_DISCARD_KEY },
+
   'su:talent_used': { audio: 'immediate', sound: TALENT_KEY },
   'su:minion_play_effect_queued': 'silent',
   'su:minion_play_effect_consumed': 'silent',
@@ -94,6 +97,11 @@ export const SU_EVENTS = defineEvents({
   'su:ability_feedback': { audio: 'immediate', sound: UPDATE_CHIME_KEY },
   'su:ability_triggered': 'fx',        // 持续效果/触发器激活（FX 动画）
 
+  'su:on_turn_start_ability_handled': 'silent', // 标记回合开始能力已处理（防止重复触发选择框）
+  'su:base_ability_suppressed': 'silent', // 基地能力被压制（状态同步）
+  'su:card_suppressed': 'silent', // 卡牌能力被压制（与熊同行 POD）
+  'su:superiority_pod_protect_enabled': 'silent', // 全面优势 POD：开启“保护直到你下回合开始”
+  
   // ========== 动画驱动（FX 系统）==========
   'su:base_scored': 'fx',             // 基地得分（飞行动画 onImpact）
   'su:base_cleared': 'silent',         // 基地清除（计分后弃置随从/ongoing，紧跟 afterScoring）
@@ -112,7 +120,7 @@ export const SU_EVENT_TYPES = {
   VP_AWARDED: SU_EVENTS['su:vp_awarded'].type,
   CARDS_DRAWN: SU_EVENTS['su:cards_drawn'].type,
   CARDS_DISCARDED: SU_EVENTS['su:cards_discarded'].type,
-  CARD_REMOVED_FROM_DECK: SU_EVENTS['su:card_removed_from_deck'].type,
+  ACTION_BOXED: SU_EVENTS['su:action_boxed'].type,
   TURN_STARTED: SU_EVENTS['su:turn_started'].type,
   TURN_ENDED: SU_EVENTS['su:turn_ended'].type,
   BASE_REPLACED: SU_EVENTS['su:base_replaced'].type,

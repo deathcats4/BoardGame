@@ -375,11 +375,15 @@ function registerWerewolfOngoingEffects(): void {
     });
 
     // 制造恐慌 ongoing：回合开始时若你力量最高，爆破点降到0
+    // 2026-03-06: 原版和 POD 版效果完全相同，触发器检查同时支持两个 defId
     registerTrigger('werewolf_marking_territory', 'onTurnStart', (ctx: TriggerContext) => {
         const { state, playerId, now } = ctx;
         for (let i = 0; i < state.bases.length; i++) {
             const base = state.bases[i];
-            const hasMT = base.ongoingActions.some(a => matchesDefId(a.defId, 'werewolf_marking_territory') && a.ownerId === playerId);
+            const hasMT = base.ongoingActions.some(a => 
+                (a.defId === 'werewolf_marking_territory' || a.defId === 'werewolf_marking_territory_pod') 
+                && a.ownerId === playerId
+            );
             if (!hasMT) continue;
             let myTotal = 0;
             let maxOther = 0;

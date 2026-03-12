@@ -72,14 +72,16 @@ export function registerCthulhuAbilities(): void {
     registerAbility('cthulhu_servitor', 'talent', cthulhuServitor);
 
     // === ongoing 效果注册 ===
-    // 克苏鲁祭坛：打出随从时额外打出一张战术?
+    // 克苏鲁祭坛：打出随从时额外打出一张战术
     registerTrigger('cthulhu_altar', 'onMinionPlayed', cthulhuAltarTrigger);
+    registerTrigger('cthulhu_altar_pod', 'onMinionPlayed', cthulhuAltarTrigger);
     // 深化目标：回合结束时条件获VP
     registerTrigger('cthulhu_furthering_the_cause', 'onTurnEnd', cthulhuFurtheringTheCauseTrigger);
-    // 天选之人：基地计分前抽疑狂卡?2力量
+    // 天选之人：基地计分前抽疑狂卡 + 2力量
     registerTrigger('cthulhu_chosen', 'beforeScoring', cthulhuChosenBeforeScoring);
     // 完成仪式：回合开始时清场并换基地
     registerTrigger('cthulhu_complete_the_ritual', 'onTurnStart', cthulhuCompleteTheRitualTrigger);
+    registerTrigger('cthulhu_complete_the_ritual_pod', 'onTurnStart', cthulhuCompleteTheRitualTrigger);
 }
 
 /** 强制招募 onPlay：将弃牌堆中力量≤3的随从放到牌库顶（玩家选择任意数量） */
@@ -100,7 +102,7 @@ function cthulhuRecruitByForce(ctx: AbilityContext): AbilityResult {
         const def = getCardDef(c.defId) as MinionCardDef | undefined;
         const name = def?.name ?? c.defId;
         const power = def?.power ?? 0;
-        return { id: `minion-${i}`, label: `${name} (力量 ${power})`, value: { cardUid: c.uid, defId: c.defId, minionDefId: c.defId }, _source: 'discard' as const , displayMode: 'card' as const };
+        return { id: `minion-${i}`, label: `${name} (力量 ${power})`, value: { cardUid: c.uid, defId: c.defId, minionDefId: c.defId }, _source: 'discard' as const, displayMode: 'card' as const };
     });
     const promptOptions: PromptOption<MinionCardChoiceValue | SkipChoiceValue>[] = [
         ...options,
@@ -108,8 +110,8 @@ function cthulhuRecruitByForce(ctx: AbilityContext): AbilityResult {
     ];
     const interaction = createSimpleChoice<MinionCardChoiceValue | SkipChoiceValue>(
         `cthulhu_recruit_by_force_${ctx.now}`, ctx.playerId,
-        '选择要放到牌库顶的随从（任意数量，可跳过）', promptOptions,
-        { sourceId: 'cthulhu_recruit_by_force', targetType: 'generic', multi: { min: 0, max: eligibleMinions.length } },
+        '选择要放到牌库顶的随从（任意数量，可跳过）', [...options, { id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }] as any,
+        { sourceId: 'cthulhu_recruit_by_force', multi: { min: 0, max: eligibleMinions.length } },
     );
     return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
 }
@@ -124,12 +126,12 @@ function cthulhuItBeginsAgain(ctx: AbilityContext): AbilityResult {
     const options = actionsInDiscard.map((c, i) => {
         const def = getCardDef(c.defId);
         const name = def?.name ?? c.defId;
-        return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, _source: 'discard' as const , displayMode: 'card' as const };
+        return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, _source: 'discard' as const, displayMode: 'card' as const };
     });
     const interaction = createSimpleChoice<CardChoiceValue | SkipChoiceValue>(
         `cthulhu_it_begins_again_${ctx.now}`, ctx.playerId,
-        '选择要洗回牌库的战术（任意数量，可跳过）', [...options, { id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }],
-        { sourceId: 'cthulhu_it_begins_again', targetType: 'generic', multi: { min: 0, max: actionsInDiscard.length } },
+        '选择要洗回牌库的战术（任意数量，可跳过）', [...options, { id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }] as any,
+        { sourceId: 'cthulhu_it_begins_again', multi: { min: 0, max: actionsInDiscard.length } },
     );
     // 手动提供 optionsGenerator：从弃牌堆过滤行动卡（保留 skip 选项）
     interaction.data.optionsGenerator = state => {
@@ -139,7 +141,7 @@ function cthulhuItBeginsAgain(ctx: AbilityContext): AbilityResult {
         const opts: PromptOption<CardChoiceValue | SkipChoiceValue>[] = actions.map((c, i) => {
             const def = getCardDef(c.defId);
             const name = def?.name ?? c.defId;
-            return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, _source: 'discard' as const, displayMode: 'card' as const };
+            return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, displayMode: 'card' as const };
         });
         return [...opts, { id: 'skip', label: '跳过', value: { skip: true }, displayMode: 'button' as const }];
     };
@@ -233,9 +235,7 @@ function cthulhuMadnessUnleashed(ctx: AbilityContext): AbilityResult {
     const options = madnessInHand.map((c, i) => ({
         id: `madness-${i}`,
         label: `疑狂卡?${i + 1}`,
-        value: { cardUid: c.uid, defId: c.defId },
-        _source: 'hand' as const,
-        displayMode: 'card' as const,
+        value: { cardUid: c.uid, defId: c.defId, displayMode: 'card' as const },
     }));
     const promptOptions: PromptOption<CardChoiceValue | SkipChoiceValue>[] = [
         ...options,
@@ -264,36 +264,62 @@ function cthulhuCompleteTheRitualTrigger(ctx: TriggerContext): SmashUpEvent[] {
     for (let i = 0; i < ctx.state.bases.length; i++) {
         const base = ctx.state.bases[i];
         const ritual = base.ongoingActions.find(
-            a => matchesDefId(a.defId, 'cthulhu_complete_the_ritual') && a.ownerId === ctx.playerId
+            a => (a.defId === 'cthulhu_complete_the_ritual' || a.defId === 'cthulhu_complete_the_ritual_pod') && a.ownerId === ctx.playerId
         );
         if (!ritual) continue;
 
-        // 1. 将所有随从放回拥有者牌库底
+        // 1. 将所有随从移至相应目的地（Base: 销毁, POD: 牌库底）
+        const isPod = ritual.defId.endsWith('_pod');
+
         for (const m of base.minions) {
-            events.push({
-                type: SU_EVENTS.CARD_TO_DECK_BOTTOM,
-                payload: {
-                    cardUid: m.uid,
-                    defId: m.defId,
-                    ownerId: m.owner,
-                    reason: 'cthulhu_complete_the_ritual',
-                },
-                timestamp: ctx.now,
-            } as CardToDeckBottomEvent);
+            if (isPod) {
+                events.push({
+                    type: SU_EVENTS.CARD_TO_DECK_BOTTOM,
+                    payload: {
+                        cardUid: m.uid,
+                        defId: m.defId,
+                        ownerId: m.owner,
+                        reason: 'cthulhu_complete_the_ritual',
+                    },
+                    timestamp: ctx.now,
+                } as CardToDeckBottomEvent);
+            } else {
+                events.push(destroyMinion(
+                    m.uid, m.defId, i, m.owner, ctx.playerId, 'cthulhu_complete_the_ritual', ctx.now
+                ));
+            }
         }
 
-        // 2. 将所?ongoing 行动卡放回拥有者牌库底（包括仪式本身）
+        // 2. 将所有 ongoing 行动卡移至相应目的地（包括仪式本身）
         for (const ongoing of base.ongoingActions) {
-            events.push({
-                type: SU_EVENTS.CARD_TO_DECK_BOTTOM,
-                payload: {
-                    cardUid: ongoing.uid,
-                    defId: ongoing.defId,
-                    ownerId: ongoing.ownerId,
-                    reason: 'cthulhu_complete_the_ritual',
-                },
-                timestamp: ctx.now,
-            } as CardToDeckBottomEvent);
+            if (isPod) {
+                events.push({
+                    type: SU_EVENTS.CARD_TO_DECK_BOTTOM,
+                    payload: {
+                        cardUid: ongoing.uid,
+                        defId: ongoing.defId,
+                        ownerId: ongoing.ownerId,
+                        reason: 'cthulhu_complete_the_ritual',
+                    },
+                    timestamp: ctx.now,
+                } as CardToDeckBottomEvent);
+            } else {
+                // 原版规则通常也是销毁或进入弃牌堆，随基地销毁逻辑处理
+                // 由于仪式是 Play on a base，基地移除时会自动清理
+                // 但显式销毁所有卡牌更符合描述 "destroy all cards here"
+                events.push({
+                    type: SU_EVENTS.ONGOING_DETACHED,
+                    payload: {
+                        cardUid: ongoing.uid,
+                        defId: ongoing.defId,
+                        ownerId: ongoing.ownerId,
+                        targetType: 'base',
+                        targetBaseIndex: i,
+                        reason: 'cthulhu_complete_the_ritual'
+                    },
+                    timestamp: ctx.now
+                } as any);
+            }
         }
 
         // 3. 移除旧基地（BASE_CLEARED 清除基地上的随从/ongoing 并移除基地）
@@ -356,30 +382,16 @@ function cthulhuChosenBeforeScoring(ctx: TriggerContext): TriggerResult {
     // 链式处理：为第一个天选之人创建确认交互
     const first = chosenList[0];
     const remaining = chosenList.slice(1);
-    
+
     const interaction = createSimpleChoice(
         `cthulhu_chosen_confirm_${ctx.now}`, first.controller,
         '神选者：是否抽一张疯狂卡来获得+2力量？',
         [
-            {
-                id: 'yes',
-                label: '是（抽疯狂卡，+2力量）',
-                value: {
-                    activate: true,
-                    uid: first.uid,
-                    minionUid: first.uid,
-                    defId: first.defId,
-                    minionDefId: first.defId,
-                    baseIndex: first.baseIndex,
-                    controller: first.controller,
-                },
-                displayMode: 'button' as const,
-                baseDefId: ctx.state.bases[first.baseIndex]?.defId,
-            },
-            { id: 'no', label: '否（不触发）', value: { activate: false }, displayMode: 'button' as const, baseDefId: ctx.state.bases[first.baseIndex]?.defId },
+            { id: 'yes', label: '是（抽疯狂卡，+2力量）', value: { activate: true, uid: first.uid, baseIndex: first.baseIndex, controller: first.controller }, displayMode: 'button' as const },
+            { id: 'no', label: '否（不触发）', value: { activate: false }, displayMode: 'button' as const },
         ],
-        { sourceId: 'cthulhu_chosen_confirm', targetType: 'minion' }
-        );
+        'cthulhu_chosen_confirm'
+    );
     const ms = queueInteraction(ctx.matchState, {
         ...interaction,
         data: { ...interaction.data, continuationContext: { remaining } },
@@ -391,18 +403,55 @@ function cthulhuChosenBeforeScoring(ctx: TriggerContext): TriggerResult {
 // ongoing 效果触发器?
 // ============================================================================
 
-/** 克苏鲁祭坛触发：打出随从时额外打出一张战术?*/
-function cthulhuAltarTrigger(ctx: TriggerContext): SmashUpEvent[] {
+/** 克苏鲁祭坛触发：打出随从时额外打出一张战术 */
+function cthulhuAltarTrigger(ctx: TriggerContext): TriggerResult | SmashUpEvent[] {
     const events: SmashUpEvent[] = [];
-    const baseIndex = ctx.baseIndex;
-    if (baseIndex === undefined) return events;
-    const base = ctx.state.bases[baseIndex];
+    const minionPlayedBaseIndex = ctx.baseIndex;
+    if (minionPlayedBaseIndex === undefined) return events;
+
+    const base = ctx.state.bases[minionPlayedBaseIndex];
     if (!base) return events;
+
+    // 检查此基地上的祭坛
     for (const ongoing of base.ongoingActions) {
-        if (!matchesDefId(ongoing.defId, 'cthulhu_altar')) continue;
         if (ongoing.ownerId !== ctx.playerId) continue;
-        events.push(grantExtraAction(ctx.playerId, 'cthulhu_altar', ctx.now));
+
+        if (ongoing.defId === 'cthulhu_altar') {
+            // 原版：打出随从后（通常是任何地方，但代码中限制在此基地）获得额外行动
+            // Fandom: "After you play a minion, you may play an extra action."
+            // 保持现状但修正描述
+            events.push(grantExtraAction(ctx.playerId, 'cthulhu_altar', ctx.now));
+        } else if (ongoing.defId === 'cthulhu_altar_pod') {
+            // POD: "每回合一次，在此处打出随从后，你可以打出一个额外战术"
+            const usedUids = ctx.state.cthulhuAltarUsedUids ?? [];
+            if (usedUids.includes(ongoing.uid)) continue;
+
+            const interaction = createSimpleChoice(
+                `cthulhu_altar_pod_confirm_${ctx.now}`, ctx.playerId,
+                '克苏鲁祭坛：是否打出一个额外战术？',
+                [
+                    { id: 'yes', label: '是', value: { activate: true, altarUid: ongoing.uid }, displayMode: 'button' },
+                    { id: 'no', label: '否', value: { activate: false }, displayMode: 'button' },
+                ],
+                'cthulhu_altar_pod_confirm',
+            );
+            return { events: [], matchState: queueInteraction(ctx.matchState!, interaction) };
+        }
     }
+
+    // 检查其他基地上的原版祭坛（原版祭坛不限基地）
+    if (events.length === 0) {
+        for (let i = 0; i < ctx.state.bases.length; i++) {
+            if (i === minionPlayedBaseIndex) continue;
+            const b = ctx.state.bases[i];
+            for (const o of b.ongoingActions) {
+                if (o.defId === 'cthulhu_altar' && o.ownerId === ctx.playerId) {
+                    events.push(grantExtraAction(ctx.playerId, 'cthulhu_altar', ctx.now));
+                }
+            }
+        }
+    }
+
     return events;
 }
 
@@ -475,8 +524,8 @@ function cthulhuStarSpawn(ctx: AbilityContext): AbilityResult {
         label: getPlayerLabel(pid),
         value: { targetPlayerId: pid, madnessUid: madnessCard.uid },
     }));
-    
-    const interaction = createSimpleChoice<TargetPlayerChoiceValue>(
+
+    const interaction = createSimpleChoice(
         `cthulhu_star_spawn_${ctx.now}`, ctx.playerId,
         '选择要给予疯狂卡的玩家', options,
         { sourceId: 'cthulhu_star_spawn', targetType: 'generic', autoCancelOption: true },
@@ -507,7 +556,7 @@ function cthulhuServitor(ctx: AbilityContext): AbilityResult {
     const options = actionsInDiscard.map((c, i) => {
         const def = getCardDef(c.defId);
         const name = def?.name ?? c.defId;
-        return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, _source: 'discard' as const , displayMode: 'card' as const };
+        return { id: `action-${i}`, label: name, value: { cardUid: c.uid, defId: c.defId }, _source: 'discard' as const, displayMode: 'card' as const };
     });
     const interaction = createSimpleChoice<CardChoiceValue>(
         `cthulhu_servitor_${ctx.now}`, ctx.playerId,
@@ -522,6 +571,26 @@ function cthulhuServitor(ctx: AbilityContext): AbilityResult {
 
 /** 注册克苏鲁之仆派系的交互解决处理函数 */
 export function registerCthulhuInteractionHandlers(): void {
+    // 克苏鲁祭坛 POD：处理玩家是否选择打出额外战术
+    registerInteractionHandler('cthulhu_altar_pod_confirm', (state, playerId, value, _iData, _random, timestamp) => {
+        const { activate, altarUid } = value as { activate: boolean; altarUid?: string };
+        if (!activate || !altarUid) return { state, events: [] };
+
+        const events: SmashUpEvent[] = [];
+        // 标记此祭坛本回合已使用
+        const usedUids = state.core.cthulhuAltarUsedUids ?? [];
+        const newState = {
+            ...state,
+            core: {
+                ...state.core,
+                cthulhuAltarUsedUids: [...usedUids, altarUid]
+            }
+        };
+
+        events.push(grantExtraAction(playerId, 'cthulhu_altar_pod', timestamp));
+        return { state: newState, events };
+    });
+
     // 重新开始：玩家选择任意数量的行动卡洗回牌库
     registerInteractionHandler('cthulhu_it_begins_again', (state, playerId, value, _iData, random, timestamp) => {
         const selectedCards = normalizeChoiceArray<CardUidSelection>(value);
@@ -533,11 +602,13 @@ export function registerCthulhuInteractionHandlers(): void {
         const actionsFromDiscard = player.discard.filter(c => selectedUidSet.has(c.uid));
         const newDeck = [...player.deck, ...actionsFromDiscard];
         const shuffled = random.shuffle([...newDeck]);
-        return { state, events: [{
-            type: SU_EVENTS.DECK_REORDERED,
-            payload: { playerId, deckUids: shuffled.map(c => c.uid) },
-            timestamp,
-        }] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.DECK_REORDERED,
+                payload: { playerId, deckUids: shuffled.map(c => c.uid) },
+                timestamp,
+            }]
+        };
     });
 
     registerInteractionHandler('cthulhu_corruption', (state, playerId, value, _iData, _random, timestamp) => {
@@ -546,7 +617,7 @@ export function registerCthulhuInteractionHandlers(): void {
         if (!base) return { state, events: [] };
         const target = base.minions.find(m => m.uid === minionUid);
         if (!target) return { state, events: [] };
-        return { state, events: [destroyMinion(target.uid, target.defId, baseIndex, target.owner, playerId, 'cthulhu_corruption', timestamp)] };
+        return { state, events: [destroyMinion(target.uid, target.defId, baseIndex, target.owner, _playerId, 'cthulhu_corruption', timestamp)] };
     });
 
     registerInteractionHandler('cthulhu_servitor', (state, playerId, value, _iData, _random, timestamp) => {
@@ -557,23 +628,24 @@ export function registerCthulhuInteractionHandlers(): void {
         if (!actionCard) return { state, events: [] };
         // DECK_REORDERED：将弃牌堆中的行动卡放到牌库顶，reducer 会自动从弃牌堆移除
         const newDeckUids = [actionCard.uid, ...player.deck.map(c => c.uid)];
-        return { state, events: [{
-            type: SU_EVENTS.DECK_REORDERED,
-            payload: { playerId, deckUids: newDeckUids },
-            timestamp,
-        }] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.DECK_REORDERED,
+                payload: { playerId, deckUids: newDeckUids },
+                timestamp,
+            }]
+        };
     });
 
     registerInteractionHandler('cthulhu_star_spawn', (state, playerId, value, _iData, _random, timestamp) => {
         // 检查是否取消（框架自动添加的取消选项）
-        const selected = value as { __cancel__?: boolean; targetPlayerId?: string; madnessUid?: string };
-        if (selected.__cancel__) return { state, events: [] };
-        
-        const { targetPlayerId, madnessUid } = selected;
-        
+        if ((value as any).__cancel__) return { state, events: [] };
+
+        const { targetPlayerId, madnessUid } = value as { targetPlayerId?: string; madnessUid?: string };
+
         // 正常执行：转移疯狂卡
         if (!targetPlayerId || !madnessUid) return { state, events: [] };
-        
+
         const events: SmashUpEvent[] = [];
         events.push(returnMadnessCard(playerId, madnessUid, 'cthulhu_star_spawn', timestamp));
         const drawEvt = drawMadnessCards(targetPlayerId, 1, state.core, 'cthulhu_star_spawn', timestamp);
@@ -592,11 +664,13 @@ export function registerCthulhuInteractionHandlers(): void {
         const drawCount = Math.min(2, player.deck.length);
         if (drawCount === 0) return { state, events: [] };
         const drawnUids = player.deck.slice(0, drawCount).map(c => c.uid);
-        return { state, events: [{
-            type: SU_EVENTS.CARDS_DRAWN,
-            payload: { playerId, count: drawCount, cardUids: drawnUids },
-            timestamp,
-        } as CardsDrawnEvent] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.CARDS_DRAWN,
+                payload: { playerId, count: drawCount, cardUids: drawnUids },
+                timestamp,
+            } as CardsDrawnEvent]
+        };
     });
 
     // 强制招募：玩家选择任意数量的随从放到牌库顶
@@ -612,11 +686,13 @@ export function registerCthulhuInteractionHandlers(): void {
             .filter(Boolean);
         // DECK_REORDERED：选中的弃牌堆卡放牌库顶，reducer 会自动从弃牌堆移除
         const newDeck = [...selectedFromDiscard, ...player.deck];
-        return { state, events: [{
-            type: SU_EVENTS.DECK_REORDERED,
-            payload: { playerId, deckUids: newDeck.map(c => c!.uid) },
-            timestamp,
-        }] };
+        return {
+            state, events: [{
+                type: SU_EVENTS.DECK_REORDERED,
+                payload: { playerId, deckUids: newDeck.map(c => c!.uid) },
+                timestamp,
+            }]
+        };
     });
 
     registerInteractionHandler('cthulhu_madness_unleashed', (state, playerId, value, _iData, _random, timestamp) => {
@@ -669,30 +745,16 @@ export function registerCthulhuInteractionHandlers(): void {
         if (remaining.length > 0) {
             const next = remaining[0];
             const rest = remaining.slice(1);
-            
+
             const interaction = createSimpleChoice(
                 `cthulhu_chosen_confirm_${timestamp}`, next.controller,
                 '神选者：是否抽一张疯狂卡来获得+2力量？',
                 [
-                    {
-                        id: 'yes',
-                        label: '是（抽疯狂卡，+2力量）',
-                        value: {
-                            activate: true,
-                            uid: next.uid,
-                            minionUid: next.uid,
-                            defId: next.defId,
-                            minionDefId: next.defId,
-                            baseIndex: next.baseIndex,
-                            controller: next.controller,
-                        },
-                        displayMode: 'button' as const,
-                        baseDefId: state.core.bases[next.baseIndex]?.defId,
-                    },
-                    { id: 'no', label: '否（不触发）', value: { activate: false }, displayMode: 'button' as const, baseDefId: state.core.bases[next.baseIndex]?.defId },
+                    { id: 'yes', label: '是（抽疯狂卡，+2力量）', value: { activate: true, uid: next.uid, baseIndex: next.baseIndex, controller: next.controller }, displayMode: 'button' as const },
+                    { id: 'no', label: '否（不触发）', value: { activate: false }, displayMode: 'button' as const },
                 ],
-                { sourceId: 'cthulhu_chosen_confirm', targetType: 'minion' }
-                );
+                'cthulhu_chosen_confirm'
+            );
             return {
                 state: queueInteraction(state, {
                     ...interaction,

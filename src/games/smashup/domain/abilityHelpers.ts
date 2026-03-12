@@ -44,8 +44,10 @@ import type {
 import { SU_EVENT_TYPES as SU_EVENTS } from './events';
 import { getEffectivePower } from './ongoingModifiers';
 import { triggerAllBaseAbilities } from './baseAbilities';
-import { fireTriggers } from './ongoingEffects';
+import { fireTriggers, fireSpecificTrigger } from './ongoingEffects';
 import { getMinionDef } from '../data/cards';
+import { getTitanDef } from '../data/titans';
+import { getCurrentPlayerId } from './types';
 
 // ============================================================================
 // 交互选项工厂函数
@@ -651,7 +653,37 @@ export function fireMinionPlayedTriggers(params: {
     events.push(...ongoingResult.events);
     if (ongoingResult.matchState) matchState = ongoingResult.matchState;
 
-    // 4. 消费 pendingMinionPlayEffects 队列（如 crack_of_dusk / its_alive 的打出后+1指示物）
+    // 4. [规则修复] 如果当前是 startTurn 阶段，且打出的随从有 onTurnStart 效果，应立即触发
+    // （官方 FAQ：如 Sprout 召唤 Water Lily，如果 Water Lily 是在回合开始阶段入场，它可以触发自己）
+    // 
+    // 【修复】检查 triggerOnTurnStart 标志：如果 MINION_PLAYED 事件明确标记了 triggerOnTurnStart=true，
+    // 则认为是回合开始阶段的特招，应该触发 onTurnStart 效果。
+    // 
+    // 【重要】判断逻辑：
+    // - startTurn 阶段 + fromDeck + triggerOnTurnStart=true：幼苗触发 → 特招睡莲 → 睡莲应该触发 onTurnStart（符合官方 FAQ）
+    // - playCards 阶段 + fromDeck + triggerOnTurnStart=true：幼苗触发后阶段推进到 playCards，但新睡莲仍应触发
+    // - playCards 阶段 + fromDeck + triggerOnTurnStart=false/undefined：金星捕蝇草天赋 → 特招幼苗 → 幼苗不应该触发 onTurnStart
+    // 
+    // 【关键修复 2026-03-06】：只有显式标记 triggerOnTurnStart=true 时才触发，避免 undefined 时误判
+    const isFromDeck = params.playedEvt.payload.fromDeck;
+    const currentPhase = matchState?.sys?.phase;
+    const triggerOnTurnStart = params.playedEvt.payload.triggerOnTurnStart;
+    
+    const shouldTriggerOnTurnStart = isFromDeck && triggerOnTurnStart === true;
+    
+    console.log(`[fireMinionPlayedTriggers] Step 4 check: defId=${defId}, isFromDeck=${isFromDeck}, currentPhase=${currentPhase}, triggerOnTurnStart=${triggerOnTurnStart}, shouldTrigger=${shouldTriggerOnTurnStart}`);
+    
+    if (shouldTriggerOnTurnStart) {
+        const turnStartResult = fireSpecificTrigger(core, 'onTurnStart', defId, {
+            state: core, matchState,
+            playerId: getCurrentPlayerId(core),
+            random, now,
+        });
+        events.push(...turnStartResult.events);
+        if (turnStartResult.matchState) matchState = turnStartResult.matchState;
+    }
+
+    // 5. 消费 pendingMinionPlayEffects 队列（如 crack_of_dusk / its_alive 的打出后+1指示物）
     const player = core.players[playerId];
     if (player?.pendingMinionPlayEffects && player.pendingMinionPlayEffects.length > 0) {
         const effect = player.pendingMinionPlayEffects[0];
@@ -672,6 +704,48 @@ export function fireMinionPlayedTriggers(params: {
 // ============================================================================
 // 额外出牌额度
 // ============================================================================
+
+/**
+ * 检查黑熊口粮POD压制条件
+ * 
+ * 规则：如果玩家在指定基地（或任何基地）有随从，且该基地有已激活天赋的黑熊口粮POD（其他玩家的），
+ * 则该玩家被压制，无法获得额外出牌额度。
+ * 
+ * @param state 当前游戏状态
+ * @param playerId 要检查的玩家ID
+ * @param restrictToBase 可选，只检查指定基地（用于基地限定额度）
+ * @returns true = 被压制，false = 未被压制
+ */
+export function checkBearNecessitiesSuppression(
+    state: SmashUpCore,
+    playerId: PlayerId,
+    restrictToBase?: number
+): boolean {
+    // 如果指定了 restrictToBase，只检查该基地
+    const basesToCheck = restrictToBase !== undefined 
+        ? [state.bases[restrictToBase]].filter(Boolean)
+        : state.bases;
+    
+    // 检查所有需要检查的基地
+    for (const base of basesToCheck) {
+        // 检查该基地是否有已激活天赋的黑熊口粮POD（其他玩家的）
+        const bearNecessitiesPod = base.ongoingActions.find(
+            a => a.defId === 'bear_cavalry_bear_necessities_pod' 
+                 && a.talentUsed 
+                 && a.ownerId !== playerId
+        );
+        
+        if (bearNecessitiesPod) {
+            // 检查该玩家在该基地是否有随从
+            const playerHasMinionOnBase = base.minions.some(m => m.controller === playerId);
+            if (playerHasMinionOnBase) {
+                return true; // 被压制
+            }
+        }
+    }
+    
+    return false; // 未被压制
+}
 
 /** 生成额外随从额度事件 */
 export function grantExtraMinion(
@@ -823,10 +897,11 @@ export function buildActionCancelRollbackEvents(
     now: number,
     rollbackEvents: SmashUpEvent[] = [],
 ): SmashUpEvent[] {
+    const actionEvt = grantExtraAction(playerId, undefined, `${reasonPrefix}_cancel`, now);
     return [
         ...rollbackEvents,
         recoverCardsFromDiscard(playerId, [actionCardUid], `${reasonPrefix}_cancel`, now),
-        grantExtraAction(playerId, `${reasonPrefix}_cancel`, now),
+        ...(actionEvt ? [actionEvt] : []),
     ];
 }
 
@@ -1192,3 +1267,6 @@ export function buildAbilityFeedback(
         timestamp: now,
     };
 }
+
+// ============================================================================
+// 泰坦初始化

@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { SmashUpCore, PlayerState, MinionOnBase, BaseInPlay, MinionDestroyedEvent } from '../domain/types';
-import { SU_EVENTS } from '../domain/types';
+import type { SmashUpCore, PlayerState, MinionOnBase, BaseInPlay, MinionDestroyedEvent, MadnessDrawnEvent } from '../domain/types';
+import { SU_EVENTS, MADNESS_CARD_DEF_ID } from '../domain/types';
 import { initAllAbilities, resetAbilityInit } from '../abilities';
 import { clearRegistry, resolveAbility } from '../domain/abilityRegistry';
 import type { AbilityContext } from '../domain/abilityRegistry';
@@ -44,6 +44,7 @@ function makeState(overrides?: Partial<SmashUpCore>): SmashUpCore {
         currentPlayerIndex: 0,
         bases: [],
         baseDeck: [],
+        madnessDeck: [MADNESS_CARD_DEF_ID, MADNESS_CARD_DEF_ID, MADNESS_CARD_DEF_ID],
         turnNumber: 1,
         nextUid: 100,
         ...overrides,
@@ -98,7 +99,7 @@ describe('修格斯消灭随从选择权', () => {
         expect(i2?.playerId).toBe('0');
     });
 
-    it('对手拒绝且只有1个随从时，直接消灭', () => {
+    it('对手拒绝且只有1个随从时，也应产生由修格斯控制者选择（可跳过）的 Interaction', () => {
         const shoggoth = makeMinion('sh-1', 'elder_thing_shoggoth', '0', 6, { powerModifier: 0 });
         const opM1 = makeMinion('op-1', 'test_minion_a', '1', 3, { powerModifier: 0 });
         const base = makeBase({ minions: [shoggoth, opM1] });
@@ -111,10 +112,11 @@ describe('修格斯消灭随从选择权', () => {
         const ms2 = { ...r1.matchState!, sys: { ...r1.matchState!.sys, interaction: { current: undefined, queue: [] } } };
         const r2 = handler(ms2, '1', { choice: 'decline' }, i1?.data, dummyRandom, 1)!;
 
-        // 只有1个随从，直接消灭
-        const destroyEvents = r2.events.filter((e: any) => e.type === SU_EVENTS.MINION_DESTROYED);
-        expect(destroyEvents).toHaveLength(1);
-        expect((destroyEvents[0] as MinionDestroyedEvent).payload.minionUid).toBe('op-1');
+        // 不应直接消灭，而是给控制者选择（或跳过）
+        expect(r2.events.filter((e: any) => e.type === SU_EVENTS.MINION_DESTROYED)).toHaveLength(0);
+        const i2 = (r2.state?.sys as any)?.interaction?.current;
+        expect(i2?.data?.sourceId).toBe('elder_thing_shoggoth_destroy');
+        expect(i2?.playerId).toBe('0');
     });
 
     it('控制者选择消灭指定随从后产生正确事件', () => {
@@ -151,6 +153,54 @@ describe('修格斯消灭随从选择权', () => {
         const r2 = handler(ms2, '1', { choice: 'draw_madness' }, i1?.data, dummyRandom, 1)!;
 
         expect(r2.events.filter((e: any) => e.type === SU_EVENTS.MINION_DESTROYED)).toHaveLength(0);
+    });
+
+    it('控制者选择跳过不消灭：不产生 MINION_DESTROYED，且链结束时若力量<12则抽2张疯狂卡', () => {
+        const shoggoth = makeMinion('sh-1', 'elder_thing_shoggoth', '0', 6, { powerModifier: 0 });
+        const opM1 = makeMinion('op-1', 'test_minion_a', '1', 3, { powerModifier: 0 });
+        const base = makeBase({ minions: [shoggoth, opM1] });
+        const state = makeState({ bases: [base] });
+
+        const r1 = triggerShoggothOnPlay(state);
+        const i1 = (r1.matchState?.sys as any)?.interaction?.current;
+
+        // 对手拒绝 → 产生由 P0 选择消灭/跳过的交互
+        const opHandler = getInteractionHandler('elder_thing_shoggoth_opponent')!;
+        const ms2 = { ...r1.matchState!, sys: { ...r1.matchState!.sys, interaction: { current: undefined, queue: [] } } };
+        const r2 = opHandler(ms2, '1', { choice: 'decline' }, i1?.data, dummyRandom, 1)!;
+        const i2 = (r2.state?.sys as any)?.interaction?.current;
+        expect(i2?.playerId).toBe('0');
+
+        // P0 选择跳过
+        const destroyHandler = getInteractionHandler('elder_thing_shoggoth_destroy')!;
+        const ms3 = { ...r2.state, sys: { ...r2.state.sys, interaction: { current: undefined, queue: [] } } };
+        const r3 = destroyHandler(ms3, '0', { skip: true }, i2?.data, dummyRandom, 2)!;
+
+        expect(r3.events.filter((e: any) => e.type === SU_EVENTS.MINION_DESTROYED)).toHaveLength(0);
+        const madness = r3.events.filter((e: any) => e.type === SU_EVENTS.MADNESS_DRAWN) as MadnessDrawnEvent[];
+        expect(madness).toHaveLength(1);
+        expect(madness[0].payload.playerId).toBe('0');
+        expect(madness[0].payload.count).toBe(2);
+    });
+
+    it('链结束时“<12 总力量”包含修格斯自身：刚好12则不抽2张疯狂卡', () => {
+        const shoggoth = makeMinion('sh-1', 'elder_thing_shoggoth', '0', 6, { powerModifier: 0 });
+        const ally = makeMinion('a-1', 'test_ally', '0', 6, { powerModifier: 0 });
+        const opM1 = makeMinion('op-1', 'test_minion_a', '1', 3, { powerModifier: 0 });
+        const base = makeBase({ minions: [shoggoth, ally, opM1] });
+        const state = makeState({ bases: [base] });
+
+        const r1 = triggerShoggothOnPlay(state);
+        const i1 = (r1.matchState?.sys as any)?.interaction?.current;
+
+        // 对手选择抽疯狂卡 → 不进入消灭选择，直接链结束触发 finalize
+        const handler = getInteractionHandler('elder_thing_shoggoth_opponent')!;
+        const ms2 = { ...r1.matchState!, sys: { ...r1.matchState!.sys, interaction: { current: undefined, queue: [] } } };
+        const r2 = handler(ms2, '1', { choice: 'draw_madness' }, i1?.data, dummyRandom, 1)!;
+
+        // 仍会产生对手抽疯狂卡事件（1张），但不应产生控制者抽2张的事件
+        const drawn = r2.events.filter((e: any) => e.type === SU_EVENTS.MADNESS_DRAWN) as MadnessDrawnEvent[];
+        expect(drawn.some(e => e.payload.playerId === '0' && e.payload.count === 2)).toBe(false);
     });
 
     it('多对手链式处理：P1拒绝后P0选择消灭，然后继续询问P2', () => {

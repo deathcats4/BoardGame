@@ -21,6 +21,8 @@ export interface LayoutConfig {
     ongoingTopOffset: number;
     /** 手牌区域高度（px） */
     handAreaHeight: number;
+    /** 泰坦卡片宽度（vw） */
+    titanCardWidth: number;
 }
 
 /**
@@ -45,6 +47,7 @@ export function getLayoutConfig(playerCount: number): LayoutConfig {
                 ongoingCardWidth: 3.8,
                 ongoingTopOffset: 6,
                 handAreaHeight: 220,
+                titanCardWidth: 4.5,
             };
         case 3:
             // 三人局：适度缩放，缩小间距
@@ -57,6 +60,7 @@ export function getLayoutConfig(playerCount: number): LayoutConfig {
                 ongoingCardWidth: 3.5,
                 ongoingTopOffset: 5.5,
                 handAreaHeight: 200,
+                titanCardWidth: 4.2,
             };
         case 4:
             // 四人局：紧凑布局，无间距
@@ -69,6 +73,7 @@ export function getLayoutConfig(playerCount: number): LayoutConfig {
                 ongoingCardWidth: 3,
                 ongoingTopOffset: 5,
                 handAreaHeight: 180,
+                titanCardWidth: 3.8,
             };
         default:
             // 理论上不会到达这里（已在上方边界检查处理）
@@ -83,6 +88,7 @@ export function getLayoutConfig(playerCount: number): LayoutConfig {
                 ongoingCardWidth: 3.8,
                 ongoingTopOffset: 6,
                 handAreaHeight: 220,
+                titanCardWidth: 4.5,
             };
     }
 }

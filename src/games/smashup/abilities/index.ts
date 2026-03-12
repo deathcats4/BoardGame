@@ -37,6 +37,7 @@ import { registerFrankensteinAbilities, registerFrankensteinInteractionHandlers 
 import { registerWerewolfAbilities, registerWerewolfInteractionHandlers } from './werewolves';
 import { registerVampireAbilities, registerVampireInteractionHandlers } from './vampires';
 import { registerGiantAntAbilities, registerGiantAntInteractionHandlers } from './giant_ants';
+import { registerTitanAbilities, registerTitanInteractionHandlers } from './titans';
 import { registerBaseAbilities, registerBaseInteractionHandlers, clearBaseAbilityRegistry } from '../domain/baseAbilities';
 import { registerMultiBaseScoringInteractionHandler } from '../domain/index';
 import { registerAllOngoingModifiers } from './ongoing_modifiers';
@@ -44,7 +45,8 @@ import { clearPowerModifierRegistry, registerPodPowerModifierAliases } from '../
 import { clearOngoingEffectRegistry, registerPodOngoingAliases } from '../domain/ongoingEffects';
 import { clearDiscardPlayProviders } from '../domain/discardPlayability';
 import { clearRegistry, registerPodAbilityAliases } from '../domain/abilityRegistry';
-import { clearInteractionHandlers, registerPodInteractionAliases } from '../domain/abilityInteractionHandlers';
+import { clearInteractionHandlers, registerPodInteractionAliases, registerSystemInteractionHandlers } from '../domain/abilityInteractionHandlers';
+import { ENABLE_TITANS } from '../domain/config';
 
 let initialized = false;
 
@@ -60,6 +62,7 @@ export function initAllAbilities(): void {
     clearPowerModifierRegistry();
     clearOngoingEffectRegistry();
     clearDiscardPlayProviders();
+    registerSystemInteractionHandlers();
 
     // 基础?8 派系
     registerAlienAbilities();
@@ -115,6 +118,12 @@ export function initAllAbilities(): void {
     registerVampireInteractionHandlers();
     registerGiantAntAbilities();
     registerGiantAntInteractionHandlers();
+
+    // 泰坦能力
+    if (ENABLE_TITANS) {
+        registerTitanAbilities();
+        registerTitanInteractionHandlers();
+    }
 
     // 持续力量修正
     registerAllOngoingModifiers();
