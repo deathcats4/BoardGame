@@ -36,6 +36,7 @@ import {
     HAND_LIMIT,
     VP_TO_WIN,
     getCurrentPlayerId,
+    MADNESS_CARD_DEF_ID,
 } from './types';
 import { getEffectivePower, getTotalEffectivePowerOnBase, getEffectiveBreakpoint, getEffectivePowerBreakdown, getOngoingCardPowerContribution, getScoringEligibleBaseIndices } from './ongoingModifiers';
 import { fireTriggers, fireSpecificTrigger, getEligibleTriggers, interceptEvent as ongoingInterceptEvent } from './ongoingEffects';
@@ -48,6 +49,12 @@ import { triggerAllBaseAbilities, triggerBaseAbility, triggerExtendedBaseAbility
 import { openMeFirstWindow, openAfterScoringWindow, buildBaseTargetOptions, isSpecialLimitBlocked } from './abilityHelpers';
 import type { PhaseExitResult } from '../../../engine/systems/FlowSystem';
 import { registerInteractionHandler } from './abilityInteractionHandlers';
+import { theKrakenOngoing, theKrakenSpecial } from './abilities/titans/theKraken';
+import { arcaneProtectorSpecial } from './abilities/titans/arcaneProtector';
+import { fortTitanosaurusOngoing } from './abilities/titans/fortTitanosaurus';
+import { invisibleNinjaOngoing } from './abilities/titans/invisibleNinja';
+import { majorUrsaOngoing } from './abilities/titans/majorUrsa';
+import { killerKudzuOngoing } from './abilities/titans/killerKudzu';
 import { createSimpleChoice, queueInteraction } from '../../../engine/systems/InteractionSystem';
 import { RESPONSE_WINDOW_EVENTS } from '../../../engine/systems/ResponseWindowSystem';
 import { resolveSpecial } from './abilityRegistry';
@@ -244,8 +251,6 @@ export function scoreOneBase(
     for (const [pidForKraken, playerForKraken] of Object.entries(updatedCore.players)) {
         const titan = playerForKraken.activeTitan;
         if (!titan || titan.defId !== 'titan_the_kraken' || titan.baseIndex !== baseIndex) continue;
-
-        const { theKrakenOngoing } = require('./abilities/titans/theKraken');
         if (theKrakenOngoing) {
             const ctx: AbilityContext = {
                 state: updatedCore,
@@ -1830,7 +1835,6 @@ function postProcessSystemEvents(
                 if (playerForSpecial) {
                     const cardsPlayed = playerForSpecial.cardsPlayedThisTurn ?? 0;
                     if (cardsPlayed >= 5) {
-                        const { arcaneProtectorSpecial } = require('./abilities/titans/arcaneProtector');
                         if (arcaneProtectorSpecial) {
                             const ctx: AbilityContext = {
                                 state: ms.core,
@@ -1869,7 +1873,6 @@ function postProcessSystemEvents(
             // 【泰坦 Ongoing】Cthulhu: 你打出疯狂牌后，给泰坦放置 +1 指示物（需在场“见证”）
             // 注意：即使疯狂牌选择“返回疯狂牌库”也属于“打出疯狂牌”
             {
-                const { MADNESS_CARD_DEF_ID } = require('./types');
                 if (playedEvt.payload.defId === MADNESS_CARD_DEF_ID) {
                     // 仅在该事件发生前泰坦已在场时触发（见证规则）
                     let tempCore = state;
@@ -1901,7 +1904,6 @@ function postProcessSystemEvents(
             // 判断"影响随从"：行动卡的目标是随从（需要从 execute 中传递 targetMinionUid）
             if (playedEvt.payload.targetMinionUid) {
                 // 采用 require 解压避免跨文件循环引用问题：
-                const { fortTitanosaurusOngoing } = require('./abilities/titans/fortTitanosaurus');
                 if (fortTitanosaurusOngoing) {
                     const ctx: AbilityContext = {
                         state: ms.core, // 用最新 core 数据
@@ -1927,7 +1929,6 @@ function postProcessSystemEvents(
                 if (playerForSpecial) {
                     const cardsPlayed = playerForSpecial.cardsPlayedThisTurn ?? 0;
                     if (cardsPlayed >= 5) {
-                        const { arcaneProtectorSpecial } = require('./abilities/titans/arcaneProtector');
                         if (arcaneProtectorSpecial) {
                             const ctx: AbilityContext = {
                                 state: ms.core,
@@ -1952,7 +1953,6 @@ function postProcessSystemEvents(
             const ownerId = returnedEvt.payload.ownerId;
             const player = state.players[ownerId];
             if (player && player.activeTitan?.titanDefId === 'titan_invisible_ninja' && !player.invisibleNinjaOngoingUsedThisTurn) {
-                const { invisibleNinjaOngoing } = require('./abilities/titans/invisibleNinja');
                 if (invisibleNinjaOngoing) {
                     const ctx: AbilityContext = {
                         state: ms.core,
@@ -2000,7 +2000,6 @@ function postProcessSystemEvents(
             if (destroyerId && destroyerId === pid && ownerId !== pid) {
                 const player = state.players[pid];
                 if (player && player.activeTitan?.titanDefId === 'titan_invisible_ninja' && !player.invisibleNinjaOngoingUsedThisTurn) {
-                    const { invisibleNinjaOngoing } = require('./abilities/titans/invisibleNinja');
                     if (invisibleNinjaOngoing) {
                         const ctx: AbilityContext = {
                             state: ms.core,
@@ -2040,8 +2039,6 @@ function postProcessSystemEvents(
                     const titanBaseIndex = titan.baseIndex;
                     const affectsBase = titanBaseIndex === fromBaseIndex || titanBaseIndex === toBaseIndex;
                     if (!affectsBase) continue;
-
-                    const { majorUrsaOngoing } = require('./abilities/titans/majorUrsa');
                     if (majorUrsaOngoing) {
                         const ctx: AbilityContext = {
                             state: ms.core,
@@ -2081,7 +2078,6 @@ function postProcessSystemEvents(
                 if (!hasKrakenInZone || !krakenNotInPlay) continue;
 
                 // 触发 The Kraken Special：为该玩家创建“是否要在新基地上打出 Kraken”的交互
-                const { theKrakenSpecial } = require('./abilities/titans/theKraken');
                 if (theKrakenSpecial) {
                     const ctx: AbilityContext = {
                         state: ms.core,
@@ -2148,7 +2144,6 @@ function postProcessSystemEvents(
             };
             const { playerId, titanDefId } = removedEvt.payload;
             if (titanDefId === 'titan_killer_kudzu') {
-                const { killerKudzuOngoing } = require('./abilities/titans/killerKudzu');
                 if (killerKudzuOngoing) {
                     const ctx: AbilityContext = {
                         state: ms.core,

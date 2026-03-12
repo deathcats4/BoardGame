@@ -9,6 +9,7 @@
 import type { GameEvent } from '../../../engine/types';
 import type { EngineSystem, HookResult } from '../../../engine/systems/types';
 import { INTERACTION_EVENTS, resolveInteraction } from '../../../engine/systems/InteractionSystem';
+import { RESPONSE_WINDOW_EVENTS } from '../../../engine/systems/ResponseWindowSystem';
 import type { SmashUpCore, SmashUpEvent, MinionPlayedEvent, PendingPostScoringAction } from './types';
 import { buildValidatedMoveEvents } from './abilityHelpers';
 import { interceptEvent } from './ongoingEffects';

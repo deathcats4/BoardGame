@@ -14,6 +14,7 @@ import {
 } from './ongoingModifiers';
 import { canPlayFromDiscard } from './discardPlayability';
 import { isSpecialLimitBlocked, checkBearNecessitiesSuppression } from './abilityHelpers';
+import { mustUseBaseLimitedMinionQuota } from './utils';
 
 export function validate(
     state: MatchState<SmashUpCore>,
