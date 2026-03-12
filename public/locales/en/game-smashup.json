@@ -110,7 +110,14 @@
     "titan_zone_desc": "Powerful reinforcements waiting to be played",
     "yourTitan": "Your Titan",
     "opponentTitan": "Opponent Titan",
-    "powerTokens": "Power Tokens"
+    "powerTokens": "Power Tokens",
+    "not_your_turn": "Not your turn",
+    "click_to_interact": "Click to interact",
+    "power_tokens": "Power tokens",
+    "your_titan": "Your titan",
+    "opponent_titan": "Opponent's titan",
+    "titanZone": "Titan zone",
+    "titanZoneHint": "Click to deploy titan"
   },
   "feedback": {
     "deck_search_no_match": "No matching card found in deck. Deck reshuffled.",

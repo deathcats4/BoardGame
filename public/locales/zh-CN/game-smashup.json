@@ -123,7 +123,14 @@
     "no_titan_in_zone": "泰坦区域为空",
     "titan_already_placed": "泰坦已在场上",
     "click_to_magnify": "点击放大",
-    "release_the_kraken": "海怪出现！"
+    "release_the_kraken": "海怪出现！",
+    "not_your_turn": "不是你的回合",
+    "click_to_interact": "点击交互",
+    "power_tokens": "力量指示物",
+    "your_titan": "你的泰坦",
+    "opponent_titan": "对手的泰坦",
+    "titanZone": "泰坦区域",
+    "titanZoneHint": "点击出场泰坦"
   },
   "feedback": {
     "deck_search_no_match": "牌库中未找到符合条件的卡牌，已重洗牌库",
