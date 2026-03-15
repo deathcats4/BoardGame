@@ -6,7 +6,22 @@
 
 import { registerAbility } from '../domain/abilityRegistry';
 import type { AbilityContext, AbilityResult } from '../domain/abilityRegistry';
-import { destroyMinion, grantExtraMinion, moveMinion, getMinionPower, buildMinionTargetOptions, buildBaseTargetOptions, resolveOrPrompt, buildAbilityFeedback, createSkipOption, addTempPower, addPowerCounter, grantExtraAction, buildValidatedDestroyEvents, buildValidatedMoveEvents } from '../domain/abilityHelpers';
+import {
+    destroyMinion,
+    grantExtraMinion,
+    moveMinion,
+    getMinionPower,
+    buildMinionTargetOptions,
+    buildBaseTargetOptions,
+    resolveOrPrompt,
+    buildAbilityFeedback,
+    createSkipOption,
+    addTempPower,
+    addPowerCounter,
+    grantExtraAction,
+    buildValidatedDestroyEvents,
+    buildValidatedMoveEvents,
+} from '../domain/abilityHelpers';
 import { SU_EVENT_TYPES } from '../domain/events';
 import { SU_EVENTS } from '../domain/types';
 import type { SmashUpEvent, MinionOnBase, OngoingDetachedEvent, MinionPlayedEvent } from '../domain/types';
@@ -18,6 +33,11 @@ import { createSimpleChoice, queueInteraction } from '../../../engine/systems/In
 import { registerInteractionHandler } from '../domain/abilityInteractionHandlers';
 import type { PlayerId } from '../../../engine/types';
 import type { SuperiorityPodProtectEnabledEvent } from '../domain/types';
+
+// 本文件中使用的 defId 匹配工具：基础版 + `_pod` 版本都视为同一张牌
+function matchesDefId(defId: string | undefined | null, baseDefId: string): boolean {
+    return defId === baseDefId || defId === `${baseDefId}_pod`;
+}
 
 /** 注册黑熊骑兵派系所有能力*/
 export function registerBearCavalryAbilities(): void {
@@ -168,13 +188,14 @@ function bearHugProcessNext(
     return { events };
 }
 
-/** 委任 onPlay：选择手牌随从打出到基地，然后移动该基地上对手随从 */
+/** 委任 onPlay：给予额外随从额度，并选择手牌随从打出到基地，然后移动该基地上对手随从 */
 function bearCavalryCommission(ctx: AbilityContext): AbilityResult {
     const player = ctx.state.players[ctx.playerId];
     const handMinions = player.hand.filter(c => c.type === 'minion');
+    const events: SmashUpEvent[] = [grantExtraMinion(ctx.playerId, 'bear_cavalry_commission', ctx.now)];
     if (handMinions.length === 0) {
-        // POD口径：无可打出的随从则 fizzle
-        return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+        // 原版语义：即使当前没有可打出的随从，也先给予额外随从额度
+        return { events };
     }
 
     // 让玩家选择要打出的手牌随从
@@ -191,7 +212,7 @@ function bearCavalryCommission(ctx: AbilityContext): AbilityResult {
     );
     // 标记是否为 POD 版本，用于后续交互链区分“必须移动”与“可以跳过”
     (interaction.data as any).isPod = ctx.defId === 'bear_cavalry_commission_pod';
-    return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
+    return { events, matchState: queueInteraction(ctx.matchState, interaction) };
 }
 
 
@@ -449,7 +470,13 @@ function bearCavalryCubScoutTrigger(ctx: TriggerContext): SmashUpEvent[] {
         const movedPower = getMinionPower(ctx.state, movedMinion, destBaseIndex);
         if (movedPower < scoutPower) {
             events.push(destroyMinion(
-                movedMinion.uid, movedMinion.defId, destBaseIndex, movedMinion.owner, undefined, 'bear_cavalry_cub_scout', ctx.now
+                movedMinion.uid,
+                movedMinion.defId,
+                destBaseIndex,
+                movedMinion.owner,
+                undefined,
+                'bear_cavalry_cub_scout',
+                ctx.now,
             ));
             break;
         }
@@ -489,37 +516,47 @@ function bearCavalryCubScoutPodTrigger(ctx: TriggerContext): SmashUpEvent[] | { 
     
     // 找到被移动的随从
     let movedMinion: MinionOnBase | undefined;
-    let movedBaseIndex: number | undefined;
     for (let i = 0; i < ctx.state.bases.length; i++) {
         const found = ctx.state.bases[i].minions.find(m => m.uid === ctx.triggerMinionUid);
-        if (found) { movedMinion = found; movedBaseIndex = i; break; }
+        if (found) { movedMinion = found; break; }
     }
-    if (!movedMinion || movedBaseIndex === undefined) return events;
-    
-    // moves here：必须确认该随从当前就在 destBaseIndex（否则不触发）
-    if (movedBaseIndex !== destBaseIndex) return events;
+    if (!movedMinion) return events;
     
     // 找到幼熊斥候
     for (const scout of destBase.minions) {
         if (scout.defId !== 'bear_cavalry_cub_scout_pod') continue;
-        if (scout.controller === movedMinion.controller) {
-            continue;
-        }
-        
+        if (scout.controller === movedMinion.controller) continue;
+
         const scoutPower = getMinionPower(ctx.state, scout, destBaseIndex);
         const movedPower = getMinionPower(ctx.state, movedMinion, destBaseIndex);
-        
+
         if (movedPower < scoutPower) {
-            // 创建交互：询问是否消灭
+            // 无 matchState：自动执行“是”分支（消灭），不创建交互
+            if (!ctx.matchState) {
+                events.push(
+                    destroyMinion(
+                        movedMinion.uid,
+                        movedMinion.defId,
+                        destBaseIndex,
+                        movedMinion.owner,
+                        scout.controller,
+                        'bear_cavalry_cub_scout_pod',
+                        ctx.now,
+                    ),
+                );
+                return events;
+            }
+
+            // 有 matchState：创建交互，询问是否消灭并后续可移动己方小随从
             const interaction = createSimpleChoice(
                 `bear_cavalry_cub_scout_pod_destroy_${ctx.now}_${scout.uid}`,
                 scout.controller,
                 `幼熊斥候：是否消灭 ${getCardDef(movedMinion.defId)?.name ?? movedMinion.defId}？`,
                 [
                     { id: 'yes', label: '是（消灭并移动己方小随从）', value: 'yes' as any },
-                    { id: 'no', label: '否', value: 'no' as any }
+                    { id: 'no', label: '否', value: 'no' as any },
                 ],
-                { sourceId: 'bear_cavalry_cub_scout_pod_destroy', targetType: 'generic' }
+                { sourceId: 'bear_cavalry_cub_scout_pod_destroy', targetType: 'generic' },
             );
             (interaction.data as any).minionUid = movedMinion.uid;
             (interaction.data as any).minionDefId = movedMinion.defId;
@@ -527,15 +564,10 @@ function bearCavalryCubScoutPodTrigger(ctx: TriggerContext): SmashUpEvent[] | { 
             (interaction.data as any).ownerId = movedMinion.owner;
             (interaction.data as any).scoutUid = scout.uid;
             (interaction.data as any).scoutBaseIndex = destBaseIndex;
-            
-            // 调用 queueInteraction 并返回 matchState
-            if (!ctx.matchState) {
-                return events;
-            }
-            
+
             return {
                 events,
-                matchState: queueInteraction(ctx.matchState, interaction)
+                matchState: queueInteraction(ctx.matchState, interaction),
             };
         }
     }
@@ -563,9 +595,17 @@ function bearCavalryHighGroundTrigger(ctx: TriggerContext): SmashUpEvent[] {
         if (ongoing.ownerId === movedMinion.controller) continue;
         const ownerHasMinion = destBase.minions.some(m => m.controller === ongoing.ownerId);
         if (!ownerHasMinion) continue;
-        events.push(destroyMinion(
-            movedMinion.uid, movedMinion.defId, destBaseIndex, movedMinion.owner, undefined, 'bear_cavalry_high_ground', ctx.now
-        ));
+        events.push(
+            destroyMinion(
+                movedMinion.uid,
+                movedMinion.defId,
+                destBaseIndex,
+                movedMinion.owner,
+                undefined,
+                'bear_cavalry_high_ground',
+                ctx.now,
+            ),
+        );
         break;
     }
     return events;
@@ -593,46 +633,81 @@ function bearCavalryHighGroundPodTrigger(ctx: TriggerContext): SmashUpEvent[] | 
     for (const ongoing of destBase.ongoingActions) {
         if (ongoing.defId !== 'bear_cavalry_high_ground_pod') continue;
         if (ongoing.ownerId === movedMinion.controller) continue;
-        
+
         const ownerHasMinion = destBase.minions.some(m => m.controller === ongoing.ownerId);
         if (!ownerHasMinion) continue;
-        
-        // 去重检查：检查交互队列中是否已存在相同的交互
-        if (ctx.matchState) {
-            const queue = ctx.matchState.sys.interaction.queue;
-            const current = ctx.matchState.sys.interaction.current;
-            const allInteractions = current ? [current, ...queue] : queue;
-            
-            const existingInteraction = allInteractions.find(
-                (i: any) => i.data?.sourceId === 'bear_cavalry_high_ground_pod_trigger' &&
-                            i.data?.ongoingUid === ongoing.uid &&
-                            i.data?.minionUid === movedMinion.uid
+
+        // 无 matchState：自动选择“destroy”分支
+        if (!ctx.matchState) {
+            events.push({
+                type: SU_EVENTS.ONGOING_DETACHED,
+                payload: {
+                    cardUid: ongoing.uid,
+                    defId: 'bear_cavalry_high_ground_pod',
+                    ownerId: ongoing.ownerId,
+                    reason: 'bear_cavalry_high_ground_pod',
+                },
+                timestamp: ctx.now,
+            } as OngoingDetachedEvent);
+
+            events.push(
+                destroyMinion(
+                    movedMinion.uid,
+                    movedMinion.defId,
+                    destBaseIndex,
+                    movedMinion.owner,
+                    ongoing.ownerId,
+                    'bear_cavalry_high_ground_pod',
+                    ctx.now,
+                ),
             );
-            
-            if (existingInteraction) {
-                continue; // 已存在相同的交互，跳过（去重）
-            }
+            return events;
         }
-        
-        // 创建交互：选择消灭或摸牌打战术
+
+        // 有 matchState：创建交互，选择“消灭或摸牌打战术”
+        // 去重检查：检查交互队列中是否已存在相同的交互
+        const queue = ctx.matchState.sys.interaction.queue;
+        const current = ctx.matchState.sys.interaction.current;
+        const allInteractions = current ? [current, ...queue] : queue;
+
+        const existingInteraction = allInteractions.find(
+            (i: any) =>
+                i.data?.sourceId === 'bear_cavalry_high_ground_pod_trigger' &&
+                i.data?.ongoingUid === ongoing.uid &&
+                i.data?.minionUid === movedMinion.uid,
+        );
+
+        if (existingInteraction) {
+            continue; // 已存在相同的交互，跳过（去重）
+        }
+
         const interaction = createSimpleChoice(
             `bear_cavalry_high_ground_pod_trigger_${ctx.now}_${ongoing.uid}`,
             ongoing.ownerId,
             '制高点：选择一项',
             [
-                { id: 'destroy', label: '消灭制高点并消灭该随从', value: { action: 'destroy', minionUid: movedMinion.uid, minionDefId: movedMinion.defId, baseIndex: destBaseIndex, ownerId: movedMinion.owner, ongoingUid: ongoing.uid } as any },
-                { id: 'draw', label: '摸一张牌并打出一张战术', value: { action: 'draw', ongoingUid: ongoing.uid } as any }
+                {
+                    id: 'destroy',
+                    label: '消灭制高点并消灭该随从',
+                    value: {
+                        action: 'destroy',
+                        minionUid: movedMinion.uid,
+                        minionDefId: movedMinion.defId,
+                        baseIndex: destBaseIndex,
+                        ownerId: movedMinion.owner,
+                        ongoingUid: ongoing.uid,
+                    } as any,
+                },
+                { id: 'draw', label: '摸一张牌并打出一张战术', value: { action: 'draw', ongoingUid: ongoing.uid } as any },
             ],
-            { sourceId: 'bear_cavalry_high_ground_pod_trigger', targetType: 'generic' }
+            { sourceId: 'bear_cavalry_high_ground_pod_trigger', targetType: 'generic' },
         );
         (interaction.data as any).ongoingUid = ongoing.uid;
         (interaction.data as any).minionUid = movedMinion.uid;
-        
-        // 调用 queueInteraction 并返回 matchState
-        if (!ctx.matchState) return events;
+
         return {
             events,
-            matchState: queueInteraction(ctx.matchState, interaction)
+            matchState: queueInteraction(ctx.matchState, interaction),
         };
     }
     
