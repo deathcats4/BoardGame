@@ -2210,9 +2210,8 @@ describe('印斯茅斯派系能力', () => {
             // 非同名卡（dk2）应放到牌库底
             const reorderEvt = result.events.find(e => e.type === SU_EVENTS.DECK_REORDERED);
             expect(reorderEvt).toBeDefined();
-            // 新牌库 = 剩余牌库（dk4）+ 放底的（dk2）
-            expect(reorderEvt!.payload.deckUids).toEqual(['dk4', 'dk2']);
-        });
+            // 新牌库 = 剩余牌库 + 本次翻出来但没进手牌的牌：dk4, dk1, dk3, dk2
+expect(reorderEvt!.payload.deckUids).toEqual(['dk4', 'dk1', 'dk3', 'dk2']);
 
         it('牌库顶3张无同名卡时全部放牌库底', () => {
             const core = makeState({
