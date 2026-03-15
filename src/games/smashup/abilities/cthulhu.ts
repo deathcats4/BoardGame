@@ -149,7 +149,8 @@ function cthulhuItBeginsAgain(ctx: AbilityContext): AbilityResult {
 /** 克苏鲁的馈赠 onPlay：从牌库顶搜索直到找到2张行动卡，放入手牌，其余放牌库底 */
 function cthulhuFhtagn(ctx: AbilityContext): AbilityResult {
     const { events } = revealAndPickFromDeck({
-        player: ctx.state.players[ctx.playerId],
+        state: ctx.state,
+        random: ctx.random,
         playerId: ctx.playerId,
         predicate: card => card.type === 'action',
         maxPick: 2,
