@@ -504,9 +504,15 @@ export function reduce(state: SmashUpCore, event: SmashUpEvent): SmashUpCore {
                     talentUsed: o.ownerId === playerId ? false : o.talentUsed,
                 })),
             }));
-            // 检查沉睡印记：被标记的玩家本回合 actionLimit 设为 0
+            const remainingPlayerRestrictions = state.playerRestrictionsUntilTurnStart?.filter(
+                entry => entry.sourcePlayerId !== playerId,
+            );
+            // 检查沉睡印记 / 睡眠印记 POD：被限制打出战术的玩家本回合 actionLimit 设为 0
             const isSleepMarked = state.sleepMarkedPlayers?.includes(playerId);
-            const newActionLimit = isSleepMarked ? 0 : 1;
+            const isActionRestricted = remainingPlayerRestrictions?.some(
+                entry => entry.targetPlayerId === playerId && entry.restrictionType === 'play_action',
+            ) ?? false;
+            const newActionLimit = (isSleepMarked || isActionRestricted) ? 0 : 1;
             // 清除该玩家的沉睡标记
             const newSleepMarked = isSleepMarked
                 ? (state.sleepMarkedPlayers?.filter(p => p !== playerId) ?? [])
@@ -576,6 +582,9 @@ export function reduce(state: SmashUpCore, event: SmashUpEvent): SmashUpCore {
                 // 清空本回合已使用的持续行动 UID 追踪
                 turnUsedOngoingUids: undefined,
                 sleepMarkedPlayers: newSleepMarked?.length ? newSleepMarked : undefined,
+                playerRestrictionsUntilTurnStart: remainingPlayerRestrictions?.length
+                    ? remainingPlayerRestrictions
+                    : undefined,
                 players: newPlayers,
             };
         }

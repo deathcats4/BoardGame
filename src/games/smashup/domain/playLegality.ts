@@ -1,7 +1,7 @@
 import type { ValidationResult } from '../../../engine/types';
 import type { ActionCardDef, PlayConstraint, SmashUpCore } from './types';
 import { getCardDef, getMinionDef } from '../data/cards';
-import { isOperationRestricted } from './ongoingEffects';
+import { hasPlayerTurnRestriction, isOperationRestricted } from './ongoingEffects';
 import { getPlayerEffectivePowerOnBase } from './ongoingModifiers';
 import { mustUseBaseLimitedMinionQuota } from './utils';
 
@@ -57,6 +57,10 @@ export function validateActionPlaySemantics(
         effectiveHandSize?: number;
     },
 ): ValidationResult {
+    if (hasPlayerTurnRestriction(core, playerId, 'play_action')) {
+        return { valid: false, error: '当前效果禁止你打出战术' };
+    }
+
     const def = getCardDef(params.defId) as ActionCardDef | undefined;
     if (!def) return { valid: false, error: '卡牌定义不存在' };
 

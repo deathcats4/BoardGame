@@ -59,7 +59,7 @@ import { autoMulligan } from '../../../engine/primitives/mulligan';
 import { resolveOnPlay, resolveSpecial, resolveTalent, resolveOnDestroy } from './abilityRegistry';
 import type { AbilityContext } from './abilityRegistry';
 import { triggerBaseAbility, triggerExtendedBaseAbility } from './baseAbilities';
-import { fireTriggers, isMinionProtected, getConsumableProtectionSource } from './ongoingEffects';
+import { fireTriggers, hasPlayerTurnRestriction, isMinionProtected, getConsumableProtectionSource } from './ongoingEffects';
 import { canPlayFromDiscard } from './discardPlayability';
 
 // ============================================================================
@@ -838,6 +838,9 @@ export function filterProtectedMoveEvents(
     for (const e of events) {
         if (e.type !== SU_EVENTS.MINION_MOVED) {
             result.push(e);
+            continue;
+        }
+        if (hasPlayerTurnRestriction(core, sourcePlayerId, 'move_minion')) {
             continue;
         }
         const me = e as MinionMovedEvent;

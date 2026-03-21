@@ -373,6 +373,17 @@ export interface SmashUpCore {
     turnDestroyedMinions?: { uid: string; defId: string; baseIndex: number; owner: string }[];
     /** 被沉睡印记标记的玩家（下回合不能打行动卡） */
     sleepMarkedPlayers?: PlayerId[];
+    /**
+     * 持续到施加者下个回合开始的玩家限制（如睡眠印记 POD）
+     *
+     * - play_action: 目标玩家在效果持续期间不能打出战术/行动卡
+     * - move_minion: 目标玩家在效果持续期间不能移动随从
+     */
+    playerRestrictionsUntilTurnStart?: Array<{
+        targetPlayerId: PlayerId;
+        sourcePlayerId: PlayerId;
+        restrictionType: 'play_action' | 'move_minion';
+    }>;
     /** 本回合每位玩家移动随从到各基地的次数（用于牧场等"首次移动"触发） */
     minionsMovedToBaseThisTurn?: Record<string, Record<number, number>>;
     /**

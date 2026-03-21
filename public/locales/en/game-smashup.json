@@ -2263,7 +2263,7 @@
     },
     "trickster_mark_of_sleep_pod": {
       "name": "Mark of Sleep",
-      "effectText": "Choose a player. That player cannot play actions on their next turn."
+      "effectText": "For each other player, choose one: until the start of your turn, that player either cannot play actions or cannot move minions."
     },
     "trickster_flame_trap_pod": {
       "name": "Flame Trap",

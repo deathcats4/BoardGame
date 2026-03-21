@@ -9,14 +9,81 @@ import type { AbilityContext, AbilityResult } from '../domain/abilityRegistry';
 import { destroyMinion, getMinionPower, buildMinionTargetOptions, resolveOrPrompt, buildAbilityFeedback, createSkipOption } from '../domain/abilityHelpers';
 import { SU_EVENTS } from '../domain/types';
 import type { CardsDiscardedEvent, CardsDrawnEvent, OngoingDetachedEvent, SmashUpEvent, LimitModifiedEvent } from '../domain/types';
-import type { MinionCardDef } from '../domain/types';
+import type { MinionCardDef, SmashUpCore } from '../domain/types';
 import { drawCards, matchesDefId } from '../domain/utils';
 import { registerProtection, registerRestriction, registerTrigger } from '../domain/ongoingEffects';
+import type { PlayerTurnRestrictionType } from '../domain/ongoingEffects';
+import type { TriggerContext, TriggerResult } from '../domain/ongoingEffects';
 import { getCardDef, getBaseDef } from '../data/cards';
 import { createSimpleChoice, queueInteraction } from '../../../engine/systems/InteractionSystem';
+import type { MatchState } from '../../../engine/types';
 import { registerInteractionHandler } from '../domain/abilityInteractionHandlers';
 import { FACTION_DISPLAY_NAMES } from '../domain/ids';
 import { getOpponentLabel } from '../domain/utils';
+
+type PayThePiperChoiceValue = { cardUid: string; defId: string };
+type TricksterMarkOfSleepPodChoiceValue = { restrictionType: PlayerTurnRestrictionType };
+type TricksterMarkOfSleepPodContext = {
+    sourcePlayerId: string;
+    targetPlayerId: string;
+    remainingTargetPlayerIds: string[];
+};
+
+function buildPayThePiperDiscardOptions(core: SmashUpCore, playerId: string) {
+    const player = core.players[playerId];
+    if (!player) return [];
+    return player.hand.map((card, index) => {
+        const def = getCardDef(card.defId);
+        return {
+            id: `card-${index}`,
+            label: def?.name ?? card.defId,
+            value: { cardUid: card.uid, defId: card.defId },
+            _source: 'hand' as const,
+            displayMode: 'card' as const,
+        };
+    });
+}
+
+function queuePayThePiperDiscardChoice(
+    matchState: MatchState<SmashUpCore>,
+    playerId: string,
+    now: number,
+): MatchState<SmashUpCore> {
+    const interaction = createSimpleChoice<PayThePiperChoiceValue>(
+        `trickster_pay_the_piper_${playerId}_${now}`,
+        playerId,
+        '留下买路财：选择 1 张手牌弃掉',
+        buildPayThePiperDiscardOptions(matchState.core, playerId),
+        { sourceId: 'trickster_pay_the_piper', targetType: 'hand' },
+    );
+    (interaction.data as any).optionsGenerator = (state: MatchState<SmashUpCore>) =>
+        buildPayThePiperDiscardOptions(state.core, playerId);
+    return queueInteraction(matchState, interaction);
+}
+
+function createTricksterMarkOfSleepPodInteraction(
+    sourcePlayerId: string,
+    targetPlayerId: string,
+    remainingTargetPlayerIds: string[],
+    now: number,
+) {
+    const interaction = createSimpleChoice<TricksterMarkOfSleepPodChoiceValue>(
+        `trickster_mark_of_sleep_pod_${targetPlayerId}_${now}`,
+        sourcePlayerId,
+        `睡眠印记：为${getOpponentLabel(targetPlayerId)}选择一项`,
+        [
+            { id: 'no-action', label: '不能打出战术', value: { restrictionType: 'play_action' } },
+            { id: 'no-move', label: '不能移动随从', value: { restrictionType: 'move_minion' } },
+        ],
+        { sourceId: 'trickster_mark_of_sleep_pod', targetType: 'generic' },
+    );
+    (interaction.data as any).continuationContext = {
+        sourcePlayerId,
+        targetPlayerId,
+        remainingTargetPlayerIds,
+    } satisfies TricksterMarkOfSleepPodContext;
+    return interaction;
+}
 
 /** 侏儒 onPlay：消灭力量低于己方随从数量的随从 */
 function tricksterGnome(ctx: AbilityContext): AbilityResult {
@@ -52,6 +119,133 @@ function tricksterGnome(ctx: AbilityContext): AbilityResult {
         if (!target) return { events: [] };
         return { events: [destroyMinion(target.uid, target.defId, ctx.baseIndex, target.owner, undefined, 'trickster_gnome', ctx.now)] };
     });
+}
+
+type TricksterGnomePodPending = {
+    gnomeUid: string;
+    controller: string;
+    baseIndex: number;
+};
+
+function countTitansOnBase(state: SmashUpCore, baseIndex: number): number {
+    let titanCount = 0;
+    for (const pid of state.turnOrder) {
+        const titan = (state.players[pid] as any)?.activeTitan as { baseIndex?: number } | undefined;
+        if (titan?.baseIndex === baseIndex) titanCount += 1;
+    }
+    return titanCount;
+}
+
+function buildTricksterGnomePodOptions(
+    state: SmashUpCore,
+    baseIndex: number,
+    sourcePlayerId: string,
+) {
+    const base = state.bases[baseIndex];
+    if (!base) return [createSkipOption()];
+
+    const destroyThreshold = base.minions.length + countTitansOnBase(state, baseIndex);
+    const targets = base.minions.filter(m => getMinionPower(state, m, baseIndex) < destroyThreshold);
+    const options = targets.map(target => {
+        const def = getCardDef(target.defId) as MinionCardDef | undefined;
+        const power = getMinionPower(state, target, baseIndex);
+        return {
+            uid: target.uid,
+            defId: target.defId,
+            baseIndex,
+            label: `${def?.name ?? target.defId} (力量 ${power})`,
+        };
+    });
+
+    const minionOptions = buildMinionTargetOptions(options, {
+        state,
+        sourcePlayerId,
+        effectType: 'destroy',
+    });
+    minionOptions.push(createSkipOption());
+    return minionOptions;
+}
+
+function createTricksterGnomePodInteraction(
+    state: SmashUpCore,
+    pending: TricksterGnomePodPending,
+    remaining: TricksterGnomePodPending[],
+    now: number,
+) {
+    const base = state.bases[pending.baseIndex];
+    if (!base?.minions.some(m => m.uid === pending.gnomeUid && m.defId === 'trickster_gnome_pod')) {
+        return null;
+    }
+
+    const options = buildTricksterGnomePodOptions(state, pending.baseIndex, pending.controller);
+    if (options.length === 1 && (options[0].value as any)?.skip) {
+        return null;
+    }
+
+    const interaction = createSimpleChoice(
+        `trickster_gnome_pod_${pending.gnomeUid}_${now}`,
+        pending.controller,
+        '侏儒：你可以消灭此基地一个力量低于这里随从与泰坦总数的随从',
+        options as any[],
+        { sourceId: 'trickster_gnome_pod', targetType: 'minion', autoResolveIfSingle: false },
+    );
+    (interaction.data as any).continuationContext = {
+        baseIndex: pending.baseIndex,
+        gnomeUid: pending.gnomeUid,
+        controller: pending.controller,
+        remaining,
+    };
+    (interaction.data as any).optionsGenerator = (nextState: MatchState<SmashUpCore>, data: any) => {
+        const continuation = data?.continuationContext as TricksterGnomePodPending & { remaining?: TricksterGnomePodPending[] } | undefined;
+        if (!continuation) return [createSkipOption()];
+        const nextBase = nextState.core.bases[continuation.baseIndex];
+        if (!nextBase?.minions.some(m => m.uid === continuation.gnomeUid && m.defId === 'trickster_gnome_pod')) {
+            return [createSkipOption()];
+        }
+        return buildTricksterGnomePodOptions(nextState.core, continuation.baseIndex, continuation.controller);
+    };
+    return interaction;
+}
+
+function queueNextTricksterGnomePodInteraction(
+    matchState: MatchState<SmashUpCore>,
+    pendingList: TricksterGnomePodPending[],
+    now: number,
+): MatchState<SmashUpCore> | undefined {
+    for (let index = 0; index < pendingList.length; index++) {
+        const pending = pendingList[index];
+        const remaining = pendingList.slice(index + 1);
+        const interaction = createTricksterGnomePodInteraction(matchState.core, pending, remaining, now);
+        if (!interaction) continue;
+        return queueInteraction(matchState, interaction);
+    }
+    return undefined;
+}
+
+/**
+ * 侏儒 POD beforeScoring：
+ * 在基地计分前，你可以消灭此基地一个力量低于这里随从和泰坦总数的随从。
+ * 这是场上自动触发的 beforeScoring 交互，不应继承基础版的 onPlay 逻辑。
+ */
+function tricksterGnomePodBeforeScoring(ctx: TriggerContext): TriggerResult {
+    if (ctx.baseIndex === undefined || !ctx.matchState) return { events: [] };
+
+    const base = ctx.state.bases[ctx.baseIndex];
+    if (!base) return { events: [] };
+
+    const pending = base.minions
+        .filter(m => m.defId === 'trickster_gnome_pod')
+        .map(m => ({ gnomeUid: m.uid, controller: m.controller, baseIndex: ctx.baseIndex! }));
+    if (pending.length === 0) return { events: [] };
+
+    const nextState = queueNextTricksterGnomePodInteraction(ctx.matchState, pending, ctx.now);
+    return nextState ? { events: [], matchState: nextState } : { events: [] };
+}
+
+function tricksterGnomePodOnPlay(): AbilityResult {
+    // POD 版侏儒的真实效果在 beforeScoring trigger 中处理。
+    // 这里显式注册空 onPlay，阻止自动别名把基础版入场效果错误复制过来。
+    return { events: [] };
 }
 
 /** 带走宝物 onPlay：每个其他玩家随机弃两张手牌 */
@@ -135,6 +329,7 @@ function tricksterEnshroudingMistOnPlay(ctx: AbilityContext): AbilityResult {
 /** 注册诡术师派系所有能力*/
 export function registerTricksterAbilities(): void {
     registerAbility('trickster_gnome', 'onPlay', tricksterGnome);
+    registerAbility('trickster_gnome_pod', 'onPlay', tricksterGnomePodOnPlay);
     // 带走宝物（行动卡）：每个对手随机弃两张手牌
     registerAbility('trickster_take_the_shinies', 'onPlay', tricksterTakeTheShinies);
     // 幻想破碎（行动卡）：消灭一个已打出的行动卡
@@ -143,6 +338,7 @@ export function registerTricksterAbilities(): void {
     registerAbility('trickster_gremlin', 'onDestroy', tricksterGremlinOnDestroy);
     // 沉睡印记（行动卡）：对手下回合不能打行动
     registerAbility('trickster_mark_of_sleep', 'onPlay', tricksterMarkOfSleep);
+    registerAbility('trickster_mark_of_sleep_pod', 'onPlay', tricksterMarkOfSleepPod);
     // 封路（ongoing）：打出时选择一个派系
     registerAbility('trickster_block_the_path', 'onPlay', tricksterBlockThePath);
     // 隐蔽迷雾（ongoing）：打出当回合也给予额外随从（与大法师同理）
@@ -150,6 +346,7 @@ export function registerTricksterAbilities(): void {
 
     // 注册 ongoing 拦截?
     registerTricksterOngoingEffects();
+    registerTrigger('trickster_gnome_pod', 'beforeScoring', tricksterGnomePodBeforeScoring);
 }
 
 /** 注册诡术师派系的交互解决处理函数 */
@@ -167,6 +364,28 @@ export function registerTricksterInteractionHandlers(): void {
         const target = base.minions.find(m => m.uid === minionUid);
         if (!target) return undefined;
         return { state, events: [destroyMinion(target.uid, target.defId, baseIndex, target.owner, playerId, 'trickster_gnome', timestamp)] };
+    });
+
+    registerInteractionHandler('trickster_gnome_pod', (state, playerId, value, iData, _random, timestamp) => {
+        const continuation = iData?.continuationContext as {
+            baseIndex?: number;
+            remaining?: TricksterGnomePodPending[];
+        } | undefined;
+        const baseIndex = (value as { baseIndex?: number } | undefined)?.baseIndex ?? continuation?.baseIndex;
+        const selectedUid = (value as { minionUid?: string } | undefined)?.minionUid;
+        const events: SmashUpEvent[] = [];
+
+        if (!(value as any)?.skip && selectedUid && baseIndex !== undefined) {
+            const base = state.core.bases[baseIndex];
+            const target = base?.minions.find(m => m.uid === selectedUid);
+            if (target) {
+                events.push(destroyMinion(target.uid, target.defId, baseIndex, target.owner, playerId, 'trickster_gnome_pod', timestamp));
+            }
+        }
+
+        const remaining = (continuation?.remaining ?? []).filter(entry => entry.gnomeUid !== selectedUid);
+        const nextState = queueNextTricksterGnomePodInteraction(state, remaining, timestamp);
+        return { state: nextState ?? state, events };
     });
 
     // 幻想破碎：选择行动卡后消灭
@@ -190,6 +409,49 @@ export function registerTricksterInteractionHandlers(): void {
         };
     });
 
+    registerInteractionHandler('trickster_mark_of_sleep_pod', (state, _playerId, value, iData, _random, timestamp) => {
+        const continuation = (iData as any)?.continuationContext as TricksterMarkOfSleepPodContext | undefined;
+        const restrictionType = (value as TricksterMarkOfSleepPodChoiceValue | undefined)?.restrictionType;
+        if (!continuation?.targetPlayerId || !continuation.sourcePlayerId || !restrictionType) {
+            return { state, events: [] };
+        }
+
+        const nextRestrictions = [
+            ...(state.core.playerRestrictionsUntilTurnStart ?? []).filter(entry => !(
+                entry.sourcePlayerId === continuation.sourcePlayerId
+                && entry.targetPlayerId === continuation.targetPlayerId
+            )),
+            {
+                sourcePlayerId: continuation.sourcePlayerId,
+                targetPlayerId: continuation.targetPlayerId,
+                restrictionType,
+            },
+        ];
+
+        let nextState: MatchState<SmashUpCore> = {
+            ...state,
+            core: {
+                ...state.core,
+                playerRestrictionsUntilTurnStart: nextRestrictions,
+            },
+        };
+
+        const [nextTargetPlayerId, ...remainingTargetPlayerIds] = continuation.remainingTargetPlayerIds;
+        if (nextTargetPlayerId) {
+            nextState = queueInteraction(
+                nextState,
+                createTricksterMarkOfSleepPodInteraction(
+                    continuation.sourcePlayerId,
+                    nextTargetPlayerId,
+                    remainingTargetPlayerIds,
+                    timestamp,
+                ),
+            );
+        }
+
+        return { state: nextState, events: [] };
+    });
+
     // 封路：选择派系后，将派系信息存入 ongoing 的 metadata
     registerInteractionHandler('trickster_block_the_path', (state, _playerId, value, iData, _random, _timestamp) => {
         // 检查取消标记
@@ -210,6 +472,21 @@ export function registerTricksterInteractionHandlers(): void {
             };
         });
         return { state: { ...state, core: { ...state.core, bases: newBases } }, events: [] };
+    });
+
+    registerInteractionHandler('trickster_pay_the_piper', (state, playerId, value, _iData, _random, timestamp) => {
+        const { cardUid } = value as Partial<PayThePiperChoiceValue>;
+        if (!cardUid) return { state, events: [] };
+        const player = state.core.players[playerId];
+        if (!player?.hand.some(card => card.uid === cardUid)) return { state, events: [] };
+        return {
+            state,
+            events: [{
+                type: SU_EVENTS.CARDS_DISCARDED,
+                payload: { playerId, cardUids: [cardUid] },
+                timestamp,
+            }],
+        };
     });
 }
 
@@ -292,6 +569,28 @@ function tricksterMarkOfSleep(ctx: AbilityContext): AbilityResult {
         { sourceId: 'trickster_mark_of_sleep', targetType: 'player', autoCancelOption: true },
     );
     return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
+}
+
+/** 睡眠印记 POD onPlay：为每个其他玩家分别选择“不能打出战术”或“不能移动随从” */
+function tricksterMarkOfSleepPod(ctx: AbilityContext): AbilityResult {
+    const otherPlayers = ctx.state.turnOrder.filter(pid => pid !== ctx.playerId);
+    if (otherPlayers.length === 0) {
+        return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+    }
+
+    const [firstTargetPlayerId, ...remainingTargetPlayerIds] = otherPlayers;
+    return {
+        events: [],
+        matchState: queueInteraction(
+            ctx.matchState,
+            createTricksterMarkOfSleepPodInteraction(
+                ctx.playerId,
+                firstTargetPlayerId,
+                remainingTargetPlayerIds,
+                ctx.now,
+            ),
+        ),
+    };
 }
 
 // executeMarkOfSleep 已移除，沉睡印记改为标记模式（在对手回合开始时生效）
@@ -465,15 +764,20 @@ function registerTricksterOngoingEffects(): void {
             if (!piper || i !== trigCtx.baseIndex) continue;
             // 只对其他玩家触发
             if (piper.ownerId === trigCtx.playerId) continue;
-            // 对手随机弃一张牌
+            // 对手自己选择弃掉 1 张手牌
             const opponent = trigCtx.state.players[trigCtx.playerId];
             if (!opponent || opponent.hand.length === 0) continue;
-            const idx = Math.floor(trigCtx.random.random() * opponent.hand.length);
-            return [{
-                type: SU_EVENTS.CARDS_DISCARDED,
-                payload: { playerId: trigCtx.playerId, cardUids: [opponent.hand[idx].uid] },
-                timestamp: trigCtx.now,
-            }];
+            if (!trigCtx.matchState) {
+                return [{
+                    type: SU_EVENTS.CARDS_DISCARDED,
+                    payload: { playerId: trigCtx.playerId, cardUids: [opponent.hand[0].uid] },
+                    timestamp: trigCtx.now,
+                }];
+            }
+            return {
+                events: [],
+                matchState: queuePayThePiperDiscardChoice(trigCtx.matchState, trigCtx.playerId, trigCtx.now),
+            };
         }
         return [];
     });

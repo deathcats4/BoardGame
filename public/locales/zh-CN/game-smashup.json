@@ -2263,7 +2263,7 @@
     },
     "trickster_mark_of_sleep_pod": {
       "name": "睡眠印记",
-      "effectText": "选择一个玩家，该玩家不能在他的下个回合中打出战术。"
+      "effectText": "为每个其他玩家选择一项：直到你的回合开始时，该玩家要么不能打出战术，要么不能移动随从。"
     },
     "trickster_flame_trap_pod": {
       "name": "火焰陷阱",
