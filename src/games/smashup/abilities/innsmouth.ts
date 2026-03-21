@@ -6,9 +6,9 @@
 
 import { registerAbility } from '../domain/abilityRegistry';
 import type { AbilityContext, AbilityResult } from '../domain/abilityRegistry';
-import { addTempPower, grantExtraMinion, drawMadnessCards, getMinionPower, revealAndPickFromDeck, buildAbilityFeedback, buildValidatedReturnEvents } from '../domain/abilityHelpers';
+import { addTempPower, grantExtraMinion, drawMadnessCards, getMinionPower, revealAndPickFromDeck, buildAbilityFeedback, buildValidatedReturnEvents, buildStandardDrawEvents } from '../domain/abilityHelpers';
 import { SU_EVENTS } from '../domain/types';
-import type { SmashUpEvent, DeckReorderedEvent, CardsDrawnEvent } from '../domain/types';
+import type { SmashUpEvent, DeckReorderedEvent } from '../domain/types';
 import { registerProtection } from '../domain/ongoingEffects';
 import type { ProtectionCheckContext } from '../domain/ongoingEffects';
 import { getCardDef } from '../data/cards';
@@ -129,26 +129,72 @@ function innsmouthInPlainSightChecker(ctx: ProtectionCheckContext): boolean {
 
 /**
  * 回归大海 special：计分后同名随从回手牌
- * MVP：将自己在被计分基地上的所有同 defId 随从回手牌
+ * 规则语义：先选择一种名字，再选择任意数量该名字的己方随从返回手牌。
  */
 function innsmouthReturnToTheSea(ctx: AbilityContext): AbilityResult {
     const base = ctx.state.bases[ctx.baseIndex];
     if (!base) return { events: [] };
 
-    // 找触发随从（自身）
-    const triggerMinion = base.minions.find(m => m.uid === ctx.cardUid);
-    if (!triggerMinion) return { events: [] };
+    const myMinions = base.minions.filter(m => m.controller === ctx.playerId);
+    if (myMinions.length === 0) return { events: [] };
 
-    // 找同基地上自己的同 defId 随从（包含触发随从自身）
-    const sameDefMinions = base.minions.filter(
-        m => m.controller === ctx.playerId && m.defId === triggerMinion.defId
+    const groups = new Map<string, { defId: string; count: number; name: string }>();
+    for (const minion of myMinions) {
+        const existing = groups.get(minion.defId);
+        if (existing) {
+            existing.count += 1;
+            continue;
+        }
+        const def = getCardDef(minion.defId);
+        groups.set(minion.defId, {
+            defId: minion.defId,
+            count: 1,
+            name: def?.name ?? minion.defId,
+        });
+    }
+
+    const options = Array.from(groups.values()).map((group, i) => ({
+        id: `group-${i}`,
+        label: `${group.name} (x${group.count})`,
+        value: {
+            minionDefId: group.defId,
+            baseIndex: ctx.baseIndex,
+        },
+        displayMode: 'card' as const,
+    }));
+    if (options.length === 0) return { events: [] };
+
+    const interaction = createSimpleChoice<{
+        minionDefId: string;
+        baseIndex: number;
+    }>(
+        `innsmouth_return_to_the_sea_${ctx.now}`,
+        ctx.playerId,
+        '选择一种要返回手牌的同名随从',
+        options,
+        { sourceId: 'innsmouth_return_to_the_sea', targetType: 'generic' },
     );
-    if (sameDefMinions.length === 0) return { events: [] };
+    return { events: [], matchState: ctx.matchState ? queueInteraction(ctx.matchState, interaction) : undefined };
+}
 
-    // "任意数量"→创建多选交互让玩家选择返回哪些
+function buildInnsmouthReturnToSeaSelection(
+    state: AbilityContext['matchState'],
+    playerId: string,
+    minionDefId: string,
+    baseIndex: number,
+    now: number,
+) {
+    const base = state.core.bases[baseIndex];
+    if (!base) return undefined;
+
+    const sameDefMinions = base.minions.filter(
+        m => m.controller === playerId && m.defId === minionDefId,
+    );
+    if (sameDefMinions.length === 0) return undefined;
+
+    const def = getCardDef(minionDefId);
+    const name = def?.name ?? minionDefId;
     const options = sameDefMinions.map((m, i) => {
-        const def = getCardDef(m.defId);
-        const name = def?.name ?? m.defId;
         return {
             id: `minion-${i}`,
             label: name,
@@ -157,24 +203,29 @@ function innsmouthReturnToTheSea(ctx: AbilityContext): AbilityResult {
                 minionDefId: m.defId,
                 owner: m.owner,
                 controller: m.controller,
-                baseIndex: ctx.baseIndex,
+                baseIndex,
             },
             _source: 'field' as const,
             displayMode: 'card' as const,
         };
     });
-    const interaction = createSimpleChoice<{
+
+    return createSimpleChoice<{
         minionUid: string;
         minionDefId: string;
         owner: string;
         controller: string;
         baseIndex: number;
     }>(
-        `innsmouth_return_to_the_sea_${ctx.now}`, ctx.playerId,
+        `innsmouth_return_to_the_sea_select_${now}`,
+        playerId,
         '选择要返回手牌的同名随从', options,
-        { sourceId: 'innsmouth_return_to_the_sea', targetType: 'minion', multi: { min: 0, max: sameDefMinions.length } },
+        {
+            sourceId: 'innsmouth_return_to_the_sea',
+            targetType: 'minion',
+            multi: { min: 0, max: sameDefMinions.length },
+        },
     );
-    return { events: [], matchState: ctx.matchState ? queueInteraction(ctx.matchState, interaction) : undefined };
 }
 
 /**
@@ -217,18 +268,7 @@ function innsmouthMysteriesOfTheDeep(ctx: AbilityContext): AbilityResult {
     if (!hasTriple) return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.condition_not_met', ctx.now)] };
 
     const events: SmashUpEvent[] = [];
-    const player = ctx.state.players[ctx.playerId];
-
-    // ?张牌
-    const topThree = player.deck.slice(0, 3);
-    if (topThree.length > 0) {
-        const drawEvt: CardsDrawnEvent = {
-            type: SU_EVENTS.CARDS_DRAWN,
-            payload: { playerId: ctx.playerId, count: topThree.length, cardUids: topThree.map(c => c.uid) },
-            timestamp: ctx.now,
-        };
-        events.push(drawEvt);
-    }
+    events.push(...buildStandardDrawEvents(ctx.state, ctx.playerId, 3, ctx.random, ctx.now));
 
     // 提示：是否额外抽2张牌+2张疯狂卡
     const options: PromptOption<{ accept: boolean }>[] = [
@@ -361,15 +401,7 @@ export function registerInnsmouthInteractionHandlers(): void {
         const { accept } = value as { accept: boolean };
         if (!accept) return { state, events: [] };
         const events: SmashUpEvent[] = [];
-        const player = state.core.players[playerId];
-        const topTwo = player.deck.slice(0, 2);
-        if (topTwo.length > 0) {
-            events.push({
-                type: SU_EVENTS.CARDS_DRAWN,
-                payload: { playerId, count: topTwo.length, cardUids: topTwo.map(c => c.uid) },
-                timestamp,
-            } as CardsDrawnEvent);
-        }
+        events.push(...buildStandardDrawEvents(state.core, playerId, 2, _random, timestamp));
         const madnessEvt = drawMadnessCards(playerId, 2, state.core, 'innsmouth_mysteries_of_the_deep', timestamp);
         if (madnessEvt) events.push(madnessEvt);
         return { state, events };
@@ -377,6 +409,7 @@ export function registerInnsmouthInteractionHandlers(): void {
 
     // 重返深海：玩家选择返回手牌的同名随从
     registerInteractionHandler('innsmouth_return_to_the_sea', (state, playerId, value, _iData, _random, timestamp) => {
+        const chosenGroup = value as { minionDefId?: string; baseIndex?: number } | undefined;
         const selected = value as Array<{
             minionUid: string;
             minionDefId: string;
@@ -384,9 +417,28 @@ export function registerInnsmouthInteractionHandlers(): void {
             controller: string;
             baseIndex: number;
         }>;
-        if (!Array.isArray(selected) || selected.length === 0) return { state, events: [] };
+
+        if (!Array.isArray(selected)) {
+            if (!chosenGroup?.minionDefId || chosenGroup.baseIndex === undefined) {
+                return { state, events: [] };
+            }
+
+            const interaction = buildInnsmouthReturnToSeaSelection(
+                state,
+                playerId,
+                chosenGroup.minionDefId,
+                chosenGroup.baseIndex,
+                timestamp,
+            );
+            if (!interaction) return { state, events: [] };
+            return { state: queueInteraction(state, interaction), events: [] };
+        }
+
+        if (selected.length === 0) return { state, events: [] };
         const events: SmashUpEvent[] = [];
+        const selectedDefId = selected[0]?.minionDefId;
         for (const item of selected) {
+            if (item.minionDefId !== selectedDefId) continue;
             const core = state.core;
             const base = core.bases[item.baseIndex];
             const minion = base?.minions.find(m => m.uid === item.minionUid);
