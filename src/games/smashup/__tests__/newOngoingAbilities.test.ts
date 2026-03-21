@@ -34,6 +34,7 @@ import { SU_COMMANDS } from '../domain/types';
 import { clearInteractionHandlers } from '../domain/abilityInteractionHandlers';
 import { getInteractionHandler } from '../domain/abilityInteractionHandlers';
 import type { RandomFn } from '../../../engine/types';
+import { makeMatchState, getInteractionsFromMS } from './helpers';
 
 // ============================================================================
 // 测试辅助
@@ -653,6 +654,86 @@ describe('pirate_king beforeScoring', () => {
             state, playerId: '0', baseIndex: 0, random: dummyRandom, now: 0,
         });
         expect(events.filter(e => e.type === SU_EVENTS.MINION_MOVED).length).toBe(0);
+    });
+
+    it('trickster_gnome_pod 计分前会创建可消灭弱随从的交互', () => {
+        const state = makeState({
+            bases: [
+                makeBase({
+                    minions: [
+                        makeMinion('gnome-pod', 'trickster_gnome_pod', '0', 3),
+                        makeMinion('ally-2', 'ally_small', '0', 2),
+                        makeMinion('ally-5', 'ally_big', '0', 5),
+                        makeMinion('enemy-3', 'enemy_mid', '1', 3),
+                    ],
+                }),
+            ],
+        });
+
+        const result = fireTriggers(state, 'beforeScoring', {
+            state,
+            matchState: makeMatchState(state),
+            playerId: '0',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        });
+
+        expect(result.events).toHaveLength(0);
+        expect(result.matchState).toBeDefined();
+
+        const prompt = getInteractionsFromMS(result.matchState!)[0] as any;
+        expect(prompt?.data?.sourceId).toBe('trickster_gnome_pod');
+
+        const optionValues = prompt?.data?.options?.map((option: any) => option?.value?.minionUid) ?? [];
+        expect(optionValues).toContain('gnome-pod');
+        expect(optionValues).toContain('ally-2');
+        expect(optionValues).toContain('enemy-3');
+        expect(optionValues).not.toContain('ally-5');
+    });
+
+    it('trickster_gnome_pod 响应后会消灭所选目标', () => {
+        const state = makeState({
+            bases: [
+                makeBase({
+                    minions: [
+                        makeMinion('gnome-pod', 'trickster_gnome_pod', '0', 3),
+                        makeMinion('ally-2', 'ally_small', '0', 2),
+                        makeMinion('enemy-3', 'enemy_mid', '1', 3),
+                        makeMinion('enemy-5', 'enemy_big', '1', 5),
+                    ],
+                }),
+            ],
+        });
+
+        const result = fireTriggers(state, 'beforeScoring', {
+            state,
+            matchState: makeMatchState(state),
+            playerId: '0',
+            baseIndex: 0,
+            random: dummyRandom,
+            now: 0,
+        });
+        const prompt = getInteractionsFromMS(result.matchState!)[0] as any;
+        const option = prompt?.data?.options?.find((entry: any) => entry?.value?.minionUid === 'enemy-3');
+        const handler = getInteractionHandler('trickster_gnome_pod');
+
+        expect(option).toBeDefined();
+        expect(handler).toBeDefined();
+
+        const resolved = handler!(
+            result.matchState!,
+            '0',
+            option.value,
+            prompt.data,
+            dummyRandom,
+            1001,
+        );
+
+        expect(resolved?.events.some(event => event.type === SU_EVENTS.MINION_DESTROYED)).toBe(true);
+        const destroyEvent = resolved?.events.find(event => event.type === SU_EVENTS.MINION_DESTROYED) as MinionDestroyedEvent | undefined;
+        expect(destroyEvent?.payload.minionUid).toBe('enemy-3');
+        expect(destroyEvent?.payload.reason).toBe('trickster_gnome_pod');
     });
 });
 
