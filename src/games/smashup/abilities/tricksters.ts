@@ -44,6 +44,45 @@ function buildPayThePiperDiscardOptions(core: SmashUpCore, playerId: string) {
     });
 }
 
+function collectBlockThePathFactionIds(state: SmashUpCore): string[] {
+    const factionSet = new Set<string>();
+
+    // 优先使用本局实际参战派系，避免 POD 版本在双方还没亮出对应卡牌时无目标可选。
+    for (const pid of state.turnOrder) {
+        const player = state.players[pid];
+        for (const factionId of player?.factions ?? []) {
+            if (typeof factionId === 'string' && factionId.length > 0) {
+                factionSet.add(factionId);
+            }
+        }
+    }
+
+    if (factionSet.size > 0) {
+        return Array.from(factionSet);
+    }
+
+    // 测试或异常状态如果缺少 factions 元数据，再回退到可见卡牌上的派系信息。
+    for (const base of state.bases) {
+        for (const minion of base.minions) {
+            const def = getCardDef(minion.defId);
+            if (def?.faction) {
+                factionSet.add(def.faction);
+            }
+        }
+    }
+    for (const pid of state.turnOrder) {
+        const player = state.players[pid];
+        for (const card of player?.hand ?? []) {
+            const def = getCardDef(card.defId);
+            if (def?.faction) {
+                factionSet.add(def.faction);
+            }
+        }
+    }
+
+    return Array.from(factionSet);
+}
+
 function queuePayThePiperDiscardChoice(
     matchState: MatchState<SmashUpCore>,
     playerId: string,
@@ -526,24 +565,9 @@ function tricksterGremlinOnDestroy(ctx: AbilityContext): AbilityResult {
 
 /** 封路 onPlay（ongoing）：选择一个派系，该派系随从不能被打出到此基地 */
 function tricksterBlockThePath(ctx: AbilityContext): AbilityResult {
-    // 收集场上所有派系
-    const factionSet = new Set<string>();
-    for (const base of ctx.state.bases) {
-        for (const m of base.minions) {
-            const def = getCardDef(m.defId);
-            if (def?.faction) factionSet.add(def.faction);
-        }
-    }
-    // 也从所有玩家手牌中收集派系
-    for (const pid of ctx.state.turnOrder) {
-        const player = ctx.state.players[pid];
-        for (const c of player.hand) {
-            const def = getCardDef(c.defId);
-            if (def?.faction) factionSet.add(def.faction);
-        }
-    }
-    if (factionSet.size === 0) return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
-    const options = Array.from(factionSet).map((fid, i) => ({
+    const factionIds = collectBlockThePathFactionIds(ctx.state);
+    if (factionIds.length === 0) return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+    const options = factionIds.map((fid, i) => ({
         id: `faction-${i}`, label: FACTION_DISPLAY_NAMES[fid] || fid, value: { factionId: fid },
     }));
     const interaction = createSimpleChoice(
