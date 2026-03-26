@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import { executePipeline, createInitialSystemState } from '../../../engine/pipeline';
 import { reduce } from '../domain/reducer';
 import { SU_COMMANDS, SU_EVENTS } from '../domain/types';
 import type {
@@ -21,6 +22,8 @@ import { clearBaseAbilityRegistry } from '../domain/baseAbilities';
 import { runCommand } from './testRunner';
 import type { MatchState, RandomFn } from '../../../engine/types';
 import { makeMatchState } from './helpers';
+import { SmashUpDomain, smashUpSystemsForTest } from '../game';
+import { SMASHUP_FACTION_IDS } from '../domain/ids';
 
 beforeAll(() => {
     clearRegistry();
@@ -69,6 +72,199 @@ describe('trickster interaction regressions', () => {
         expect(destroyEvent).toBeDefined();
         expect((destroyEvent as any).payload.minionUid).toBe('e1');
         expect(respondResult.finalState.core.bases[0].minions.some(m => m.uid === 'e1')).toBe(false);
+    });
+
+    it('trickster_block_the_path_pod can resolve faction choice without pipeline error', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('a1', 'trickster_block_the_path_pod', 'action', '0')],
+                    factions: [SMASHUP_FACTION_IDS.TRICKSTERS_POD, SMASHUP_FACTION_IDS.PIRATES_POD],
+                }),
+                '1': makePlayer('1', {
+                    hand: [makeCard('robot-hand-1', 'robot_microbot_alpha', 'minion', '1')],
+                    factions: [SMASHUP_FACTION_IDS.ROBOTS, SMASHUP_FACTION_IDS.NINJAS],
+                }),
+            },
+            bases: [{
+                defId: 'b1',
+                minions: [],
+                ongoingActions: [],
+            }],
+        });
+
+        const playResult = runCommand(makeMatchState(state), {
+            type: SU_COMMANDS.PLAY_ACTION,
+            playerId: '0',
+            payload: { cardUid: 'a1', targetBaseIndex: 0 },
+        } as any, defaultRandom);
+
+        expect(playResult.success).toBe(true);
+        expect(playResult.error).toBeUndefined();
+
+        const prompt = playResult.finalState.sys.interaction?.current as any;
+        expect(prompt?.data?.sourceId).toBe('trickster_block_the_path');
+
+        const robotOption = prompt?.data?.options?.find((option: any) => option?.value?.factionId === 'robots');
+        expect(robotOption).toBeDefined();
+
+        const respondResult = runCommand(playResult.finalState, {
+            type: 'SYS_INTERACTION_RESPOND',
+            playerId: '0',
+            payload: { optionId: robotOption.id },
+        } as any, defaultRandom);
+
+        expect(respondResult.success).toBe(true);
+        expect(respondResult.error).toBeUndefined();
+        expect(respondResult.finalState.core.bases[0].ongoingActions).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    uid: 'a1',
+                    defId: 'trickster_block_the_path_pod',
+                    metadata: expect.objectContaining({
+                        blockedFaction: 'robots',
+                    }),
+                }),
+            ]),
+        );
+    });
+
+    it('trickster_block_the_path_pod 在场上和手牌都没有可见目标时，仍可选择本局参战派系', () => {
+        const state = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('a1', 'trickster_block_the_path_pod', 'action', '0')],
+                    factions: [SMASHUP_FACTION_IDS.TRICKSTERS_POD, SMASHUP_FACTION_IDS.PIRATES_POD],
+                }),
+                '1': makePlayer('1', {
+                    hand: [],
+                    factions: [SMASHUP_FACTION_IDS.ROBOTS_POD, SMASHUP_FACTION_IDS.NINJAS_POD],
+                }),
+            },
+            bases: [{
+                defId: 'b1',
+                minions: [],
+                ongoingActions: [],
+            }],
+        });
+
+        const playResult = runCommand(makeMatchState(state), {
+            type: SU_COMMANDS.PLAY_ACTION,
+            playerId: '0',
+            payload: { cardUid: 'a1', targetBaseIndex: 0 },
+        } as any, defaultRandom);
+
+        expect(playResult.success).toBe(true);
+        expect(playResult.error).toBeUndefined();
+
+        const prompt = playResult.finalState.sys.interaction?.current as any;
+        const factionIds = prompt?.data?.options
+            ?.map((option: any) => option?.value?.factionId)
+            .filter(Boolean);
+
+        expect(factionIds).toEqual(expect.arrayContaining([
+            SMASHUP_FACTION_IDS.TRICKSTERS_POD,
+            SMASHUP_FACTION_IDS.PIRATES_POD,
+            SMASHUP_FACTION_IDS.ROBOTS_POD,
+            SMASHUP_FACTION_IDS.NINJAS_POD,
+        ]));
+
+        const robotsPodOption = prompt?.data?.options?.find(
+            (option: any) => option?.value?.factionId === SMASHUP_FACTION_IDS.ROBOTS_POD,
+        );
+        expect(robotsPodOption).toBeDefined();
+
+        const respondResult = runCommand(playResult.finalState, {
+            type: 'SYS_INTERACTION_RESPOND',
+            playerId: '0',
+            payload: { optionId: robotsPodOption.id },
+        } as any, defaultRandom);
+
+        expect(respondResult.success).toBe(true);
+        expect(respondResult.finalState.core.bases[0].ongoingActions).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    uid: 'a1',
+                    defId: 'trickster_block_the_path_pod',
+                    metadata: expect.objectContaining({
+                        blockedFaction: SMASHUP_FACTION_IDS.ROBOTS_POD,
+                    }),
+                }),
+            ]),
+        );
+    });
+
+    it('trickster_block_the_path_pod also succeeds with production system stack', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('a1', 'trickster_block_the_path_pod', 'action', '0')],
+                    factions: [SMASHUP_FACTION_IDS.TRICKSTERS_POD, SMASHUP_FACTION_IDS.PIRATES_POD],
+                }),
+                '1': makePlayer('1', {
+                    hand: [makeCard('robot-hand-1', 'robot_microbot_alpha', 'minion', '1')],
+                    factions: [SMASHUP_FACTION_IDS.ROBOTS, SMASHUP_FACTION_IDS.NINJAS],
+                }),
+            },
+            bases: [{
+                defId: 'b1',
+                minions: [],
+                ongoingActions: [],
+            }],
+        });
+        const playerIds = ['0', '1'];
+        const initialState: MatchState<SmashUpCore> = {
+            core,
+            sys: createInitialSystemState(playerIds, smashUpSystemsForTest, undefined),
+        };
+        initialState.sys.phase = 'playCards';
+
+        const playResult = executePipeline(
+            { domain: SmashUpDomain, systems: smashUpSystemsForTest },
+            initialState,
+            {
+                type: SU_COMMANDS.PLAY_ACTION,
+                playerId: '0',
+                payload: { cardUid: 'a1', targetBaseIndex: 0 },
+                timestamp: 0,
+            } as any,
+            defaultRandom,
+            playerIds,
+        );
+
+        expect(playResult.success).toBe(true);
+        expect(playResult.error).toBeUndefined();
+
+        const prompt = playResult.state.sys.interaction?.current as any;
+        const robotOption = prompt?.data?.options?.find((option: any) => option?.value?.factionId === 'robots');
+        expect(robotOption).toBeDefined();
+
+        const respondResult = executePipeline(
+            { domain: SmashUpDomain, systems: smashUpSystemsForTest },
+            playResult.state,
+            {
+                type: 'SYS_INTERACTION_RESPOND',
+                playerId: '0',
+                payload: { optionId: robotOption.id },
+                timestamp: 1,
+            } as any,
+            defaultRandom,
+            playerIds,
+        );
+
+        expect(respondResult.success).toBe(true);
+        expect(respondResult.error).toBeUndefined();
+        expect(respondResult.state.core.bases[0].ongoingActions).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    uid: 'a1',
+                    defId: 'trickster_block_the_path_pod',
+                    metadata: expect.objectContaining({
+                        blockedFaction: 'robots',
+                    }),
+                }),
+            ]),
+        );
     });
 });
 
