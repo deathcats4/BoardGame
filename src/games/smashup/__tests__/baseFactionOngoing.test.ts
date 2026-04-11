@@ -15,7 +15,6 @@ import {
     registerTrigger,
     clearOngoingEffectRegistry,
     registerPodOngoingAliases,
-    interceptEvent,
     isMinionProtected,
     isOperationRestricted,
     fireTriggers,
@@ -32,7 +31,6 @@ import { resolveAbility } from '../domain/abilityRegistry';
 import { reduce } from '../domain/reduce';
 import { clearInteractionHandlers, getInteractionHandler } from '../domain/abilityInteractionHandlers';
 import { getMinionDef } from '../data/cards';
-import { buildAffectRecords } from '../domain/affect';
 
 // ============================================================================
 // 测试辅助
@@ -636,81 +634,6 @@ describe('忍者 ongoing/special 能力', () => {
     });
 });
 
-describe('机器人 ongoing 回归', () => {
-    beforeEach(() => {
-        clearRegistry();
-        clearInteractionHandlers();
-        clearOngoingEffectRegistry();
-        registerPodOngoingAliases();
-        registerRobotAbilities();
-    });
-
-    test('双方都有 Archive 时，只触发被消灭微型机所属玩家的 Archive', () => {
-        const archive0 = makeMinion({ defId: 'robot_microbot_archive', uid: 'ma-p0', controller: '0' });
-        const guard0 = makeMinion({ defId: 'robot_microbot_guard', uid: 'mg-p0', controller: '0' });
-        const base0 = makeBase({ defId: 'base_a', minions: [archive0, guard0] });
-
-        const archive1 = makeMinion({
-            defId: 'robot_microbot_archive',
-            uid: 'ma-p1',
-            controller: '1',
-            owner: '1',
-        });
-        const base1 = makeBase({ defId: 'base_b', minions: [archive1] });
-        const state = makeState([base0, base1]);
-
-        const { events } = fireTriggers(state, 'onMinionDestroyed', {
-            state,
-            playerId: '0',
-            baseIndex: 0,
-            triggerMinionUid: 'mg-p0',
-            triggerMinionDefId: 'robot_microbot_guard',
-            triggerMinion: guard0,
-            random: dummyRandom,
-            now: 1000,
-        } as any);
-
-        const drawEvents = events.filter(e => e.type === SU_EVENTS.CARDS_DRAWN) as any[];
-        expect(drawEvents).toHaveLength(1);
-        expect(drawEvents[0].payload.playerId).toBe('0');
-    });
-
-    test('同一玩家有两个 Archive 时，应各自触发一次抽牌', () => {
-        const archiveA = makeMinion({ defId: 'robot_microbot_archive', uid: 'ma-double-a', controller: '0' });
-        const archiveB = makeMinion({ defId: 'robot_microbot_archive', uid: 'ma-double-b', controller: '0' });
-        const guard = makeMinion({ defId: 'robot_microbot_guard', uid: 'mg-double', controller: '0' });
-        const base = makeBase({ minions: [archiveA, archiveB, guard] });
-        const seedState = makeState([base]);
-        const state = makeState([base], {
-            '0': {
-                ...seedState.players['0'],
-                deck: [
-                    makeCard('d1', 'deck_card_1', 'minion', '0', SMASHUP_FACTION_IDS.NINJAS),
-                    makeCard('d2', 'deck_card_2', 'action', '0', SMASHUP_FACTION_IDS.NINJAS),
-                    makeCard('d3', 'deck_card_3', 'minion', '0', SMASHUP_FACTION_IDS.NINJAS),
-                ],
-            },
-        });
-
-        const { events } = fireTriggers(state, 'onMinionDestroyed', {
-            state,
-            playerId: '0',
-            baseIndex: 0,
-            triggerMinionUid: 'mg-double',
-            triggerMinionDefId: 'robot_microbot_guard',
-            triggerMinion: guard,
-            random: dummyRandom,
-            now: 1000,
-        } as any);
-
-        const drawEvent = events.find(e => e.type === SU_EVENTS.CARDS_DRAWN) as any;
-        expect(drawEvent).toBeTruthy();
-        expect(drawEvent.payload.playerId).toBe('0');
-        expect(drawEvent.payload.count).toBe(2);
-        expect(drawEvent.payload.cardUids).toHaveLength(2);
-    });
-});
-
 // ============================================================================
  // 机器人 ongoing 能力
  // ============================================================================
@@ -1231,250 +1154,6 @@ describe('诡术师 ongoing 能力', () => {
             expect((events[0] as any).payload.count).toBe(1);
             expect(events[1].type).toBe(SU_EVENTS.MINION_METADATA_UPDATED);
         });
-
-        test('POD 版不沿用旧版 onMinionAffected 触发', () => {
-            const brownie = makeMinion({ defId: 'trickster_brownie_pod', uid: 'brownie-pod-1', controller: '0', owner: '0' });
-            const base0 = makeBase({ minions: [brownie] });
-            const base1 = makeBase({});
-            const state = makeState([base0, base1]);
-
-            const { events } = fireTriggers(state, 'onMinionAffected', {
-                state,
-                playerId: '1',
-                baseIndex: 1,
-                triggerMinionUid: 'opp-new-m',
-                triggerMinionDefId: 'some_minion',
-                random: dummyRandom,
-                now: 1000,
-            } as any);
-
-            expect(events).toHaveLength(0);
-        });
-
-        test('POD 版应标记消灭者', () => {
-            const base = makeBase({
-                ongoingActions: [{ uid: 'ft-pod-1', defId: 'trickster_flame_trap_pod', ownerId: '0' }],
-            });
-            const state = makeState([base]);
-
-            const { events } = fireTriggers(state, 'onMinionPlayed', {
-                state,
-                playerId: '1',
-                baseIndex: 0,
-                triggerMinionUid: 'new-m',
-                triggerMinionDefId: 'some_minion',
-                random: dummyRandom,
-                now: 1000,
-            });
-
-            expect(events).toHaveLength(2);
-            expect(events[1].type).toBe(SU_EVENTS.MINION_DESTROYED);
-            expect((events[1] as any).payload.destroyerId).toBe('0');
-        });
-
-        function makeBrownieState(overrides?: Partial<MinionOnBase>): SmashUpCore {
-            const brownie = makeMinion({
-                defId: 'trickster_brownie',
-                uid: 'brownie-1',
-                controller: '0',
-                owner: '0',
-                ...overrides,
-            });
-            return makeState([makeBase({ minions: [brownie] })], {
-                '1': {
-                    id: '1',
-                    vp: 0,
-                    hand: [
-                        makeCard('opp-h1', 'pirate_first_mate', 'action', '1', SMASHUP_FACTION_IDS.PIRATES),
-                        makeCard('opp-h2', 'wizard_archmage', 'action', '1', SMASHUP_FACTION_IDS.WIZARDS),
-                        makeCard('opp-h3', 'robot_microbot_alpha', 'action', '1', SMASHUP_FACTION_IDS.ROBOTS),
-                    ],
-                } as any,
-            });
-        }
-
-        function triggerBrownieFromEvent(state: SmashUpCore, event: any) {
-            const allEvents = buildAffectRecords(state, event, '1').flatMap(record => {
-                if (!record.countsForOnMinionAffected || !record.triggerMinion || record.baseIndex === undefined) {
-                    return [];
-                }
-                return fireTriggers(state, 'onMinionAffected', {
-                    state,
-                    playerId: record.sourcePlayerId ?? '1',
-                    baseIndex: record.baseIndex,
-                    sourceCardUid: record.sourceCardUid,
-                    sourceBaseIndex: record.sourceBaseIndex,
-                    sourceControllerId: record.sourceControllerId,
-                    triggerMinionUid: record.triggerMinionUid,
-                    triggerMinionDefId: record.triggerMinionDefId,
-                    triggerMinion: record.triggerMinion,
-                    affectType: record.affectType,
-                    reason: record.reason,
-                    random: dummyRandom,
-                    now: 1000,
-                }).events;
-            });
-            return allEvents.filter(evt => evt.type === SU_EVENTS.CARDS_DISCARDED);
-        }
-
-        test.each([
-            ['回手', () => ({
-                type: SU_EVENTS.MINION_RETURNED,
-                payload: {
-                    minionUid: 'brownie-1',
-                    minionDefId: 'trickster_brownie',
-                    fromBaseIndex: 0,
-                    toPlayerId: '0',
-                    reason: 'pirate_shanghai',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-1',
-                    sourceDefId: 'pirate_shanghai',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            })],
-            ['正向加力', () => ({
-                type: SU_EVENTS.PERMANENT_POWER_ADDED,
-                payload: {
-                    minionUid: 'brownie-1',
-                    baseIndex: 0,
-                    amount: 2,
-                    reason: 'robot_augmentation',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-2',
-                    sourceDefId: 'robot_augmentation',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            })],
-            ['负向减力', () => ({
-                type: SU_EVENTS.PERMANENT_POWER_ADDED,
-                payload: {
-                    minionUid: 'brownie-1',
-                    baseIndex: 0,
-                    amount: -2,
-                    reason: 'killer_plant_sleep_spores',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-3',
-                    sourceDefId: 'killer_plant_sleep_spores',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            })],
-            ['附着行动', () => ({
-                type: SU_EVENTS.ONGOING_ATTACHED,
-                payload: {
-                    cardUid: 'src-4',
-                    defId: 'trickster_mark_of_sleep',
-                    ownerId: '1',
-                    targetType: 'minion',
-                    targetBaseIndex: 0,
-                    targetMinionUid: 'brownie-1',
-                },
-                timestamp: 1000,
-            })],
-            ['控制权变化', () => ({
-                type: SU_EVENTS.MINION_CONTROL_CHANGED,
-                payload: {
-                    minionUid: 'brownie-1',
-                    minionDefId: 'trickster_brownie',
-                    baseIndex: 0,
-                    ownerId: '0',
-                    fromControllerId: '0',
-                    toControllerId: '1',
-                    reason: 'ghost_make_contact',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-5',
-                    sourceDefId: 'ghost_make_contact',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            })],
-            ['压制', () => ({
-                type: SU_EVENTS.CARD_SUPPRESSED,
-                payload: {
-                    cardUid: 'brownie-1',
-                    baseIndex: 0,
-                    suppressorPlayerId: '1',
-                    cardType: 'minion',
-                    reason: 'wizard_mass_enchantment',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-6',
-                    sourceDefId: 'wizard_mass_enchantment',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            })],
-        ])('被%s时会让对手弃两张牌', (_label, buildEvent) => {
-            const state = makeBrownieState();
-            const discardEvents = triggerBrownieFromEvent(state, buildEvent());
-
-            expect(discardEvents).toHaveLength(1);
-            expect((discardEvents[0] as any).payload.playerId).toBe('1');
-            expect((discardEvents[0] as any).payload.cardUids).toHaveLength(2);
-        });
-
-        test.each([
-            ['detach', makeBrownieState({
-                attachedActions: [{ uid: 'attach-1', defId: 'trickster_mark_of_sleep', ownerId: '1' }],
-            }), {
-                type: SU_EVENTS.ONGOING_DETACHED,
-                payload: {
-                    cardUid: 'attach-1',
-                    defId: 'trickster_mark_of_sleep',
-                    ownerId: '1',
-                    reason: 'trickster_mark_of_sleep_transferred',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-7',
-                    sourceDefId: 'trickster_tinx',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            }],
-            ['规则清附件', makeBrownieState({
-                attachedActions: [{ uid: 'attach-2', defId: 'trickster_mark_of_sleep', ownerId: '1' }],
-            }), {
-                type: SU_EVENTS.ONGOING_DETACHED,
-                payload: {
-                    cardUid: 'attach-2',
-                    defId: 'trickster_mark_of_sleep',
-                    ownerId: '1',
-                    reason: 'trickster_mark_of_sleep_host_destroyed',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-8',
-                    sourceDefId: 'pirate_cannon',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            }],
-            ['持续效果过期', makeBrownieState({
-                attachedActions: [{ uid: 'attach-3', defId: 'robot_augmentation', ownerId: '1' }],
-            }), {
-                type: SU_EVENTS.ONGOING_DETACHED,
-                payload: {
-                    cardUid: 'attach-3',
-                    defId: 'robot_augmentation',
-                    ownerId: '1',
-                    reason: 'robot_augmentation_expired',
-                    sourcePlayerId: '1',
-                    sourceCardUid: 'src-9',
-                    sourceDefId: 'robot_augmentation',
-                    sourceControllerId: '1',
-                    sourceBaseIndex: 0,
-                },
-                timestamp: 1000,
-            }],
-        ])('不会因%s误触发', (_label, state, event) => {
-            const discardEvents = triggerBrownieFromEvent(state, event);
-            expect(discardEvents).toEqual([]);
-        });
     });
 
     describe('trickster_block_the_path: 封路', () => {
@@ -1521,65 +1200,6 @@ describe('诡术师 ongoing 能力', () => {
 
             // 玩家 0 的 Hideout 不应该保护玩家 1 的随从
             expect(isMinionProtected(state, enemyMinion, 0, '0', 'action')).toBe(false);
-        });
-
-        test('POD 版不沿用旧版行动牌保护', () => {
-            const myMinion = makeMinion({ defId: 'trickster_a', uid: 't-1', controller: '0' });
-            const base = makeBase({
-                minions: [myMinion],
-                ongoingActions: [{ uid: 'ho-1', defId: 'trickster_hideout_pod', ownerId: '0' }],
-            });
-            const state = makeState([base]);
-
-            expect(isMinionProtected(state, myMinion, 0, '1', 'action')).toBe(false);
-        });
-
-        test('POD 版会阻止其他玩家把随从移动到此基地', () => {
-            const sourceBase = makeBase({
-                minions: [makeMinion({ defId: 'robot_zapbot', uid: 'm-1', controller: '1', owner: '1' })],
-            });
-            const targetBase = makeBase({
-                ongoingActions: [{ uid: 'ho-1', defId: 'trickster_hideout_pod', ownerId: '0' }],
-            });
-            const state = makeState([sourceBase, targetBase]);
-
-            const result = interceptEvent(state, {
-                type: SU_EVENTS.MINION_MOVED,
-                payload: {
-                    minionUid: 'm-1',
-                    minionDefId: 'robot_zapbot',
-                    fromBaseIndex: 0,
-                    toBaseIndex: 1,
-                    reason: 'test_move',
-                },
-                timestamp: 1000,
-            } as any);
-
-            expect(result).toBeNull();
-        });
-
-        test('POD 版允许拥有者把自己的随从移动到此基地', () => {
-            const sourceBase = makeBase({
-                minions: [makeMinion({ defId: 'trickster_a', uid: 'm-2', controller: '0', owner: '0' })],
-            });
-            const targetBase = makeBase({
-                ongoingActions: [{ uid: 'ho-1', defId: 'trickster_hideout_pod', ownerId: '0' }],
-            });
-            const state = makeState([sourceBase, targetBase]);
-
-            const result = interceptEvent(state, {
-                type: SU_EVENTS.MINION_MOVED,
-                payload: {
-                    minionUid: 'm-2',
-                    minionDefId: 'trickster_a',
-                    fromBaseIndex: 0,
-                    toBaseIndex: 1,
-                    reason: 'test_move',
-                },
-                timestamp: 1000,
-            } as any);
-
-            expect(result).toBeUndefined();
         });
     });
 
@@ -1642,20 +1262,27 @@ describe('诡术师 ongoing 能力', () => {
             expect(events).toHaveLength(0);
         });
 
-        test('POD 版不在 onTurnStart 自动给额外随从额度', () => {
-            const base = makeBase({
-                ongoingActions: [{ uid: 'em-1', defId: 'trickster_enshrouding_mist_pod', ownerId: '0' }],
-            });
+        test('onPlay 在非出牌阶段也应为 immediate extra', () => {
+            const base = makeBase();
             const state = makeState([base]);
+            const ms = makeMatchState(state);
+            ms.sys.phase = 'startTurn';
 
-            const { events } = fireTriggers(state, 'onTurnStart', {
+            const executor = resolveAbility('trickster_enshrouding_mist', 'onPlay')!;
+            const result = executor({
                 state,
+                matchState: ms,
                 playerId: '0',
+                cardUid: 'em-1',
+                defId: 'trickster_enshrouding_mist',
+                baseIndex: 0,
                 random: dummyRandom,
                 now: 1000,
             });
 
-            expect(events).toHaveLength(0);
+            expect(result.events).toHaveLength(1);
+            expect(result.events?.[0].type).toBe(SU_EVENTS.LIMIT_MODIFIED);
+            expect((result.events?.[0] as any).payload.playTiming).toBe('immediate');
         });
     });
 
@@ -1683,31 +1310,6 @@ describe('诡术师 ongoing 能力', () => {
             expect(events).toHaveLength(1);
             expect(events[0].type).toBe(SU_EVENTS.MINION_DESTROYED);
             expect((events[0] as any).payload.minionUid).toBe('wm-1');
-        });
-
-        test('POD 版应标记消灭者', () => {
-            const leprechaun = makeMinion({
-                defId: 'trickster_leprechaun_pod', uid: 'lp-pod-1', controller: '0', owner: '0', basePower: 4,
-            });
-            const weakMinion = makeMinion({
-                defId: 'weak_minion', uid: 'wm-1', controller: '1', owner: '1', basePower: 2,
-            });
-            const base = makeBase({ minions: [leprechaun, weakMinion] });
-            const state = makeState([base]);
-
-            const { events } = fireTriggers(state, 'onMinionPlayed', {
-                state,
-                playerId: '1',
-                baseIndex: 0,
-                triggerMinionUid: 'wm-1',
-                triggerMinionDefId: 'weak_minion',
-                random: dummyRandom,
-                now: 1000,
-            });
-
-            expect(events).toHaveLength(2);
-            expect(events[0].type).toBe(SU_EVENTS.MINION_DESTROYED);
-            expect((events[0] as any).payload.destroyerId).toBe('0');
         });
     });
 

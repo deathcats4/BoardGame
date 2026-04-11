@@ -9,8 +9,8 @@ import { registerAbility } from '../domain/abilityRegistry';
 import type { AbilityContext, AbilityResult } from '../domain/abilityRegistry';
 import {
     drawMadnessCards,
-    grantExtraAction,
-    grantExtraMinion,
+    grantContextualExtraAction,
+    grantContextualExtraMinion,
     destroyMinion,
     getMinionPower,
     buildBaseTargetOptions,
@@ -194,7 +194,7 @@ function elderThingTouchOfMadness(ctx: AbilityContext): AbilityResult {
     }
 
     // 额外打出一张行动
-    events.push(grantExtraAction(ctx.playerId, 'elder_thing_touch_of_madness', ctx.now));
+    events.push(grantContextualExtraAction(ctx, 'elder_thing_touch_of_madness'));
 
     return { events };
 }
@@ -292,7 +292,7 @@ function elderThingBeginTheSummoning(ctx: AbilityContext): AbilityResult {
     if (minionsInDiscard.length === 0) {
         // 没有随从可选，仍给额外行动，但提示弃牌堆为空
         events.push(buildAbilityFeedback(ctx.playerId, 'feedback.discard_empty', ctx.now));
-        events.push(grantExtraAction(ctx.playerId, 'elder_thing_begin_the_summoning', ctx.now));
+        events.push(grantContextualExtraAction(ctx, 'elder_thing_begin_the_summoning'));
         return { events };
     }
     // Prompt 选择
@@ -429,8 +429,6 @@ function elderThingByakheePod(ctx: AbilityContext): AbilityResult {
     return { events };
 }
 
-type PodYesNoChoiceValue = { choice: 'yes' } | { choice: 'no' };
-
 function elderThingMiGoPod(ctx: AbilityContext): AbilityResult {
     const opponents = getOrderedOpponentIds(ctx.state, ctx.playerId);
     if (opponents.length === 0) return { events: [] };
@@ -507,7 +505,7 @@ function elderThingBeginTheSummoningPod(ctx: AbilityContext): AbilityResult {
     const player = ctx.state.players[ctx.playerId];
     const minionsInDiscard = player.discard.filter(c => c.type === 'minion');
     if (minionsInDiscard.length === 0) {
-        return { events: [grantExtraAction(ctx.playerId, 'elder_thing_begin_the_summoning_pod', ctx.now)] };
+        return { events: [grantContextualExtraAction(ctx, 'elder_thing_begin_the_summoning_pod')] };
     }
     const options = minionsInDiscard.map((c, i) => {
         const def = getCardDef(c.defId);
@@ -601,8 +599,8 @@ function elderThingUnfathomableGoalsPod(ctx: AbilityContext): AbilityResult {
         const targetIds = revealTargetIds.length === 1 ? revealTargetIds[0] : revealTargetIds;
         events.push(revealHand(targetIds, 'all', allRevealCards, 'elder_thing_unfathomable_goals_pod', ctx.now, ctx.playerId));
     }
-    if (anyTwoMadness) events.push(grantExtraMinion(ctx.playerId, 'elder_thing_unfathomable_goals_pod', ctx.now));
-    if (totalMadness >= 4) events.push(grantExtraAction(ctx.playerId, 'elder_thing_unfathomable_goals_pod', ctx.now));
+    if (anyTwoMadness) events.push(grantContextualExtraMinion(ctx, 'elder_thing_unfathomable_goals_pod'));
+    if (totalMadness >= 4) events.push(grantContextualExtraAction(ctx, 'elder_thing_unfathomable_goals_pod'));
     return { events };
 }
 
@@ -618,7 +616,7 @@ function elderThingTouchOfMadnessPod(ctx: AbilityContext): AbilityResult {
     if (drawnUids.length > 0) {
         events.push({ type: SU_EVENTS.CARDS_DRAWN, payload: { playerId: ctx.playerId, count: 1, cardUids: drawnUids }, timestamp: ctx.now } as CardsDrawnEvent);
     }
-    events.push(grantExtraAction(ctx.playerId, 'elder_thing_touch_of_madness_pod', ctx.now));
+    events.push(grantContextualExtraAction(ctx, 'elder_thing_touch_of_madness_pod'));
     return { events };
 }
 
@@ -908,7 +906,7 @@ export function registerElderThingInteractionHandlers(): void {
         const newDeckUids = [cardUid, ...player.deck.map(c => c.uid)];
         return { state, events: [
             { type: SU_EVENTS.DECK_REORDERED, payload: { playerId, deckUids: newDeckUids }, timestamp },
-            grantExtraAction(playerId, 'elder_thing_begin_the_summoning', timestamp),
+            grantContextualExtraAction({ playerId, now: timestamp, matchState: state }, 'elder_thing_begin_the_summoning'),
         ] };
     });
 
@@ -1041,7 +1039,7 @@ export function registerElderThingInteractionHandlers(): void {
     
     // 远古之物：玩家点击第二个要消灭的随从
     registerInteractionHandler('elder_thing_elder_thing_destroy_second', (state, playerId, value, iData, _random, timestamp) => {
-        const { minionUid, baseIndex, defId } = value as { minionUid: string; baseIndex: number; defId: string };
+        const { minionUid, baseIndex } = value as { minionUid: string; baseIndex: number; defId: string };
         const base = state.core.bases[baseIndex];
         const target = base?.minions.find(m => m.uid === minionUid);
         if (!target) return { state, events: [] };
@@ -1123,7 +1121,7 @@ export function registerElderThingInteractionHandlers(): void {
 
     // 修格斯：控制者选择消灭对手随从后的处理
     registerInteractionHandler('elder_thing_shoggoth_destroy', (state, playerId, value, iData, _random, timestamp) => {
-        const { minionUid, baseIndex, defId } = value as { minionUid: string; baseIndex: number; defId: string };
+        const { minionUid, baseIndex } = value as { minionUid: string; baseIndex: number; defId: string };
         const ctx = (iData as any)?.continuationContext as { casterPlayerId: string; baseIndex: number; opponents: string[]; opponentIdx: number };
         if (!ctx) return { state, events: [] };
 
@@ -1294,7 +1292,10 @@ export function registerElderThingInteractionHandlers(): void {
             payload: { cardUid, defId, ownerId: playerId, reason: 'elder_thing_begin_the_summoning_pod' },
             timestamp,
         };
-        return { state, events: [evt, grantExtraAction(playerId, 'elder_thing_begin_the_summoning_pod', timestamp)] };
+        return {
+            state,
+            events: [evt, grantContextualExtraAction({ playerId, now: timestamp, matchState: state }, 'elder_thing_begin_the_summoning_pod')],
+        };
     });
 
     registerInteractionHandler('elder_thing_mi_go_pod', (state, _playerId, value, iData, random, timestamp) => {

@@ -2175,6 +2175,13 @@ function postProcessSystemEvents(
         };
     }
 
+    const immediateExtraEvents = finalEvents.filter((event): event is LimitModifiedEvent =>
+        event.type === SU_EVENTS.LIMIT_MODIFIED && event.payload.playTiming === 'immediate',
+    );
+    if (immediateExtraEvents.length > 0) {
+        ms = queueImmediateExtraPlayInteractions(ms, immediateExtraEvents);
+    }
+
     return { events: finalEvents, matchState: ms };
 }
 

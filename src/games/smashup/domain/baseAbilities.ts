@@ -14,8 +14,6 @@ import type {
     VpAwardedEvent,
     CardsDrawnEvent,
     CardsDiscardedEvent,
-
-    LimitModifiedEvent,
     CardToDeckBottomEvent,
     MinionOnBase,
     BaseDeckReorderedEvent,
@@ -25,6 +23,8 @@ import { SU_EVENTS } from './types';
 import { getEffectivePower } from './ongoingModifiers';
 import {
     drawMadnessCards,
+    grantContextualExtraAction,
+    grantContextualExtraMinion,
     destroyMinion,
     buildBaseTargetOptions,
     buildMinionTargetOptions,
@@ -117,7 +117,6 @@ export type ActiveBaseAbilityRegistrationOptions = {
     canUse?: (ctx: BaseAbilityContext) => boolean;
 };
 
-type DeferredInteractionContext = { _deferredPostScoringEvents?: SmashUpEvent[] };
 type PirateCoveSysState = MatchState<SmashUpCore>['sys'] & { _pirateCoveTriggered?: Set<number> };
 type HandCardChoiceValue = { cardUid: string; defId: string };
 
@@ -798,16 +797,7 @@ export function registerBaseAbilities(): void {
     // "当一个玩家打出一个战术到这个基地时，该玩家可以额外打出一张战术"
     registerBaseAbility('base_the_workshop', 'onActionPlayed', (ctx) => {
         return {
-            events: [{
-                type: SU_EVENTS.LIMIT_MODIFIED,
-                payload: {
-                    playerId: ctx.playerId,
-                    limitType: 'action',
-                    delta: 1,
-                    reason: '工坊：额外打出一张战斗牌',
-                },
-                timestamp: ctx.now,
-            } as LimitModifiedEvent],
+            events: [grantContextualExtraAction(ctx, '工坊：额外打出一张战斗牌')],
         };
     });
 
@@ -1066,17 +1056,7 @@ export function registerBaseAbilities(): void {
     // 力量≤2 限制通过 LIMIT_MODIFIED 事件的 powerMax 字段全局生效
     registerBaseAbility('base_the_homeworld', 'onMinionPlayed', (ctx) => {
         return {
-            events: [{
-                type: SU_EVENTS.LIMIT_MODIFIED,
-                payload: {
-                    playerId: ctx.playerId,
-                    limitType: 'minion',
-                    delta: 1,
-                    reason: '母星：额外打出力量≤2的随从',
-                    powerMax: 2,
-                },
-                timestamp: ctx.now,
-            } as LimitModifiedEvent],
+            events: [grantContextualExtraMinion(ctx, '母星：额外打出力量≤2的随从', undefined, { powerMax: 2 })],
         };
     });
 

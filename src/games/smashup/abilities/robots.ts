@@ -42,47 +42,25 @@ export function registerRobotAbilities(): void {
     registerRobotOngoingEffects();
 }
 
-function getRobotMicrobotGuardTargets(
-    state: AbilityContext['state'],
-    baseIndex: number,
-    playerId: string,
-    sourceCardUid: string,
-) {
-    const base = state.bases[baseIndex];
-    if (!base) return [];
-
-    const myMinionCount = base.minions.filter(minion => minion.controller === playerId).length;
-    return base.minions.filter(
-        minion => minion.uid !== sourceCardUid && getMinionPower(state, minion, baseIndex) < myMinionCount,
-    );
-}
-
-function buildRobotMicrobotGuardOptions(
-    state: AbilityContext['state'],
-    baseIndex: number,
-    playerId: string,
-    sourceCardUid: string,
-) {
-    const targets = getRobotMicrobotGuardTargets(state, baseIndex, playerId, sourceCardUid);
-    return targets.map(target => {
-        const def = getCardDef(target.defId) as MinionCardDef | undefined;
-        const name = def?.name ?? target.defId;
-        const power = getMinionPower(state, target, baseIndex);
-        return {
-            uid: target.uid,
-            defId: target.defId,
-            baseIndex,
-            label: `${name} (力量 ${power})`,
-        };
-    });
-}
-
 /** 微型机守护者 onPlay：消灭力量低于己方随从数量的随从 */
 function robotMicrobotGuard(ctx: AbilityContext): AbilityResult {
-    const options = buildRobotMicrobotGuardOptions(ctx.state, ctx.baseIndex, ctx.playerId, ctx.cardUid);
-    if (options.length === 0) {
+    const base = ctx.state.bases[ctx.baseIndex];
+    if (!base) return { events: [] };
+
+    const myMinionCount = base.minions.filter(m => m.controller === ctx.playerId).length + 1;
+    const targets = base.minions.filter(
+        m => m.uid !== ctx.cardUid && getMinionPower(ctx.state, m, ctx.baseIndex) < myMinionCount,
+    );
+    if (targets.length === 0) {
         return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
     }
+
+    const options = targets.map(t => {
+        const def = getCardDef(t.defId) as MinionCardDef | undefined;
+        const name = def?.name ?? t.defId;
+        const power = getMinionPower(ctx.state, t, ctx.baseIndex);
+        return { uid: t.uid, defId: t.defId, baseIndex: ctx.baseIndex, label: `${name} (力量 ${power})` };
+    });
 
     const interaction = createSimpleChoice(
         `robot_microbot_guard_${ctx.now}`,
@@ -93,39 +71,8 @@ function robotMicrobotGuard(ctx: AbilityContext): AbilityResult {
             sourcePlayerId: ctx.playerId,
             effectType: 'destroy',
         }),
-        { sourceId: 'robot_microbot_guard', targetType: 'minion', responseValidationMode: 'live' },
+        { sourceId: 'robot_microbot_guard', targetType: 'minion' },
     );
-    (interaction.data as SimpleChoiceData<unknown> & {
-        continuationContext?: { baseIndex: number; sourceCardUid: string; sourcePlayerId: string };
-        optionsGenerator?: typeof interaction.data.optionsGenerator;
-    }).continuationContext = {
-        baseIndex: ctx.baseIndex,
-        sourceCardUid: ctx.cardUid,
-        sourcePlayerId: ctx.playerId,
-    };
-    (interaction.data as SimpleChoiceData<unknown> & {
-        continuationContext?: { baseIndex: number; sourceCardUid: string; sourcePlayerId: string };
-        optionsGenerator?: typeof interaction.data.optionsGenerator;
-    }).optionsGenerator = (state, data) => {
-        const continuationContext = data.continuationContext as
-            | { baseIndex: number; sourceCardUid: string; sourcePlayerId: string }
-            | undefined;
-        if (!continuationContext) return [];
-        return buildMinionTargetOptions(
-            buildRobotMicrobotGuardOptions(
-                state.core,
-                continuationContext.baseIndex,
-                continuationContext.sourcePlayerId,
-                continuationContext.sourceCardUid,
-            ),
-            {
-                state: state.core,
-                sourcePlayerId: continuationContext.sourcePlayerId,
-                sourceDefId: ctx.defId,
-                effectType: 'destroy',
-            },
-        );
-    };
 
     return { events: [], matchState: queueInteraction(ctx.matchState, interaction) };
 }
@@ -201,14 +148,13 @@ export function resetRobotHoverbotCounter(): void {
 
 /** 盘旋机器人 onPlay：展示牌库顶，如果是随从“你可以”将其作为额外随从打出 */
 function robotHoverbot(ctx: AbilityContext): AbilityResult {
-    const peek = peekDeckTop(
-        ctx.state, ctx.random, ctx.playerId,
-        'all', 'robot_hoverbot', ctx.now,
-    );
+    const peek = peekDeckTop(ctx.state, ctx.random, ctx.playerId, 'all', 'robot_hoverbot', ctx.now);
     if (!peek) {
         return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.deck_empty', ctx.now)] };
     }
-    const events: SmashUpEvent[] = [...peek.events];
+
+    const events: SmashUpEvent[] = [peek.revealEvent];
+
     if (peek.card.type === 'minion') {
         const def = getCardDef(peek.card.defId) as MinionCardDef | undefined;
         const power = def?.power ?? 0;
@@ -357,20 +303,12 @@ export function registerRobotInteractionHandlers(): void {
     });
 
     // 微型机守护者：选择目标后消灭
-    registerInteractionHandler('robot_microbot_guard', (state, sourcePlayerId, value, iData, _random, timestamp) => {
+    registerInteractionHandler('robot_microbot_guard', (state, sourcePlayerId, value, _iData, _random, timestamp) => {
         const { minionUid, baseIndex } = value as { minionUid: string; baseIndex: number };
-        const continuationContext = (iData as {
-            continuationContext?: { sourceCardUid?: string };
-        } | undefined)?.continuationContext;
-        const sourceCardUid = continuationContext?.sourceCardUid;
-        if (!sourceCardUid) return undefined;
+        const base = state.core.bases[baseIndex];
+        if (!base) return undefined;
 
-        const target = getRobotMicrobotGuardTargets(
-            state.core,
-            baseIndex,
-            sourcePlayerId,
-            sourceCardUid,
-        ).find(minion => minion.uid === minionUid);
+        const target = base.minions.find(m => m.uid === minionUid);
         if (!target) return undefined;
 
         return {
@@ -441,12 +379,17 @@ export function registerRobotInteractionHandlers(): void {
                     baseDefId: state.core.bases[0].defId,
                     power,
                     fromDeck: true,
-                    consumesNormalLimit: false,
                 },
                 timestamp,
             };
 
-            return { state, events: [playedEvt] };
+            return {
+                state,
+                events: [
+                    grantExtraMinion(playerId, 'robot_hoverbot', timestamp),
+                    playedEvt,
+                ],
+            };
         }
 
         const baseCandidates = state.core.bases.map((b, i) => {
@@ -489,12 +432,17 @@ export function registerRobotInteractionHandlers(): void {
                 baseIndex,
                 power: ctx.power,
                 fromDeck: true,
-                consumesNormalLimit: false,
             },
             timestamp,
         };
 
-        return { state, events: [playedEvt] };
+        return {
+            state,
+            events: [
+                grantExtraMinion(playerId, 'robot_hoverbot', timestamp),
+                playedEvt,
+            ],
+        };
     });
 }
 
@@ -509,13 +457,6 @@ function registerRobotOngoingEffects(): void {
         matchesDefId(ctx.targetMinion.defId, 'robot_warbot'),
     );
 
-    // 寰瀷鏈烘。妗堥锛氬井鍨嬫満琚秷鐏悗鎺у埗鑰呮娊 1 寮犵墝锛堟敮鎸?Alpha 鈥滆涓哄井鍨嬫満鈥濓級
-    // 微型机档案馆：微型机被消灭后控制者抽1张牌
-        // 1. 需要有被消灭随从的 defId 或 uid，否则无法判断
-
-        // 2. 找到被消灭的随从实例，用统一的 isMicrobot 判定是否是“微型机”
-        //    - 优先使用 triggerMinion（如果有快照）
-        //    - 否则在当前状态中按 uid 回溯（destroy pipeline 会在 reduce 之后触发，该随从可能已不在场，所以这是 best-effort）
     // 微型机档案馆：微型机被消灭后控制者抽 1 张牌（支持 Alpha “视为微型机”）
     registerTrigger('robot_microbot_archive', 'onMinionDestroyed', trigCtx => {
         // 必须有触发随从的基本信息
@@ -535,18 +476,6 @@ function registerRobotOngoingEffects(): void {
             }
         }
 
-        // 若找不到实体，只能根据原始 defId 判断是否是“印刷微型机”
-        if (!destroyedMinion) {
-            if (!trigCtx.triggerMinionDefId) return [];
-            if (!Array.from(MICROBOT_DEF_IDS).some(defId => matchesDefId(trigCtx.triggerMinionDefId, defId))) {
-                return [];
-            }
-        } else {
-            // 有实体时，用统一的 isMicrobot 判定（支持 Alpha“视为微型机”）
-            if (!isMicrobot(trigCtx.state, destroyedMinion)) return [];
-        }
-
-        // 3. 找到任意一个 Microbot Archive 实例，确定控制者（Archive 控制者即该能力的收益方）
         if (!destroyedMinion) {
             // 没有实体，只能按原始 defId 判断是否是“印刷微型机”
             if (!trigCtx.triggerMinionDefId) return [];
@@ -563,35 +492,29 @@ function registerRobotOngoingEffects(): void {
         }
 
         // 找到 Archive 的控制者
-        let archiveCount = 0;
+        let archiveOwner: string | undefined;
         for (const base of trigCtx.state.bases) {
-            for (const minion of base.minions) {
-                if (
-                    matchesDefId(minion.defId, 'robot_microbot_archive')
-                    && minion.controller === trigCtx.playerId
-                ) {
-                    archiveCount++;
-                }
+            const archive = base.minions.find(m => matchesDefId(m.defId, 'robot_microbot_archive'));
+            if (archive) {
+                archiveOwner = archive.controller;
+                break;
             }
         }
-        if (archiveCount === 0) return [];
+        if (!archiveOwner) return [];
 
-        // 4. "你的微型机" → 被消灭随从必须属于 archive 控制者（控制关系由 trigCtx.playerId 表示）
-
-        // 5. 抽 1 张牌（按全局抽牌规则处理牌库为空 / 手牌上限）
         // “你的 Microbot” → 被消灭随从必须由 Archive 控制者控制
+        if (trigCtx.playerId !== archiveOwner) return [];
 
-        const player = trigCtx.state.players[trigCtx.playerId];
-        // “你的 Microbot” → 被消灭随从必须由 Archive 控制者控制
+        const player = trigCtx.state.players[archiveOwner];
         if (!player || player.deck.length === 0) return [];
 
-        const { drawnUids } = drawCards(player, archiveCount, trigCtx.random);
+        const { drawnUids } = drawCards(player, 1, trigCtx.random);
         if (drawnUids.length === 0) return [];
 
         return [
             {
                 type: SU_EVENTS.CARDS_DRAWN,
-                payload: { playerId: trigCtx.playerId, count: drawnUids.length, cardUids: drawnUids },
+                payload: { playerId: archiveOwner, count: 1, cardUids: drawnUids },
                 timestamp: trigCtx.now,
             },
         ];
