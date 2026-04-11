@@ -10,8 +10,6 @@ import { resolveOnPlay, resolveSpecial } from '../domain/abilityRegistry';
 import {
     grantContextualExtraAction,
     grantContextualExtraMinion,
-    grantExtraAction,
-    grantExtraMinion,
     destroyMinion,
     shuffleHandIntoDeck,
     getMinionPower,

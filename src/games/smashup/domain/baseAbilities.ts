@@ -14,8 +14,6 @@ import type {
     VpAwardedEvent,
     CardsDrawnEvent,
     CardsDiscardedEvent,
-
-    LimitModifiedEvent,
     CardToDeckBottomEvent,
     MinionOnBase,
     BaseDeckReorderedEvent,
@@ -119,7 +117,6 @@ export type ActiveBaseAbilityRegistrationOptions = {
     canUse?: (ctx: BaseAbilityContext) => boolean;
 };
 
-type DeferredInteractionContext = { _deferredPostScoringEvents?: SmashUpEvent[] };
 type PirateCoveSysState = MatchState<SmashUpCore>['sys'] & { _pirateCoveTriggered?: Set<number> };
 type HandCardChoiceValue = { cardUid: string; defId: string };
 

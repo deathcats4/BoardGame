@@ -429,8 +429,6 @@ function elderThingByakheePod(ctx: AbilityContext): AbilityResult {
     return { events };
 }
 
-type PodYesNoChoiceValue = { choice: 'yes' } | { choice: 'no' };
-
 function elderThingMiGoPod(ctx: AbilityContext): AbilityResult {
     const opponents = getOrderedOpponentIds(ctx.state, ctx.playerId);
     if (opponents.length === 0) return { events: [] };
@@ -1041,7 +1039,7 @@ export function registerElderThingInteractionHandlers(): void {
     
     // 远古之物：玩家点击第二个要消灭的随从
     registerInteractionHandler('elder_thing_elder_thing_destroy_second', (state, playerId, value, iData, _random, timestamp) => {
-        const { minionUid, baseIndex, defId } = value as { minionUid: string; baseIndex: number; defId: string };
+        const { minionUid, baseIndex } = value as { minionUid: string; baseIndex: number; defId: string };
         const base = state.core.bases[baseIndex];
         const target = base?.minions.find(m => m.uid === minionUid);
         if (!target) return { state, events: [] };
@@ -1123,7 +1121,7 @@ export function registerElderThingInteractionHandlers(): void {
 
     // 修格斯：控制者选择消灭对手随从后的处理
     registerInteractionHandler('elder_thing_shoggoth_destroy', (state, playerId, value, iData, _random, timestamp) => {
-        const { minionUid, baseIndex, defId } = value as { minionUid: string; baseIndex: number; defId: string };
+        const { minionUid, baseIndex } = value as { minionUid: string; baseIndex: number; defId: string };
         const ctx = (iData as any)?.continuationContext as { casterPlayerId: string; baseIndex: number; opponents: string[]; opponentIdx: number };
         if (!ctx) return { state, events: [] };
 

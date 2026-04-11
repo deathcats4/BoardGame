@@ -47,8 +47,7 @@ import type {
 } from './types';
 import { SU_EVENT_TYPES as SU_EVENTS } from './events';
 import { getEffectivePower } from './ongoingModifiers';
-import { triggerAllBaseAbilities } from './baseAbilities';
-import { collectTriggers, fireTriggers } from './ongoingEffects';
+import { collectTriggers } from './ongoingEffects';
 import { getMinionDef } from '../data/cards';
 import { drawCards } from './utils';
 

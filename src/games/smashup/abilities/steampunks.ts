@@ -9,8 +9,8 @@ import type { AbilityContext, AbilityResult } from '../domain/abilityRegistry';
 import { recoverCardsFromDiscard, grantContextualExtraAction, grantExtraAction, moveMinion, resolveExtraPlayTiming, resolveOrPrompt, buildAbilityFeedback, buildMinionTargetOptions, buildBaseTargetOptions, getMinionPower } from '../domain/abilityHelpers';
 import { SU_EVENTS } from '../domain/types';
 import type { SmashUpEvent, SmashUpCore, CardsDrawnEvent, MinionReturnedEvent, OngoingDetachedEvent, ActionCardDef } from '../domain/types';
-import { registerProtection, registerRestriction, registerTrigger, registerInterceptor } from '../domain/ongoingEffects';
-import type { ProtectionCheckContext, RestrictionCheckContext, TriggerContext } from '../domain/ongoingEffects';
+import { registerRestriction, registerTrigger, registerInterceptor } from '../domain/ongoingEffects';
+import type { RestrictionCheckContext, TriggerContext } from '../domain/ongoingEffects';
 import { getCardDef, getBaseDef } from '../data/cards';
 import { createSimpleChoice, queueInteraction } from '../../../engine/systems/InteractionSystem';
 import { registerInteractionHandler } from '../domain/abilityInteractionHandlers';
@@ -491,7 +491,7 @@ export function registerSteampunkInteractionHandlers(): void {
         if (def?.subtype === 'ongoing') {
             const baseOptions = state.core.bases
                 .map((base, i) => ({ base, i }))
-                .filter(({ base, i }) => validateActionPlaySemantics(state.core, playerId, {
+                .filter(({ i }) => validateActionPlaySemantics(state.core, playerId, {
                     defId: cardDefId,
                     targetBaseIndex: i,
                     effectiveHandSize: (state.core.players[playerId]?.hand.length ?? 0) + 1,
