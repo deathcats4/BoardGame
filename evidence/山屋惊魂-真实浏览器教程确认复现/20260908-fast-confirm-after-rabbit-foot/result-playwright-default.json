@@ -1,0 +1,130 @@
+{
+  "targetUrl": "http://127.0.0.1:4274/play/betrayal/tutorial/basic-setup-and-turn",
+  "browserChannel": "playwright-default",
+  "startedAt": "2026-09-08T15:38:15.134Z",
+  "console": [
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] START: 教程启动 {manifestId: basic-setup-and-turn, stepsCount: 44, firstStepId: setup-runtime}"
+    },
+    {
+      "type": "log",
+      "text": "%c✓ [LOCAL_AI_PERF] {\"stage\":\"command-applied\",\"gameId\":\"betrayal\",\"matchId\":\"local:betrayal:tutorial-progress:v1:betrayal:basic-setup-and-turn\",\"commandType\":\"SYS_CHEAT_MERGE_STATE\",\"playerId\":\"0\",\"progressed\":false,\"hasStateDelta\":false,\"rejected\":false,\"failureReason\":null,\"phaseBefore\":\"\",\"phaseAfter\":\"\",\"handCountBefore\":null,\"handCountAfter\":null,\"cpBefore\":null,\"cpAfter\":null,\"markerBefore\":\"0||2|0|||||||0|\",\"markerAfter\":\"0||2|0|||||||0|\"} color: #51cf66; font-weight: bold; background: #e7f5e7; padding: 4px 8px; border-radius: 4px;"
+    },
+    {
+      "type": "log",
+      "text": "[LOCAL_AI_PERF] {stage: command-applied, gameId: betrayal, matchId: local:betrayal:tutorial-progress:v1:betrayal:basic-setup-and-turn, commandType: SYS_CHEAT_MERGE_STATE, playerId: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: finish, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: finish, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    }
+  ],
+  "pageErrors": [],
+  "steps": [
+    {
+      "reached": "objective-and-turn"
+    },
+    {
+      "reached": "use-rabbit-foot"
+    }
+  ],
+  "endedAt": "2026-09-08T15:39:02.805Z",
+  "before": {
+    "tutorialStepId": "rabbit-foot-result",
+    "discoveryPanelVisible": true,
+    "damageAllocationVisible": false,
+    "finalConfirmVisible": true,
+    "finalConfirmText": "确认 0/1",
+    "finalConfirmCenterHitTestId": "betrayal-discovery-continue"
+  },
+  "finalConfirmClick": {
+    "completed": true
+  },
+  "after": {
+    "tutorialStepId": "finish",
+    "discoveryPanelVisible": false,
+    "damageAllocationVisible": true,
+    "finalConfirmVisible": false,
+    "finalConfirmText": null,
+    "finalConfirmCenterHitTestId": null
+  },
+  "rejectedConfirmLogs": [],
+  "reproducedConfirm01Stuck": false
+}

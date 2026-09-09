@@ -19,6 +19,7 @@ type TutorialNextReason = 'manual' | 'auto';
 interface TutorialController {
     start: (manifest: TutorialManifest) => void;
     next: (reason?: TutorialNextReason) => void;
+    previous: () => void;
     close: () => void;
     consumeAi: (stepId?: string) => void;
     animationComplete: () => void;
@@ -39,6 +40,7 @@ interface TutorialContextType {
     isBoardMounted: boolean;
     startTutorial: (manifest: TutorialManifest) => void;
     nextStep: (reason?: TutorialNextReason) => void;
+    previousStep: () => void;
     closeTutorial: () => void;
     consumeAi: (stepId?: string) => void;
     /** 动画完成回调：通知教程系统动画已播放完毕，可以推进到下一步 */
@@ -66,6 +68,7 @@ const buildTutorialController = (dispatch: DispatchFn): TutorialController => {
         dispatchCommand,
         start: (manifest) => dispatchCommand(TUTORIAL_COMMANDS.START, { manifest }),
         next: (reason) => dispatchCommand(TUTORIAL_COMMANDS.NEXT, { reason }),
+        previous: () => dispatchCommand(TUTORIAL_COMMANDS.PREVIOUS, {}),
         close: () => dispatchCommand(TUTORIAL_COMMANDS.CLOSE, {}),
         consumeAi: (stepId) => dispatchCommand(TUTORIAL_COMMANDS.AI_CONSUMED, { stepId }),
         animationComplete: () => dispatchCommand(TUTORIAL_COMMANDS.ANIMATION_COMPLETE, {}),
@@ -274,6 +277,10 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         controllerRef.current?.next(reason);
     }, []);
 
+    const previousStep = useCallback(() => {
+        controllerRef.current?.previous();
+    }, []);
+
     const closeTutorial = useCallback(() => {
         aiExecutionGenerationRef.current += 1;
         if (aiTimerRef.current !== undefined) {
@@ -433,6 +440,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             isBoardMounted,
             startTutorial,
             nextStep,
+            previousStep,
             closeTutorial,
             consumeAi,
             animationComplete,
@@ -442,7 +450,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             notifyBoardMounted,
             notifyBoardUnmounted,
         };
-    }, [tutorial, isAiExecuting, isBoardMounted, bindDispatch, unbindDispatch, closeTutorial, consumeAi, animationComplete, nextStep, startTutorial, syncTutorialState, notifyBoardMounted, notifyBoardUnmounted]);
+    }, [tutorial, isAiExecuting, isBoardMounted, bindDispatch, unbindDispatch, closeTutorial, consumeAi, animationComplete, nextStep, previousStep, startTutorial, syncTutorialState, notifyBoardMounted, notifyBoardUnmounted]);
 
     return (
         <TutorialContext.Provider value={value}>

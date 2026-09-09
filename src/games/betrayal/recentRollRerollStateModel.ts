@@ -1,5 +1,5 @@
 import {
-    eventRollResolutionNeedsAcknowledgement,
+    eventRollResolutionNeedsSharedAcknowledgement,
     resolvePendingEventRollResolutionRequiredPlayerIds,
 } from './acknowledgementReadModel';
 import {
@@ -257,16 +257,18 @@ function applyEventRecentRollRerollState(
             helpingHandsSetup: event.payload.eventRerollHaunt?.helpingHandsSetup,
             uponReflectionSetup: event.payload.eventRerollHaunt?.uponReflectionSetup,
         };
-        const requiresAcknowledgement = eventRollResolutionNeedsAcknowledgement(acknowledgementContext);
+        const requiresSharedAcknowledgement = eventRollResolutionNeedsSharedAcknowledgement(acknowledgementContext);
         nextRoll.latestLabel = nextBranch.label;
         core.recentRoll = nextRoll;
         core.pendingEventRollResolution = {
             ...pendingEventRoll,
-            requiredPlayerIds: resolvePendingEventRollResolutionRequiredPlayerIds(core, pendingEventRoll),
+            requiredPlayerIds: requiresSharedAcknowledgement && core.playerIds.length > 0
+                ? [...core.playerIds]
+                : resolvePendingEventRollResolutionRequiredPlayerIds(core, pendingEventRoll),
             acknowledgedPlayerIds: [],
             effect: cloneUseEffect(nextEffect),
             nextPendingEventChoice,
-            requiresAcknowledgement,
+            requiresAcknowledgement: true,
             deathPrevention: event.payload.eventRerollDeathPrevention
                 ? {
                     ...event.payload.eventRerollDeathPrevention,
@@ -304,14 +306,6 @@ function applyEventRecentRollRerollState(
         };
         core.usedCardIdsThisTurn = [...core.usedCardIdsThisTurn, event.payload.cardId];
         refreshLatestEventDiscoveryAfterReroll(core, recentRoll, nextRoll, nextTotal, nextBranch.label, nextEffect);
-        if (!requiresAcknowledgement) {
-            const synced = syncCurrentExplorerProjection(core);
-            return {
-                ...synced,
-                recommendedAction: resolveRecommendedAction(synced),
-                activityLog: appendActivity(synced, event.payload.logText, 'accent'),
-            };
-        }
         return createFinalizeRecentRollRerollCore(core, event);
     }
     if (core.pendingEventChoice?.sourceTitle === recentRoll.sourceTitle && !recentRoll.eventEffectSnapshot) {

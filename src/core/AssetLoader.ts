@@ -493,8 +493,10 @@ export async function preloadCriticalImages(
         if (candidates.length === 0) return;
         for (const candidate of candidates) {
             if (isImagePreloaded(candidate)) return;
-            await preloadOptimizedImage(candidate);
+            const outcome = await preloadOptimizedImage(candidate);
             if (isImagePreloaded(candidate)) return;
+            if (outcome === 'timeout') return;
+            markImageCandidateFailed(path, effectiveLocale, candidate);
         }
     };
 
@@ -1133,24 +1135,24 @@ function removePreloadLink(src: string): void {
     if (link) link.remove();
 }
 
-async function preloadImageWithResult(src: string, timeoutMs?: number): Promise<boolean> {
+async function preloadImageWithResult(src: string, timeoutMs?: number): Promise<ImagePreloadOutcome> {
     return new Promise((resolve) => {
         let done = false;
         // 同时注入 <link rel="preload"> 确保浏览器高优先级加载 + HTTP 缓存复用
         injectPreloadLink(src);
         const img = new Image();
         // 不设置 crossOrigin — 与 CSS background-image 的 no-cors 模式保持一致
-        const finish = (ok: boolean) => {
+        const finish = (outcome: ImagePreloadOutcome) => {
             if (done) return;
             done = true;
             // 加载完成后清理 preload link
             removePreloadLink(src);
-            resolve(ok);
+            resolve(outcome);
         };
         const settleFromDimensions = () => {
             if (img.naturalWidth > 0) {
                 cacheLoadedImage(src, img);
-                finish(true);
+                finish('loaded');
                 return true;
             }
             return false;
@@ -1169,18 +1171,18 @@ async function preloadImageWithResult(src: string, timeoutMs?: number): Promise<
                     // 通知订阅者：超时的图片已在后台加载完成
                     _emitImageReady(src);
                 };
-                finish(false);
+                finish('timeout');
             }, timeoutMs)
             : null;
         img.onload = () => {
             if (timer) clearTimeout(timer);
             cacheLoadedImage(src, img);
-            finish(true);
+            finish('loaded');
         };
         img.onerror = () => {
             if (timer) clearTimeout(timer);
             console.debug(`[AssetLoader] 图片加载失败（将尝试备选格式）: ${src}`);
-            finish(false);
+            finish('failed');
         };
         img.src = src;
         if (img.complete && settleFromDimensions()) {
@@ -1193,28 +1195,30 @@ async function preloadImageWithResult(src: string, timeoutMs?: number): Promise<
 const preloadFailCount = new Map<string, number>();
 const MAX_PRELOAD_RETRIES = 2;
 
-/** 正在加载中的 Promise 去重表，避免同一 URL 并发多次请求 */
-const inFlightPreloads = new Map<string, Promise<void>>();
+type ImagePreloadOutcome = 'loaded' | 'failed' | 'timeout';
 
-async function preloadOptimizedImage(src: string): Promise<void> {
+/** 正在加载中的 Promise 去重表，避免同一 URL 并发多次请求 */
+const inFlightPreloads = new Map<string, Promise<ImagePreloadOutcome>>();
+
+async function preloadOptimizedImage(src: string): Promise<ImagePreloadOutcome> {
     const { webp } = getOptimizedImageUrls(src);
-    if (!webp) return;
+    if (!webp) return 'failed';
     // 已成功加载过的跳过（naturalWidth > 0 表示真正加载成功）
     const cached = preloadedImages.get(webp);
-    if (cached && cached.naturalWidth > 0) return;
+    if (cached && cached.naturalWidth > 0) return 'loaded';
 
     // 优先吃内存缓存 / 同步磁盘缓存命中，避免刷新后因为运行时 Map 丢失而再次阻塞。
     if (probeSynchronousImageReady(webp)) {
-        return;
+        return 'loaded';
     }
 
     // 同一 URL 正在加载中 → 复用已有 Promise，不发新请求
     const inFlight = inFlightPreloads.get(webp);
     if (inFlight) return inFlight;
-    const promise = (async () => {
-        const ok = await preloadImageWithResult(webp, SINGLE_IMAGE_TIMEOUT_MS);
-        if (!ok) {
-            // 超时/失败：记录失败次数。
+    const promise = (async (): Promise<ImagePreloadOutcome> => {
+        const outcome = await preloadImageWithResult(webp, SINGLE_IMAGE_TIMEOUT_MS);
+        if (outcome === 'failed') {
+            // 失败：记录失败次数。
             // 只有真正失败（onerror，如 404）才累计；超时的图片仍在后台加载，
             // preloadImageWithResult 的超时回调会在加载完成后自动更新 preloadedImages。
             // 超过阈值后标记为已处理（空 Image 占位），避免持续 404 的图片
@@ -1228,6 +1232,7 @@ async function preloadOptimizedImage(src: string): Promise<void> {
                 }
             }
         }
+        return outcome;
     })();
     inFlightPreloads.set(webp, promise);
     promise.finally(() => inFlightPreloads.delete(webp));

@@ -5950,7 +5950,18 @@ describe('Betrayal Board foundation', () => {
         expect(screen.queryByTestId('betrayal-rabbit-foot-dice')).not.toBeInTheDocument();
         expect(screen.getByTestId('betrayal-discovery-panel')).toHaveAttribute('data-backdrop-dismiss', 'disabled');
         expect(screen.queryByTestId('betrayal-event-roll-finalize')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('betrayal-discovery-continue')).not.toBeInTheDocument();
+        const eventRollConfirm = screen.getByTestId('betrayal-discovery-continue');
+        expect(eventRollConfirm).toHaveTextContent('确认 0/1');
+        expect(eventRollConfirm).toHaveAttribute('data-event-roll-confirmed-count', '0');
+        expect(eventRollConfirm).toHaveAttribute('data-event-roll-required-count', '1');
+        expect(eventRollConfirm).not.toHaveAttribute('data-pending-card-resolution-step');
+        expectEventRollConfirmButtonStyle(eventRollConfirm);
+
+        fireEvent.click(eventRollConfirm);
+
+        await waitFor(() => {
+            expect(screen.queryByTestId('betrayal-discovery-panel')).not.toBeInTheDocument();
+        });
     });
 
     it('别人触发的普通事件投骰只要求触发者确认，观看方点击空白仍不能关闭发现面板', () => {

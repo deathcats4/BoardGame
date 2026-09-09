@@ -47,17 +47,22 @@ export const buildTutorialProgressSeed = (
     gameId: string | undefined,
     tutorialId: string | undefined,
     manifestId: string | null | undefined,
+    manifestRevision?: number | null,
 ): string | null => {
     const progressId = resolveTutorialProgressId(tutorialId, manifestId);
     if (!gameId || !progressId) {
         return null;
     }
 
-    return [
+    const seedParts = [
         TUTORIAL_PROGRESS_SEED_PREFIX,
         encodeTutorialProgressPart(gameId),
         encodeTutorialProgressPart(progressId),
-    ].join(':');
+    ];
+    if (Number.isInteger(manifestRevision) && (manifestRevision ?? 0) > 0) {
+        seedParts.push(`r${manifestRevision}`);
+    }
+    return seedParts.join(':');
 };
 
 export const readRestorableTutorialProgress = (args: {
@@ -71,7 +76,7 @@ export const readRestorableTutorialProgress = (args: {
         return null;
     }
 
-    const seed = buildTutorialProgressSeed(gameId, tutorialId, manifest.id);
+    const seed = buildTutorialProgressSeed(gameId, tutorialId, manifest.id, manifest.revision);
     if (!seed) {
         return null;
     }
@@ -86,6 +91,9 @@ export const readRestorableTutorialProgress = (args: {
         return null;
     }
     if (tutorial.manifestId !== manifest.id) {
+        return null;
+    }
+    if (Number.isInteger(manifest.revision) && tutorial.manifestRevision !== manifest.revision) {
         return null;
     }
     if (!Number.isInteger(tutorial.stepIndex) || tutorial.stepIndex <= 0) {
@@ -114,18 +122,25 @@ export const clearTutorialProgress = (args: {
     gameId?: string;
     tutorialId?: string;
     manifestId?: string | null;
+    manifestRevision?: number | null;
 }): void => {
-    const { gameId, tutorialId, manifestId } = args;
+    const { gameId, tutorialId, manifestId, manifestRevision } = args;
     if (!gameId) {
         return;
     }
 
-    const seed = buildTutorialProgressSeed(gameId, tutorialId, manifestId);
+    const seed = buildTutorialProgressSeed(gameId, tutorialId, manifestId, manifestRevision);
     if (!seed) {
         return;
     }
 
     clearLocalMatchSnapshot(gameId, seed);
+    if (Number.isInteger(manifestRevision) && (manifestRevision ?? 0) > 0) {
+        const legacySeed = buildTutorialProgressSeed(gameId, tutorialId, manifestId);
+        if (legacySeed && legacySeed !== seed) {
+            clearLocalMatchSnapshot(gameId, legacySeed);
+        }
+    }
 };
 
 export const notifyTutorialProgressStorageChanged = (): void => {
@@ -258,6 +273,7 @@ export function useMatchRoomTutorialLifecycle(args: UseMatchRoomTutorialLifecycl
     });
     const tutorialModalIdRef = useRef<string | null>(null);
     const currentManifestId = resolvedTutorialManifest?.id ?? null;
+    const currentManifestRevision = resolvedTutorialManifest?.revision ?? null;
     const activeTutorialManifestId = tutorial.manifestId ?? null;
     const currentManifestSteps = resolvedTutorialManifest?.steps ?? null;
     const currentManifestLastStepId = currentManifestSteps?.[currentManifestSteps.length - 1]?.id ?? null;
@@ -517,6 +533,7 @@ export function useMatchRoomTutorialLifecycle(args: UseMatchRoomTutorialLifecycl
                             gameId,
                             tutorialId,
                             manifestId: currentManifestId,
+                            manifestRevision: currentManifestRevision,
                         });
                     }
                     if (gameId && completedTutorialCatalogId) {
@@ -534,6 +551,7 @@ export function useMatchRoomTutorialLifecycle(args: UseMatchRoomTutorialLifecycl
     }, [
         completedTutorialCatalogId,
         currentManifestId,
+        currentManifestRevision,
         currentManifestLastStepId,
         gameId,
         isTutorialRoute,

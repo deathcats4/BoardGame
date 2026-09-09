@@ -1,0 +1,52 @@
+{
+  "mode": "dev-headed-real-browser",
+  "before": {
+    "hasCore": true,
+    "pendingEventRollResolution": true,
+    "acknowledgedCount": 0,
+    "requiredCount": 1,
+    "knowledge": 3,
+    "speed": 4,
+    "rabbitFootUsed": true,
+    "recentRollDice": [
+      2,
+      2,
+      0
+    ],
+    "recentRollRerolledDieIndex": 1,
+    "discoveryPanelVisible": true,
+    "finalConfirmVisible": true,
+    "finalConfirmText": "确认 0/1",
+    "finalConfirmRect": {
+      "left": 734.0000610351562,
+      "top": 712.3303833007812,
+      "width": 132,
+      "height": 62.000003814697266
+    },
+    "finalConfirmCenterHitTestId": "betrayal-discovery-continue"
+  },
+  "finalConfirmClick": {
+    "completed": true
+  },
+  "after": {
+    "hasCore": true,
+    "pendingEventRollResolution": false,
+    "acknowledgedCount": null,
+    "requiredCount": null,
+    "knowledge": 4,
+    "speed": 4,
+    "rabbitFootUsed": true,
+    "recentRollDice": [
+      2,
+      2,
+      0
+    ],
+    "recentRollRerolledDieIndex": 1,
+    "discoveryPanelVisible": false,
+    "finalConfirmVisible": false,
+    "finalConfirmText": null,
+    "finalConfirmRect": null,
+    "finalConfirmCenterHitTestId": null
+  },
+  "reproducedConfirm01Stuck": false
+}

@@ -16,6 +16,8 @@ import { BETRAYAL_DISCOVERY_POOLS } from '../scenarioConfig';
 import tutorialCatalog from '../tutorial';
 import { BETRAYAL_COMMANDS } from '../commands';
 import { resolveBetrayalHauntSpecialActionStatus } from '../hauntSpecialActionReadModel';
+import type { MatchState } from '../../../engine/types';
+import type { BetrayalCore } from '../game';
 import {
     acknowledgePendingCardResolution,
     applyBetrayalCommand,
@@ -343,6 +345,32 @@ describe('Betrayal 教程配置', () => {
         });
         expect(manifest?.steps.find((step) => step.id === 'confirm-omen-card')).toBeUndefined();
         expect(manifest?.steps.find((step) => step.id === 'banish-mummy')).toBeUndefined();
+    });
+
+    it('默认教程在兔脚已消费后会判定“使用兔脚”步骤过期', () => {
+        const manifest = tutorialCatalog.tutorials['basic-setup-and-turn']?.manifest;
+        const useRabbitFootStep = manifest?.steps.find((step) => step.id === 'use-rabbit-foot');
+        const rabbitFootResultStep = manifest?.steps.find((step) => step.id === 'rabbit-foot-result');
+        expect(useRabbitFootStep).toBeTruthy();
+        expect(rabbitFootResultStep).toBeTruthy();
+        const baseState = {
+            core: {
+                usedCardIdsThisTurn: [],
+                recentRoll: { consumedRabbitFootCardIds: [] },
+            },
+            sys: {},
+        } as MatchState<Partial<BetrayalCore>>;
+        const afterRabbitFootState = {
+            ...baseState,
+            core: {
+                usedCardIdsThisTurn: ['rope'],
+                recentRoll: { consumedRabbitFootCardIds: ['rope'] },
+            },
+        } as MatchState<Partial<BetrayalCore>>;
+
+        expect(manifest?.stepValidator?.(baseState, useRabbitFootStep!)).toBe(true);
+        expect(manifest?.stepValidator?.(afterRabbitFootState, useRabbitFootStep!)).toBe(false);
+        expect(manifest?.stepValidator?.(afterRabbitFootState, rabbitFootResultStep!)).toBe(true);
     });
 
     it('玩家可见教程注入态不使用测试专用假对象', () => {
@@ -1237,7 +1265,9 @@ describe('Betrayal 教程配置', () => {
         expect(basicSteps.useRabbitFoot).not.toContain('其他玩家确认');
         expect(basicSteps.useRabbitFoot).not.toContain('伤害');
         expect(basicSteps.rabbitFootResult).toContain('重掷完成');
-        expect(basicSteps.rabbitFootResult).toContain('公开投掷');
+        expect(basicSteps.rabbitFootResult).toContain('新的骰面');
+        expect(basicSteps.rabbitFootResult).toContain('总点数');
+        expect(basicSteps.rabbitFootResult).toContain('确认');
         expect(basicSteps.rabbitFootResult).toContain('伤害分配');
         expect(basicSteps.rabbitFootResult).not.toContain('其他玩家确认');
         expect(basicSteps.rabbitFootResult).not.toContain('确认 1/3');

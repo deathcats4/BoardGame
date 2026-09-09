@@ -7828,7 +7828,7 @@
     },
     "paladins_climb_the_holy_stairs": {
       "name": "Climb the Holy Stairs",
-      "effectText": "Play on one of your minions.\nOngoing: After this minion uses a talent ability, place a +1 power counter on this minion. Talent: If this minion has more than four +1 power counters and Seraphim is not in play, play Seraphim here and return this action to your hand."
+      "effectText": "Play on one of your minions.\nOngoing: After this minion uses a talent ability, place a +1 power counter on this minion. Talent: If this minion has power 4 or more and Seraphim is not in play, play Seraphim here and return this action to your hand."
     },
     "paladins_heavenly_soldiers_descend": {
       "name": "Heavenly Soldiers Descend",

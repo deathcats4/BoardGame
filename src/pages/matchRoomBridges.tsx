@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useGameClient } from '../engine/transport/react';
-import type { MatchState } from '../engine/types';
+import type { MatchState, TutorialManifest } from '../engine/types';
+import { TUTORIAL_COMMANDS } from '../engine/systems/TutorialSystem';
 import { useTutorial } from '../contexts/TutorialContext';
 import { useGameMode } from '../contexts/GameModeContext';
 import type { OnlineAiDebugWindow } from './onlineAiRuntimeSupport';
@@ -35,13 +36,23 @@ export type MatchRoomOnlineRuntimeDebugBridgeProps = {
     live: MatchRoomLiveDebugBridgeProps;
 };
 
-export const TutorialDispatchBridge = ({ children }: { children: ReactNode }) => {
+export const TutorialDispatchBridge = ({
+    children,
+    tutorialManifest,
+}: {
+    children: ReactNode;
+    tutorialManifest?: TutorialManifest | null;
+}) => {
     const { dispatch, state } = useGameClient();
     const { bindDispatch, unbindDispatch, syncTutorialState } = useTutorial();
     const gameMode = useGameMode();
     const isTutorialMode = gameMode?.mode === 'tutorial';
     const dispatchRef = useRef(dispatch);
     const contextRef = useRef({ bindDispatch, unbindDispatch, syncTutorialState });
+    const boundManifestRef = useRef<{
+        manifest: TutorialManifest | null;
+        stateKey: string | null;
+    }>({ manifest: null, stateKey: null });
 
     useEffect(() => {
         dispatchRef.current = dispatch;
@@ -64,6 +75,42 @@ export const TutorialDispatchBridge = ({ children }: { children: ReactNode }) =>
             contextRef.current.unbindDispatch(gen);
         };
     }, [isTutorialMode]);
+
+    useLayoutEffect(() => {
+        if (!isTutorialMode || !tutorialManifest) {
+            boundManifestRef.current = { manifest: null, stateKey: null };
+            return;
+        }
+
+        const tutorial = (state as MatchState | undefined)?.sys?.tutorial;
+        if (!tutorial?.active || tutorial.manifestId !== tutorialManifest.id) {
+            boundManifestRef.current = { manifest: null, stateKey: null };
+            return;
+        }
+        if (
+            Number.isInteger(tutorialManifest.revision)
+            && Number.isInteger(tutorial.manifestRevision)
+            && tutorial.manifestRevision !== tutorialManifest.revision
+        ) {
+            return;
+        }
+
+        const stateKey = [
+            tutorial.manifestId,
+            tutorial.manifestRevision ?? '',
+            tutorial.stepIndex,
+            tutorial.step?.id ?? '',
+        ].join(':');
+        if (
+            boundManifestRef.current.manifest === tutorialManifest
+            && boundManifestRef.current.stateKey === stateKey
+        ) {
+            return;
+        }
+
+        boundManifestRef.current = { manifest: tutorialManifest, stateKey };
+        dispatchRef.current(TUTORIAL_COMMANDS.BIND_MANIFEST, { manifest: tutorialManifest });
+    }, [isTutorialMode, state, tutorialManifest]);
 
     // 提前同步教程状态（Board 被 CriticalImageGate 阻塞时也能同步）
     const lastSyncRef = useRef<string | null>(null);

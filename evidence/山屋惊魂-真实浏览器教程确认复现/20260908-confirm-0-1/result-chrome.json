@@ -1,0 +1,161 @@
+{
+  "targetUrl": "http://127.0.0.1:4274/play/betrayal/tutorial/basic-setup-and-turn",
+  "startedAt": "2026-09-08T14:26:42.171Z",
+  "consoleErrors": [
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] START: 教程启动 {manifestId: basic-setup-and-turn, stepsCount: 44, firstStepId: setup-runtime}"
+    },
+    {
+      "type": "warning",
+      "text": "[AssetLoader] betrayal 关键图片预加载耗时 18575ms（83 张）"
+    },
+    {
+      "type": "warning",
+      "text": "🔴 [性能] 平均 25.5 FPS | P95 帧时 170.8ms — 严重掉帧"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: move-to-hallway, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: confirm-room-placement, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: roll-event, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "WARNING: Multiple instances of Three.js being imported."
+    },
+    {
+      "type": "warning",
+      "text": "🔴 [性能] 平均 24.0 FPS | P95 帧时 166.7ms — 严重掉帧"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-book, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: use-rabbit-foot, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: rabbit-foot-result, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: finish, advanceOnEvents: Array(1), receivedEvents: Array(1), eventCount: 1}"
+    },
+    {
+      "type": "warning",
+      "text": "[TutorialSystem] afterEvents: {stepId: finish, advanceOnEvents: Array(1), receivedEvents: Array(0), eventCount: 0}"
+    }
+  ],
+  "pageErrors": [],
+  "steps": [
+    {
+      "reached": "objective-and-turn"
+    },
+    {
+      "reached": "use-rabbit-foot"
+    }
+  ],
+  "endedAt": "2026-09-08T14:27:17.119Z",
+  "before": {
+    "tutorialStepId": null,
+    "tutorialStepIndex": null,
+    "pendingEventRollResolution": false,
+    "hasHarnessState": false,
+    "acknowledgedCount": null,
+    "requiredCount": null,
+    "knowledge": null,
+    "speed": null,
+    "recentRollDice": null,
+    "recentRollRerolledDieIndex": null,
+    "discoveryPanelVisible": true,
+    "damageAllocationVisible": false,
+    "finalConfirmVisible": true,
+    "finalConfirmText": "确认 0/1",
+    "finalConfirmRect": {
+      "left": 734.0000610351562,
+      "top": 712.3303833007812,
+      "width": 132,
+      "height": 62.000003814697266
+    },
+    "finalConfirmCenterHitTestId": "betrayal-discovery-continue"
+  },
+  "finalConfirmClick": {
+    "completed": true
+  },
+  "after": {
+    "tutorialStepId": null,
+    "tutorialStepIndex": null,
+    "pendingEventRollResolution": false,
+    "hasHarnessState": false,
+    "acknowledgedCount": null,
+    "requiredCount": null,
+    "knowledge": null,
+    "speed": null,
+    "recentRollDice": null,
+    "recentRollRerolledDieIndex": null,
+    "discoveryPanelVisible": false,
+    "damageAllocationVisible": true,
+    "finalConfirmVisible": false,
+    "finalConfirmText": null,
+    "finalConfirmRect": null,
+    "finalConfirmCenterHitTestId": null
+  },
+  "reproducedConfirm01Stuck": false
+}

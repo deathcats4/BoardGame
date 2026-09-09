@@ -115,6 +115,96 @@ describe('TutorialSystem', () => {
         expect(next?.error).toBe(TUTORIAL_ERRORS.STEP_LOCKED);
     });
 
+    it('PREVIOUS: 不受手动跳过限制，直接回到上一个玩家可见步骤', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'previous',
+            steps: [
+                { id: 'intro', content: 'intro' },
+                {
+                    id: 'ai-bridge',
+                    content: 'ai bridge',
+                    aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                },
+                { id: 'locked-action', content: 'locked action', requireAction: true },
+            ],
+        };
+        const state = createTestState();
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+        const atLockedAction: MatchState<TestCore> = {
+            ...started!.state!,
+            sys: {
+                ...started!.state!.sys,
+                undo: {
+                    ...started!.state!.sys.undo,
+                    snapshots: [{ before: 'tutorial-step-back' }],
+                },
+                tutorial: {
+                    ...started!.state!.sys.tutorial,
+                    stepIndex: 2,
+                    step: manifest.steps[2],
+                    allowManualSkip: false,
+                },
+            },
+        };
+
+        const previous = sys.beforeCommand?.({
+            state: atLockedAction,
+            command: { type: TUTORIAL_COMMANDS.PREVIOUS, playerId: '0', payload: {} },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(previous?.halt).toBe(true);
+        expect(previous?.error).toBeUndefined();
+        expect(previous?.state?.sys.tutorial.stepIndex).toBe(0);
+        expect(previous?.state?.sys.tutorial.step?.id).toBe('intro');
+        expect(previous?.state?.sys.undo.snapshots).toEqual([{ before: 'tutorial-step-back' }]);
+        expect(previous?.events).toContainEqual(
+            expect.objectContaining({
+                type: TUTORIAL_EVENTS.STEP_CHANGED,
+                payload: expect.objectContaining({ from: 2, to: 0, stepId: 'intro' }),
+            }),
+        );
+    });
+
+    it('PREVIOUS: 第一张教程卡没有上一步时保持当前步骤且不报错', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'previous-at-start',
+            steps: [{ id: 'intro', content: 'intro' }],
+        };
+        const state = createTestState();
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        const previous = sys.beforeCommand?.({
+            state: started!.state!,
+            command: { type: TUTORIAL_COMMANDS.PREVIOUS, playerId: '0', payload: {} },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(previous?.halt).toBe(true);
+        expect(previous?.error).toBeUndefined();
+        expect(previous?.state?.sys.tutorial.stepIndex).toBe(0);
+        expect(previous?.state?.sys.tutorial.step?.id).toBe('intro');
+        expect(previous?.events).toBeUndefined();
+    });
+
     it('afterEvents: 命中 advanceOnEvents 推进步骤', () => {
         const manifest: TutorialManifest = {
             id: 'advance',
@@ -368,6 +458,148 @@ describe('TutorialSystem', () => {
         });
         expect(blocked?.halt).toBe(true);
         expect(blocked?.error).toBe(TUTORIAL_ERRORS.COMMAND_BLOCKED);
+    });
+
+    it('beforeCommand: 当前步骤已过期时先推进，再按新步骤白名单判断玩家命令', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'stale-before-command',
+            steps: [
+                {
+                    id: 'choose-reroll',
+                    content: 'choose die',
+                    requireAction: true,
+                    allowedCommands: ['USE_REROLL'],
+                    advanceOnEvents: [{ type: 'REROLLED' }],
+                },
+                {
+                    id: 'confirm-reroll-result',
+                    content: 'confirm result',
+                    requireAction: true,
+                    allowedCommands: ['CONFIRM_ROLL'],
+                    advanceOnEvents: [{ type: 'ROLL_CONFIRMED' }],
+                },
+            ],
+            stepValidator: (st, step) => {
+                if (step.id === 'choose-reroll') {
+                    return (st as MatchState<TestCore>).core.value === 0;
+                }
+                return true;
+            },
+        };
+        const state = createTestState();
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+        const staleState: MatchState<TestCore> = {
+            ...started!.state!,
+            core: { value: 1 },
+        };
+
+        const result = sys.beforeCommand?.({
+            state: staleState,
+            command: { type: 'CONFIRM_ROLL', playerId: '0', payload: {} },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(result?.halt).not.toBe(true);
+        expect(result?.error).toBeUndefined();
+        expect(result?.state?.sys.tutorial.step?.id).toBe('confirm-reroll-result');
+        expect(result?.events).toContainEqual(
+            expect.objectContaining({
+                type: TUTORIAL_EVENTS.STEP_CHANGED,
+                payload: expect.objectContaining({
+                    from: 0,
+                    to: 1,
+                    stepId: 'confirm-reroll-result',
+                }),
+            }),
+        );
+    });
+
+    it('BIND_MANIFEST: 恢复快照后重新绑定 validator，并立即推进过期步骤', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'restored-stale-before-command',
+            steps: [
+                {
+                    id: 'choose-reroll',
+                    content: 'choose die',
+                    requireAction: true,
+                    allowedCommands: ['USE_REROLL'],
+                    advanceOnEvents: [{ type: 'REROLLED' }],
+                },
+                {
+                    id: 'confirm-reroll-result',
+                    content: 'confirm result',
+                    requireAction: true,
+                    allowedCommands: ['CONFIRM_ROLL'],
+                    advanceOnEvents: [{ type: 'ROLL_CONFIRMED' }],
+                },
+            ],
+            stepValidator: (st, step) => {
+                if (step.id === 'choose-reroll') {
+                    return (st as MatchState<TestCore>).core.value === 0;
+                }
+                return true;
+            },
+        };
+        const restoredState: MatchState<TestCore> = {
+            ...createTestState(),
+            core: { value: 1 },
+            sys: {
+                ...createTestState().sys,
+                tutorial: {
+                    active: true,
+                    manifestId: manifest.id,
+                    stepIndex: 0,
+                    steps: JSON.parse(JSON.stringify(manifest.steps)),
+                    step: JSON.parse(JSON.stringify(manifest.steps[0])),
+                    allowManualSkip: false,
+                },
+            },
+        };
+
+        const bound = sys.beforeCommand?.({
+            state: restoredState,
+            command: { type: TUTORIAL_COMMANDS.BIND_MANIFEST, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(bound?.halt).toBe(true);
+        expect(bound?.error).toBeUndefined();
+        expect(bound?.state?.sys.tutorial.step?.id).toBe('confirm-reroll-result');
+        expect(bound?.events).toContainEqual(
+            expect.objectContaining({
+                type: TUTORIAL_EVENTS.STEP_CHANGED,
+                payload: expect.objectContaining({
+                    from: 0,
+                    to: 1,
+                    stepId: 'confirm-reroll-result',
+                }),
+            }),
+        );
+
+        const result = sys.beforeCommand?.({
+            state: bound?.state ?? restoredState,
+            command: { type: 'CONFIRM_ROLL', playerId: '0', payload: {} },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(result?.halt).not.toBe(true);
+        expect(result?.error).toBeUndefined();
+        expect(result?.state).toBeUndefined();
+        expect(result?.events).toBeUndefined();
     });
 
     describe('stepValidator', () => {

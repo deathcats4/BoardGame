@@ -95,13 +95,10 @@ describe('DiceBoxPhysicsSource', () => {
                 expect(createEngineMock).toHaveBeenCalledTimes(1);
             });
             await waitFor(() => {
-                expect(engineMock.rerollToValues).toHaveBeenCalledWith([0], [6], []);
+                expect(engineMock.rollToValues).toHaveBeenCalledWith([6]);
             });
-            expect(engineMock.restoreValues).toHaveBeenCalledWith([6]);
-            expect(engineMock.rollToValues).not.toHaveBeenCalled();
-            expect(
-                engineMock.restoreValues.mock.invocationCallOrder[0],
-            ).toBeLessThan(engineMock.rerollToValues.mock.invocationCallOrder[0]);
+            expect(engineMock.restoreValues).not.toHaveBeenCalled();
+            expect(engineMock.rerollToValues).not.toHaveBeenCalled();
         } finally {
             HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
             Object.defineProperty(globalThis, 'ResizeObserver', {

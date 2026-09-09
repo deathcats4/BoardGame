@@ -416,7 +416,7 @@ describe('mage-wars event FX mapper', () => {
         });
     });
 
-    it('maps ordinary mage movement to a leftward same-row move cue', () => {
+    it('does not map single-zone ordinary mage movement to a visible FX cue', () => {
         const core = MageWarsDomain.setup(['0', '1'], fixedRandom);
 
         const instruction = mapMageWarsEventToFx(createEntry({
@@ -429,29 +429,10 @@ describe('mage-wars event FX mapper', () => {
             timestamp: 9,
         }), core);
 
-        expect(instruction).toMatchObject({
-            cue: MW_FX.MOVE,
-            ctx: {
-                cell: getArenaCell(core, ARENA_ZONE_IDS.B2),
-                intensity: 'normal',
-            },
-            params: {
-                source: getArenaCell(core, ARENA_ZONE_IDS.C2),
-                playerId: '0',
-                targetPlayerId: '0',
-                fromZoneId: ARENA_ZONE_IDS.C2,
-                toZoneId: ARENA_ZONE_IDS.B2,
-                movementMode: 'normal',
-            },
-        });
-        expect(instruction?.params?.source).toMatchObject({
-            row: instruction.ctx.cell?.row,
-            col: expect.any(Number),
-        });
-        expect((instruction?.params?.source as { col: number }).col).toBeGreaterThan(instruction?.ctx.cell?.col ?? Number.POSITIVE_INFINITY);
+        expect(instruction).toBeNull();
     });
 
-    it('maps ordinary arena object movement to a leftward same-row move cue', () => {
+    it('does not map single-zone ordinary arena object movement to a visible FX cue', () => {
         const core = MageWarsDomain.setup(['0', '1'], fixedRandom);
 
         const instruction = mapMageWarsEventToFx(createEntry({
@@ -466,24 +447,81 @@ describe('mage-wars event FX mapper', () => {
             timestamp: 10,
         }), core);
 
+        expect(instruction).toBeNull();
+    });
+
+    it('maps multi-zone ordinary arena object movement to a local move cue', () => {
+        const core = MageWarsDomain.setup(['0', '1'], fixedRandom);
+
+        const instruction = mapMageWarsEventToFx(createEntry({
+            type: MAGE_WARS_EVENTS.ARENA_OBJECT_MOVED,
+            payload: {
+                ownerId: '0',
+                objectId: 'mwobj-long-moving-cat',
+                fromZoneId: ARENA_ZONE_IDS.C2,
+                toZoneId: ARENA_ZONE_IDS.A2,
+                movementMode: 'normal',
+            },
+            timestamp: 10,
+        }), core);
+
         expect(instruction).toMatchObject({
             cue: MW_FX.MOVE,
             ctx: {
-                cell: getArenaCell(core, ARENA_ZONE_IDS.B2),
+                cell: getArenaCell(core, ARENA_ZONE_IDS.A2),
                 intensity: 'normal',
             },
             params: {
                 source: getArenaCell(core, ARENA_ZONE_IDS.C2),
                 ownerId: '0',
-                objectId: 'mwobj-left-moving-cat',
-                targetObjectId: 'mwobj-left-moving-cat',
+                objectId: 'mwobj-long-moving-cat',
+                targetObjectId: 'mwobj-long-moving-cat',
                 fromZoneId: ARENA_ZONE_IDS.C2,
-                toZoneId: ARENA_ZONE_IDS.B2,
+                toZoneId: ARENA_ZONE_IDS.A2,
                 movementMode: 'normal',
             },
         });
-        expect((instruction?.params?.source as { row: number }).row).toBe(instruction?.ctx.cell?.row);
-        expect((instruction?.params?.source as { col: number }).col).toBeGreaterThan(instruction?.ctx.cell?.col ?? Number.POSITIVE_INFINITY);
+        const source = instruction?.params?.source as { row: number; col: number };
+        const target = instruction?.ctx.cell;
+        expect(target).toBeDefined();
+        expect(Math.abs(source.row - target!.row) + Math.abs(source.col - target!.col)).toBe(2);
+    });
+
+    it('maps teleport-mode arena object movement to teleport FX instead of ordinary move trail', () => {
+        const core = MageWarsDomain.setup(['0', '1'], fixedRandom);
+
+        const instruction = mapMageWarsEventToFx(createEntry({
+            type: MAGE_WARS_EVENTS.ARENA_OBJECT_MOVED,
+            payload: {
+                ownerId: '0',
+                objectId: 'mwobj-blue-gremlin',
+                fromZoneId: ARENA_ZONE_IDS.A1,
+                toZoneId: ARENA_ZONE_IDS.C2,
+                movementMode: 'teleport',
+                actionCost: 'normal',
+                sourceAbilityId: 'mw.object.2822.swift-teleport',
+            },
+            timestamp: 11,
+        }), core);
+
+        expect(instruction).toMatchObject({
+            cue: MW_FX.SPELL_TELEPORT,
+            ctx: {
+                cell: getArenaCell(core, ARENA_ZONE_IDS.C2),
+                intensity: 'strong',
+            },
+            params: {
+                source: getArenaCell(core, ARENA_ZONE_IDS.A1),
+                objectId: 'mwobj-blue-gremlin',
+                targetObjectId: 'mwobj-blue-gremlin',
+                fromZoneId: ARENA_ZONE_IDS.A1,
+                toZoneId: ARENA_ZONE_IDS.C2,
+                movementMode: 'teleport',
+                sourceAbilityId: 'mw.object.2822.swift-teleport',
+                distance: 3,
+            },
+        });
+        expect(instruction?.cue).not.toBe(MW_FX.MOVE);
     });
 
     it('maps healing roll events to a visible healing impact cue at the healed object', () => {

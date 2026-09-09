@@ -1,4 +1,5 @@
 import {
+    useEffect,
     useLayoutEffect,
     useId,
     useMemo,
@@ -160,6 +161,20 @@ const MAGE_WARS_LOCAL_PLANNING_TUTORIAL_STEP_IDS = new Set([
     'plan-incantation-next-page',
     'plan-select-rouse',
 ]);
+
+function resolveMageWarsTutorialPlanningDraftCardIds(stepId?: string): number[] {
+    if (
+        stepId === 'plan-open-incantation-category'
+        || stepId === 'plan-incantation-next-page'
+        || stepId === 'plan-select-rouse'
+    ) {
+        return [MAGE_WARS_TUTORIAL_JUNGLE_WOLF_CARD_ID];
+    }
+    if (stepId === 'plan-confirm') {
+        return [MAGE_WARS_TUTORIAL_JUNGLE_WOLF_CARD_ID, MAGE_WARS_TUTORIAL_ROUSE_THE_BEAST_CARD_ID];
+    }
+    return [];
+}
 // 与大杀四方手牌放大镜同量级：2vw / 8.5vw ≈ 23.5% 卡宽；用卡牌容器宽度自适应，避免 16:9 放大后图标相对变小。
 const MAGE_WARS_REFERENCE_INSPECT_BUTTON_SIZE = 'clamp(28px, 18.5cqw, 34px)';
 const MAGE_WARS_REFERENCE_INSPECT_ICON_SIZE = 'clamp(15px, 10cqw, 19px)';
@@ -306,11 +321,13 @@ function CardInspectButton({
     title,
     sourceCardId,
     compact = false,
+    alwaysVisible = false,
     onInspect,
 }: {
     title: string;
     sourceCardId?: number;
     compact?: boolean;
+    alwaysVisible?: boolean;
     onInspect: () => void;
 }) {
     const { t } = useTranslation('game-mage-wars');
@@ -330,8 +347,11 @@ function CardInspectButton({
         <button
             type="button"
             className={cx(
-                'pointer-events-auto absolute right-1 top-1 z-40 grid place-items-center rounded-full border border-amber-100/55 bg-black/74 text-amber-50 shadow-[0_6px_14px_rgba(0,0,0,0.5)] transition hover:border-amber-100 hover:bg-amber-300 hover:text-stone-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-100',
+                'absolute right-1 top-1 z-40 grid place-items-center rounded-full border border-amber-100/55 bg-black/74 text-amber-50 shadow-[0_6px_14px_rgba(0,0,0,0.5)] transition-[opacity,border-color,background-color,color] duration-150 hover:border-amber-100 hover:bg-amber-300 hover:text-stone-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-100',
                 compact && 'h-5 w-5',
+                alwaysVisible
+                    ? 'pointer-events-auto opacity-100'
+                    : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100',
             )}
             style={referenceButtonStyle}
             data-testid="mage-wars-card-inspect-button"
@@ -926,7 +946,7 @@ function MageHud({
     if (!compact) {
         const hintCard = (
             <div
-                className="pointer-events-none relative flex-none rounded-[0.2rem]"
+                className="group pointer-events-auto relative flex-none rounded-[0.2rem]"
                 style={fullHintCardStyle}
                 data-testid="mage-wars-mage-hud-hint-card"
                 data-mage-preview-kind="card"
@@ -1014,7 +1034,7 @@ function MageHud({
             aria-label={`${self ? t('player.you') : t('player.opponent')} ${mageLabel}`}
         >
             <div
-                className="pointer-events-none relative flex-none rounded-[0.2rem]"
+                className="group pointer-events-auto relative flex-none rounded-[0.2rem]"
                 style={compactHintCardStyle}
                 data-testid="mage-wars-mage-hud-hint-card"
                 data-mage-preview-kind="card"
@@ -1175,7 +1195,7 @@ function PreparedSpellCard({
     if (canInteract) {
         if (hasSecondaryInspect) {
             return (
-                <div className={cx('relative shrink-0 overflow-visible', cardSizeClass)} style={cardSizeStyle}>
+                <div className={cx('group relative shrink-0 overflow-visible', cardSizeClass)} style={cardSizeStyle}>
                     <button
                         type="button"
                         className={cx(
@@ -1401,7 +1421,7 @@ function ZoneFieldCard({
             data-visual-held={visualHeld ? 'true' : undefined}
             data-action-ready={object ? String(object.actionReady) : undefined}
             data-action-token-state={object?.kind === 'creature' ? (object.actionReady ? 'ready' : 'spent') : undefined}
-            data-browse-inspectable={onInspect ? 'true' : undefined}
+            data-browse-inspectable={!onClick && onInspect ? 'true' : undefined}
             data-secondary-inspect={hasSecondaryInspect ? 'true' : undefined}
             data-primary-action={onClick ? 'true' : undefined}
         >
@@ -1416,7 +1436,7 @@ function ZoneFieldCard({
     );
 
     return (
-        <div className={cx('relative z-20 shrink-0 overflow-visible', cardHeightClass)} style={cardSizeStyle}>
+        <div className={cx('group relative z-20 shrink-0 overflow-visible', cardHeightClass)} style={cardSizeStyle}>
             {primaryButton}
             {hasSecondaryInspect ? (
                 <CardInspectButton
@@ -1503,7 +1523,7 @@ function ArenaAttachmentCard({
         'data-owner-side': ownerSide,
         'data-attachment-kind': object.kind,
         'data-attachment-role': role,
-        'data-browse-inspectable': onInspect ? 'true' : undefined,
+        'data-browse-inspectable': !onClick && onInspect ? 'true' : undefined,
         'data-secondary-inspect': hasSecondaryInspect ? 'true' : undefined,
     };
 
@@ -1527,7 +1547,7 @@ function ArenaAttachmentCard({
         );
 
         return (
-            <div className={cx('relative shrink-0 overflow-visible', heightClass)} style={cardSizeStyle}>
+            <div className={cx('group relative shrink-0 overflow-visible', heightClass)} style={cardSizeStyle}>
                 {primaryButton}
                 {hasSecondaryInspect ? (
                     <CardInspectButton
@@ -1543,7 +1563,7 @@ function ArenaAttachmentCard({
 
     return (
         <div
-            className={cx('relative shrink-0 overflow-visible', heightClass)}
+            className={cx('group relative shrink-0 overflow-visible', heightClass)}
             ref={fxAnchorRef as (element: HTMLDivElement | null) => void}
             style={cardSizeStyle}
         >
@@ -3474,7 +3494,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
         sys: G.sys,
     });
     useTutorialBridge(G.sys.tutorial, dispatch, tutorialRuntimeSyncKey);
-    const { isActive: isTutorialActive, currentStep: tutorialStep, nextStep } = useTutorial();
+    const { isActive: isTutorialActive, currentStep: tutorialStep, nextStep, previousStep } = useTutorial();
     const boardTutorialStep = G.sys.tutorial.step ?? G.sys.tutorial.steps[G.sys.tutorial.stepIndex] ?? tutorialStep;
     const boardTutorialActive = isTutorialActive || G.sys.tutorial.active;
     const boardTutorialHighlightTarget = boardTutorialActive ? boardTutorialStep?.highlightTarget : undefined;
@@ -3499,6 +3519,14 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
         && canAct
         && canPlanSpells
         && selectedPlanningSpellCardIds.length > 0;
+    useEffect(() => {
+        if (!boardTutorialActive || phase !== 'planning' || viewingPlayerId !== '0') return;
+        const restoredCardIds = resolveMageWarsTutorialPlanningDraftCardIds(boardTutorialStep?.id);
+        if (restoredCardIds.length === 0) return;
+        setSelectedPlanningSpellCardIds((current) => (
+            current.length > 0 ? current : restoredCardIds
+        ));
+    }, [boardTutorialActive, boardTutorialStep?.id, phase, viewingPlayerId]);
     const togglePublicViewTarget = (targetPlayerId: PlayerId | null) => {
         if (!targetPlayerId || targetPlayerId === viewingPlayerId) {
             setPublicViewTargetPlayerId(null);
@@ -3520,7 +3548,22 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
         setSelectedPlanningSpellCardIds([]);
     };
     const removePlanningDraftAtSlot = (slotIndex: number) => {
+        const removedCardId = selectedPlanningSpellCardIds[slotIndex];
         setSelectedPlanningSpellCardIds((current) => current.filter((_, index) => index !== slotIndex));
+        if (
+            isTutorialActive
+            && tutorialStep?.id === 'plan-open-incantation-category'
+            && removedCardId === MAGE_WARS_TUTORIAL_JUNGLE_WOLF_CARD_ID
+        ) {
+            previousStep();
+        }
+        if (
+            isTutorialActive
+            && tutorialStep?.id === 'plan-confirm'
+            && removedCardId === MAGE_WARS_TUTORIAL_ROUSE_THE_BEAST_CARD_ID
+        ) {
+            previousStep();
+        }
     };
     const completeLocalTutorialStep = (expectedStepId: string) => {
         if (isTutorialActive && tutorialStep?.id === expectedStepId) {

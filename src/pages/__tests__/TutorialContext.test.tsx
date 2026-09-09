@@ -119,6 +119,23 @@ describe('TutorialContext', () => {
         vi.useRealTimers();
     });
 
+    it('previousStep 只分发教程上一步命令', () => {
+        const dispatched: Array<{ type: string; payload?: unknown }> = [];
+        const { result } = renderHook(() => useTutorial(), { wrapper });
+
+        act(() => {
+            result.current.bindDispatch((type, payload) => {
+                dispatched.push({ type, payload });
+            });
+            result.current.previousStep();
+        });
+
+        expect(dispatched).toContainEqual({
+            type: TUTORIAL_COMMANDS.PREVIOUS,
+            payload: {},
+        });
+    });
+
     it('命令桥就绪后可以先启动教程，但真实 Board 挂载前不会执行 AI 动作', async () => {
         const manifest = makeManifest();
         const dispatched: Array<{ type: string; payload?: unknown }> = [];

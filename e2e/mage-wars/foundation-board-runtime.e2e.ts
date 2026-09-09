@@ -632,6 +632,7 @@ async function expectMageWarsArenaFreeViewport(
         const shellRect = shellElement?.getBoundingClientRect();
         const contentRect = contentElement?.getBoundingClientRect();
         const bottomGridRect = bottomGridElement?.getBoundingClientRect();
+        const scaleBadgeText = document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]')?.textContent?.trim() ?? null;
         if (!viewportRect || !shellRect || !contentRect) return null;
         const tolerance = 2;
         const zoneDetails = arenaZones.map((zone) => {
@@ -661,11 +662,12 @@ async function expectMageWarsArenaFreeViewport(
             contentRatio: contentRect.width / contentRect.height,
             viewportWidth: viewportRect.width,
             viewportHeight: viewportRect.height,
-            contentCoversViewport: contentRect.left <= viewportRect.left + tolerance
-                && contentRect.top <= viewportRect.top + tolerance
-                && contentRect.right >= viewportRect.right - tolerance
-                && contentRect.bottom >= viewportRect.bottom - tolerance,
+            contentInsideViewport: contentRect.left >= viewportRect.left - tolerance
+                && contentRect.top >= viewportRect.top - tolerance
+                && contentRect.right <= viewportRect.right + tolerance
+                && contentRect.bottom <= viewportRect.bottom + tolerance,
             transform: contentElement.style.transform,
+            scaleBadgeText,
             scale: scaleMatch ? Number(scaleMatch[1]) : 1,
             zoneIds: zoneDetails.map((zone) => zone.zoneId).sort(),
             zonesOutsideViewport: zoneDetails.filter((zone) => !zone.insideViewport).map((zone) => zone.zoneId),
@@ -679,10 +681,10 @@ async function expectMageWarsArenaFreeViewport(
     expect(defaultAudit!.shellBottom, '竞技场视窗下边必须贴齐屏幕，不能留下外层黑带').toBeGreaterThanOrEqual(defaultAudit!.windowHeight - 1);
     expect(defaultAudit!.shellRatio, '竞技场视窗不能再是 4:3 小框，必须占用整块牌桌地图层').toBeGreaterThan(1.7);
     expect(Math.abs(defaultAudit!.contentRatio - 4 / 3), '默认地图必须保持正式竞技场比例').toBeLessThanOrEqual(0.01);
-    expect(defaultAudit!.contentWidth, '默认地图内容宽度必须覆盖真实视口，不能被底部 HUD 避让压成中间小框').toBeGreaterThanOrEqual(defaultAudit!.viewportWidth - 2);
-    expect(defaultAudit!.contentHeight, '默认地图内容高度必须覆盖真实视口，不能被底部 HUD 避让压成中间小框').toBeGreaterThanOrEqual(defaultAudit!.viewportHeight - 2);
-    expect(defaultAudit!.contentCoversViewport, '默认地图内容必须铺满真实视窗，不能露出外层黑框').toBe(true);
+    expect(defaultAudit!.scaleBadgeText, '默认地图缩放读数必须显示 60%').toBe('60%');
+    expect(defaultAudit!.contentInsideViewport, '默认 60% 地图必须完整落在视窗内，不能裁切竞技场全貌').toBe(true);
     expect(defaultAudit!.zoneIds).toEqual(['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'd1', 'd2', 'd3']);
+    expect(defaultAudit!.zonesOutsideViewport, '默认 60% 地图必须显示全部 12 个竞技场区域').toEqual([]);
 
     await viewport.hover();
     for (let wheelIndex = 0; wheelIndex < 14; wheelIndex += 1) {
@@ -932,6 +934,9 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
             bottomGridLayoutSource: document
                 .querySelector<HTMLElement>('[data-testid="mage-wars-bottom-viewport-grid"]')
                 ?.getAttribute('data-mage-wars-layout-source') ?? null,
+            scaleBadgeText: document
+                .querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]')
+                ?.textContent?.trim() ?? null,
             legacyScaledHudLayerCount: document.querySelectorAll('[data-mage-wars-layout-source="desktop-scaled"]').length,
             categoryButtons,
             arenaZones,
@@ -958,11 +963,16 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
     expect(layoutAudit.rects.arenaViewport!.y, 'arena viewport must start at the screen top edge').toBeLessThanOrEqual(1);
     expect(layoutAudit.rects.arenaViewport!.width, 'arena viewport must fill the wide desktop width').toBeGreaterThanOrEqual(layoutAudit.viewport.width - 2);
     expect(layoutAudit.rects.arenaViewport!.height, 'arena viewport must fill the wide desktop height').toBeGreaterThanOrEqual(layoutAudit.viewport.height - 2);
-    expect(layoutAudit.rects.arenaStage!.x, '默认地图内容必须覆盖真实视口左边，不得缩在中间框').toBeLessThanOrEqual(1);
-    expect(layoutAudit.rects.arenaStage!.y, '默认地图内容必须覆盖真实视口顶部，不得缩在中间框').toBeLessThanOrEqual(1);
-    expect(layoutAudit.rects.arenaStage!.right, '默认地图内容必须覆盖真实视口右边').toBeGreaterThanOrEqual(layoutAudit.viewport.width - 1);
-    expect(layoutAudit.rects.arenaStage!.bottom, '默认地图内容必须覆盖真实视口底部，底部 UI 作为叠加层而不是地图裁剪边界').toBeGreaterThanOrEqual(layoutAudit.viewport.height - 1);
+    expect(layoutAudit.scaleBadgeText, '默认地图缩放读数必须显示 60%').toBe('60%');
+    expect(layoutAudit.rects.arenaStage!.x, '默认 60% 地图左边必须完整留在真实视口内').toBeGreaterThanOrEqual(-2);
+    expect(layoutAudit.rects.arenaStage!.y, '默认 60% 地图顶部必须完整留在真实视口内').toBeGreaterThanOrEqual(-2);
+    expect(layoutAudit.rects.arenaStage!.right, '默认 60% 地图右边必须完整留在真实视口内').toBeLessThanOrEqual(layoutAudit.viewport.width + 2);
+    expect(layoutAudit.rects.arenaStage!.bottom, '默认 60% 地图底部必须完整留在真实视口内').toBeLessThanOrEqual(layoutAudit.viewport.height + 2);
     expect(layoutAudit.arenaZones.map((zone) => zone.zoneId).sort()).toEqual(['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'd1', 'd2', 'd3']);
+    expect(
+        layoutAudit.arenaZones.filter((zone) => !zone.insideViewport).map((zone) => zone.zoneId),
+        '默认 60% 地图必须显示全部 12 个竞技场区域',
+    ).toEqual([]);
 
     const screenBoundRects = [
         ['board', layoutAudit.rects.board],
@@ -1854,6 +1864,14 @@ test.describe('Mage Wars foundation runtime board', () => {
             const arenaZoneDetails = arenaZones.map((zone) => ({
                 zoneId: zone.getAttribute('data-testid')?.replace('mage-wars-arena-zone-', '') ?? null,
                 rect: toRect(zone),
+                insideViewport: (() => {
+                    const rect = toRect(zone);
+                    return Boolean(rect
+                        && rect.x >= -2
+                        && rect.y >= -2
+                        && rect.right <= window.innerWidth + 2
+                        && rect.bottom <= window.innerHeight + 2);
+                })(),
             }));
             const fieldCardDetails = fieldCards.map((card) => {
                 const cardRect = card.getBoundingClientRect();
@@ -1921,6 +1939,9 @@ test.describe('Mage Wars foundation runtime board', () => {
                 viewportHeight: window.innerHeight,
                 arenaStage: toRect(arenaStage),
                 arenaViewport: toRect(arenaViewport),
+                scaleBadgeText: document
+                    .querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]')
+                    ?.textContent?.trim() ?? null,
                 hudAnchorLayer: toRect(hudAnchorLayer),
                 bottomViewportGrid: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-bottom-viewport-grid"]')),
                 hudAnchorLayoutSource: hudAnchorLayer?.getAttribute('data-mage-wars-layout-source') ?? null,
@@ -2263,10 +2284,15 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.arenaViewport!.y, '地图视窗必须贴齐屏幕顶部，不能再被 16:9 内框限制').toBeLessThanOrEqual(1);
         expect(desktopLayoutAudit.arenaViewport!.right, '地图视窗必须覆盖屏幕右边').toBeGreaterThanOrEqual(desktopLayoutAudit.viewportWidth - 1);
         expect(desktopLayoutAudit.arenaViewport!.bottom, '地图视窗必须覆盖屏幕底部').toBeGreaterThanOrEqual(desktopLayoutAudit.viewportHeight - 1);
-        expect(desktopLayoutAudit.arenaStage!.x, '默认地图内容必须覆盖真实视口左边，不得缩在中间框').toBeLessThanOrEqual(1);
-        expect(desktopLayoutAudit.arenaStage!.y, '默认地图内容必须覆盖真实视口顶部，不得缩在中间框').toBeLessThanOrEqual(1);
-        expect(desktopLayoutAudit.arenaStage!.right, '默认地图内容必须覆盖真实视口右边').toBeGreaterThanOrEqual(desktopLayoutAudit.viewportWidth - 1);
-        expect(desktopLayoutAudit.arenaStage!.bottom, '默认地图内容必须覆盖真实视口底部，底部 UI 作为叠加层而不是地图裁剪边界').toBeGreaterThanOrEqual(desktopLayoutAudit.viewportHeight - 1);
+        expect(desktopLayoutAudit.scaleBadgeText, '默认地图缩放读数必须显示 60%').toBe('60%');
+        expect(desktopLayoutAudit.arenaStage!.x, '默认 60% 地图左边必须完整留在真实视口内').toBeGreaterThanOrEqual(-2);
+        expect(desktopLayoutAudit.arenaStage!.y, '默认 60% 地图顶部必须完整留在真实视口内').toBeGreaterThanOrEqual(-2);
+        expect(desktopLayoutAudit.arenaStage!.right, '默认 60% 地图右边必须完整留在真实视口内').toBeLessThanOrEqual(desktopLayoutAudit.viewportWidth + 2);
+        expect(desktopLayoutAudit.arenaStage!.bottom, '默认 60% 地图底部必须完整留在真实视口内').toBeLessThanOrEqual(desktopLayoutAudit.viewportHeight + 2);
+        expect(
+            desktopLayoutAudit.arenaZones.filter((zone) => !zone.insideViewport).map((zone) => zone.zoneId),
+            '默认 60% 地图必须显示全部 12 个竞技场区域',
+        ).toEqual([]);
         expect(Math.abs(
             desktopLayoutAudit.arenaStage!.width / desktopLayoutAudit.arenaStage!.height
             - 4 / 3,

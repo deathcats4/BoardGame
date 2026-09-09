@@ -10,11 +10,11 @@ export const BETRAYAL_HOUSE_DICE_STYLE_PROFILE = {
   soundMaterial: "plastic",
   colorSpotlight: 0xf4df9a,
   shadows: true,
-  gravityMultiplier: 540,
+  gravityMultiplier: 400,
   lightIntensity: 1.08,
   baseScale: 64,
   cameraZoom: 0.9,
-  strength: 0.58,
+  strength: 0.16,
   iterationLimit: 900,
   projectedLayoutMargin: 18,
   projectedLayoutMinGap: 12,
@@ -53,13 +53,13 @@ export const BETRAYAL_HOUSE_D6_FACE_TO_RULE_VALUE: Record<number, 0 | 1 | 2> = {
 };
 
 export const BETRAYAL_REROLL_HIGHLIGHT_CANDIDATE_COLOR = 0x00e7ff;
-export const BETRAYAL_REROLL_HIGHLIGHT_SELECTED_COLOR = 0xffd447;
+export const BETRAYAL_REROLL_HIGHLIGHT_SELECTED_COLOR = 0xff2dfb;
 export const BETRAYAL_REROLL_HIGHLIGHT_RENDERER =
   "threejs-backside-shader-shell";
 export const BETRAYAL_REROLL_VISUAL_CONTRACT =
-  "projected-face-svg-outline-plus-threejs-shell";
+  "threejs-shader-shell-plus-transparent-hitbox";
 export const BETRAYAL_REROLL_HIGHLIGHT_CANDIDATE_SCALE = 1.045;
-export const BETRAYAL_REROLL_HIGHLIGHT_SELECTED_SCALE = 1.065;
+export const BETRAYAL_REROLL_HIGHLIGHT_SELECTED_SCALE = 1.074;
 export const BETRAYAL_REROLL_HIGHLIGHT_CANDIDATE_OPACITY = 1;
 export const BETRAYAL_REROLL_HIGHLIGHT_SELECTED_OPACITY = 1;
 
@@ -268,14 +268,6 @@ export function getBetrayalRerollTargetVisualRotation(
   layout: DicePhysicsProjectedLayout,
 ): number {
   return layout.outlineRotateZ ?? layout.rotateZ;
-}
-
-export function getBetrayalRerollTargetOutlinePoints(
-  layout: DicePhysicsProjectedLayout,
-) {
-  return Array.isArray(layout.outlinePoints) && layout.outlinePoints.length >= 3
-    ? layout.outlinePoints
-    : null;
 }
 
 export function createBetrayalHouseDiceSkin(

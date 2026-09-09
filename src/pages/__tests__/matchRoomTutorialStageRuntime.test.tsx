@@ -174,14 +174,26 @@ const runtime: MatchRoomTutorialBoardRuntimeModel = {
     },
 };
 
-function persistProgressSnapshot() {
-    const seed = buildTutorialProgressSeed(runtime.gameId, runtime.tutorialId, manifest.id);
-    if (!seed || !runtime.gameId) {
+function persistProgressSnapshot(args: {
+    targetRuntime?: MatchRoomTutorialBoardRuntimeModel;
+    targetManifest?: TutorialManifest;
+    legacySeed?: boolean;
+    includeManifestRevision?: boolean;
+} = {}) {
+    const targetRuntime = args.targetRuntime ?? runtime;
+    const targetManifest = args.targetManifest ?? targetRuntime.tutorialManifest ?? manifest;
+    const seed = buildTutorialProgressSeed(
+        targetRuntime.gameId,
+        targetRuntime.tutorialId,
+        targetManifest.id,
+        args.legacySeed ? undefined : targetManifest.revision,
+    );
+    if (!seed || !targetRuntime.gameId) {
         throw new Error('expected seed and game id');
     }
 
     persistLocalMatchSnapshot({
-        gameId: runtime.gameId,
+        gameId: targetRuntime.gameId,
         seed,
         numPlayers: 2,
         randomCursor: 0,
@@ -190,10 +202,13 @@ function persistProgressSnapshot() {
             sys: {
                 tutorial: {
                     active: true,
-                    manifestId: manifest.id,
+                    manifestId: targetManifest.id,
+                    ...(args.includeManifestRevision ?? !args.legacySeed) && Number.isInteger(targetManifest.revision)
+                        ? { manifestRevision: targetManifest.revision }
+                        : undefined,
                     stepIndex: 1,
-                    steps: manifest.steps,
-                    step: manifest.steps[1] ?? null,
+                    steps: targetManifest.steps,
+                    step: targetManifest.steps[1] ?? null,
                 },
             },
         } as MatchState<unknown>,
@@ -264,8 +279,43 @@ describe('MatchRoomTutorialBoardRuntime 教程进度恢复', () => {
         expect(window.localStorage.getItem(buildLocalMatchSnapshotKey(runtime.gameId ?? '', seed))).toBeNull();
     });
 
+    it('manifest revision 变化后不会让真实教程页挂载旧章节 seed', async () => {
+        const revisedManifest: TutorialManifest = { ...manifest, revision: 2 };
+        const revisedRuntime: MatchRoomTutorialBoardRuntimeModel = {
+            ...runtime,
+            tutorialManifest: revisedManifest,
+        };
+        const legacySeed = persistProgressSnapshot({
+            targetRuntime: revisedRuntime,
+            targetManifest: revisedManifest,
+            legacySeed: true,
+        });
+        const revisedSeed = buildTutorialProgressSeed(
+            revisedRuntime.gameId,
+            revisedRuntime.tutorialId,
+            revisedManifest.id,
+            revisedManifest.revision,
+        );
+
+        render(
+            <MemoryRouter>
+                <MatchRoomTutorialBoardRuntime runtime={revisedRuntime} />
+            </MemoryRouter>,
+        );
+
+        expect(openModal).not.toHaveBeenCalled();
+        await waitFor(() => expect(latestLocalProviderProps?.seed).toBe(revisedSeed));
+        expect(latestLocalProviderProps?.seed).not.toBe(legacySeed);
+        expect(window.localStorage.getItem(buildLocalMatchSnapshotKey(revisedRuntime.gameId ?? '', legacySeed))).not.toBeNull();
+    });
+
     it('同一教程页面切到隐藏续章时，会用新章节 seed 重新挂载本地教程局', async () => {
-        const initialSeed = buildTutorialProgressSeed(runtime.gameId, runtime.tutorialId, runtime.tutorialManifest?.id);
+        const initialSeed = buildTutorialProgressSeed(
+            runtime.gameId,
+            runtime.tutorialId,
+            runtime.tutorialManifest?.id,
+            runtime.tutorialManifest?.revision,
+        );
         const reclaimRuntime: MatchRoomTutorialBoardRuntimeModel = {
             ...runtime,
             tutorialId: 'wheel-reclaim',
@@ -275,6 +325,7 @@ describe('MatchRoomTutorialBoardRuntime 教程进度恢复', () => {
             reclaimRuntime.gameId,
             reclaimRuntime.tutorialId,
             reclaimRuntime.tutorialManifest?.id,
+            reclaimRuntime.tutorialManifest?.revision,
         );
 
         const { rerender } = render(

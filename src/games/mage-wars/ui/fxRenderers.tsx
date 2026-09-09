@@ -17,6 +17,7 @@ import {
     type FxBox,
     type FxQuality,
     type FxRendererProps,
+    createFxPathBox,
 } from '../../../engine/fx';
 import {
     MAGE_WARS_ATTACK_FX_TUNING,
@@ -398,6 +399,78 @@ function MageWarsTargetBurst({
     );
 }
 
+function MovementTrail({
+    source,
+    target,
+    sourceSnapshot,
+    targetSnapshot,
+    sourceAnchorId,
+    targetAnchorId,
+    getCellPosition,
+}: {
+    source?: FxCellCoord;
+    target: FxCellCoord;
+    sourceSnapshot?: FxAnchorSnapshot | null;
+    targetSnapshot?: FxAnchorSnapshot | null;
+    sourceAnchorId?: string;
+    targetAnchorId?: string;
+    getCellPosition: FxRendererProps['getCellPosition'];
+}) {
+    if (!source || sameCell(source, target)) return null;
+    const sourceBox = sourceSnapshot?.box ?? getCellPosition(source.row, source.col);
+    const targetBox = targetSnapshot?.box ?? getCellPosition(target.row, target.col);
+    const path = createFxPathBox(sourceBox, targetBox, {
+        paddingCells: 0.35,
+        minSizeCells: 1.05,
+        overflow: 'visible',
+    });
+    const dx = path.end.xPct - path.start.xPct;
+    const dy = path.end.yPct - path.start.yPct;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 0.01) return null;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const steps = [18, 34, 50, 66, 82];
+
+    return (
+        <div
+            className="absolute pointer-events-none z-30"
+            data-testid="mage-wars-fx-move-trail"
+            data-source-row={source.row}
+            data-source-col={source.col}
+            data-target-row={target.row}
+            data-target-col={target.col}
+            data-source-snapshot-anchor-id={sourceAnchorId ?? sourceSnapshot?.anchorId ?? ''}
+            data-target-snapshot-anchor-id={targetAnchorId ?? targetSnapshot?.anchorId ?? ''}
+            style={path.style}
+        >
+            <div
+                className="absolute left-0 top-0 h-0"
+                style={{
+                    left: `${path.start.xPct}%`,
+                    top: `${path.start.yPct}%`,
+                    width: `${distance}%`,
+                    transform: `rotate(${angle}deg)`,
+                    transformOrigin: '0 50%',
+                }}
+            >
+                {steps.map((left, index) => (
+                    <span
+                        key={left}
+                        className="absolute block h-2.5 w-1.5 rounded-full border border-cyan-50/70 bg-cyan-200/80 shadow-[0_0_10px_rgba(103,232,249,0.55)]"
+                        data-testid="mage-wars-fx-move-step"
+                        style={{
+                            left: `${left}%`,
+                            top: 0,
+                            opacity: 0.52 + index * 0.08,
+                            transform: `translate(-50%, -50%) rotate(${index % 2 === 0 ? '-14deg' : '14deg'})`,
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export const SpellTeleportRenderer: React.FC<FxRendererProps> = ({
     event,
     getCellPosition,
@@ -529,19 +602,31 @@ export const MovementRenderer: React.FC<FxRendererProps> = ({
     const quality = resolveEventQuality(event);
 
     return (
-        <MageWarsTravelPath
-            source={source}
-            target={cell}
-            sourceSnapshot={sourceSnapshot}
-            targetSnapshot={targetSnapshot}
-            sourceAnchorId={sourceAnchorId}
-            targetAnchorId={targetAnchorId}
-            getCellPosition={getCellPosition}
-            kind="move"
-            quality={quality}
-            showSourceWake={false}
-            showMidBurst={false}
-        />
+        <>
+            <MovementTrail
+                source={source}
+                target={cell}
+                sourceSnapshot={sourceSnapshot}
+                targetSnapshot={targetSnapshot}
+                sourceAnchorId={sourceAnchorId}
+                targetAnchorId={targetAnchorId}
+                getCellPosition={getCellPosition}
+            />
+            <BoardBurstImpactPreset
+                cell={cell}
+                getCellPosition={getCellPosition}
+                targetSnapshot={targetSnapshot}
+                targetAnchorId={targetAnchorId}
+                delayMs={hasTravel ? MAGE_WARS_FX_TIMING.moveTravelImpactMs : 0}
+                hostTestId="mage-wars-fx-move-arrival"
+                burstTestId="mage-wars-fx-move-arrival-burst"
+                preset={MAGE_WARS_TRAVEL_FX_TUNING.move.midBurstPreset}
+                color={mageWarsFxColors('move')}
+                overflow={MAGE_WARS_TRAVEL_FX_TUNING.move.midBurstOverflow}
+                sizeClassName={MAGE_WARS_TRAVEL_FX_TUNING.move.sourceWakeSizeClassName}
+                quality={quality}
+            />
+        </>
     );
 };
 

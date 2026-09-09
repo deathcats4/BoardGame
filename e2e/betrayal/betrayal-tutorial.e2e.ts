@@ -35,7 +35,7 @@ const STEP_13 = `${EVIDENCE_DIR}/26-山屋惊魂-教程-书本使用后知识改
 const STEP_14 = `${EVIDENCE_DIR}/27-山屋惊魂-教程-点击兔脚后选择骰子.jpg`;
 const STEP_15 = `${EVIDENCE_DIR}/28-山屋惊魂-教程-兔脚选中改骰高亮.jpg`;
 const STEP_15A = `${EVIDENCE_DIR}/29-山屋惊魂-教程-兔脚重投动画进行中.jpg`;
-const STEP_16 = `${EVIDENCE_DIR}/30-山屋惊魂-教程-兔脚重投完成自动进入伤害分配.jpg`;
+const STEP_16 = `${EVIDENCE_DIR}/30-山屋惊魂-教程-兔脚重投后确认新骰面.jpg`;
 const STEP_16A = `${EVIDENCE_DIR}/31-山屋惊魂-教程-伤害分配面板可操作.jpg`;
 const STEP_16B = `${EVIDENCE_DIR}/32-山屋惊魂-教程-伤害分配完成后.jpg`;
 const MAIN_FLOW_33 = `${EVIDENCE_DIR}/main-flow-rebuilt/33-事件回合结束前.jpg`;
@@ -1152,6 +1152,7 @@ const expectRabbitFootRerollWebglHighlights = async (
               diceHighlights?: Array<{
                 dieIndex?: number;
                 variant?: string;
+                color?: number;
                 scale?: number;
                 opacity?: number;
               }>;
@@ -1167,6 +1168,8 @@ const expectRabbitFootRerollWebglHighlights = async (
                 depthWrite?: boolean;
                 transparent?: boolean;
                 shaderOpacity?: number;
+                shaderIntensity?: number;
+                shaderOutlineOffset?: number;
               }>;
             } | null>;
           }
@@ -1316,17 +1319,23 @@ const expectRabbitFootRerollWebglHighlights = async (
     if (target.dieIndex === selectedDieIndex) {
       expect(target.selected).toBe(true);
       expect(target.highlight?.variant).toBe("selected");
+      expect(target.highlight?.color).toBe(0xff2dfb);
       expect(target.shell?.variant).toBe("selected");
       expect(target.shell?.scale).toBeGreaterThanOrEqual(1.06);
       expect(target.shell?.scale).toBeLessThanOrEqual(1.075);
       expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.9);
+      expect(target.shell?.shaderIntensity).toBeGreaterThanOrEqual(1.5);
+      expect(target.shell?.shaderOutlineOffset).toBeGreaterThanOrEqual(0.024);
     } else {
       expect(target.selected).toBe(false);
       expect(target.highlight?.variant).toBe("candidate");
+      expect(target.highlight?.color).toBe(0x00e7ff);
       expect(target.shell?.variant).toBe("candidate");
       expect(target.shell?.scale).toBeGreaterThanOrEqual(1.04);
       expect(target.shell?.scale).toBeLessThanOrEqual(1.055);
       expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.9);
+      expect(target.shell?.shaderIntensity).toBeLessThan(1.3);
+      expect(target.shell?.shaderOutlineOffset).toBeLessThan(0.02);
     }
   }
 };
@@ -4302,41 +4311,38 @@ test.describe("山屋惊魂教程最小真实链路", () => {
           .catch(() => null);
         return stepId ?? "";
       }, { timeout: 10000 })
-      .toMatch(/^(rabbit-foot-result|finish)$/);
-    await expect
-      .poll(async () => await tutorialOverlayCard.textContent(), {
-        message: "兔脚重投后必须停在重投结果或伤害分配这两个相邻真实状态之一",
-        timeout: 10000,
-      })
-      .toMatch(/重掷完成|承受 1 点物理伤害/);
-    const postRerollText = (await tutorialOverlayCard.textContent()) ?? "";
-    if (postRerollText.includes("重掷完成")) {
-      const rabbitFootResultPlacement = await tutorialOverlayCard.getAttribute(
-        "data-tutorial-placement",
-      );
-      expect(
-        ["center", "top"],
-        `兔脚结果提示可以居中，也可以为了避让伤害分配面板自动上移：${rabbitFootResultPlacement}`,
-      ).toContain(rabbitFootResultPlacement);
-      await expect(tutorialOverlayCard).toContainText("重掷完成");
-      await expect(tutorialOverlayCard).toContainText("伤害分配");
-    } else {
-      expect(postRerollText).toContain("承受 1 点物理伤害");
-    }
+      .toBe("rabbit-foot-result");
+    const rabbitFootResultPlacement = await tutorialOverlayCard.getAttribute(
+      "data-tutorial-placement",
+    );
+    expect(
+      ["center", "top"],
+      `兔脚结果提示可以居中，也可以为了避让结果面板自动上移：${rabbitFootResultPlacement}`,
+    ).toContain(rabbitFootResultPlacement);
+    await expect(tutorialOverlayCard).toContainText("重掷完成");
+    await expect(tutorialOverlayCard).toContainText("新的骰面");
+    await expect(tutorialOverlayCard).toContainText("确认");
+    await expect(tutorialOverlayCard).toContainText("伤害分配");
     await expect(tutorialOverlayCard).not.toContainText("其他玩家确认");
     await expect(tutorialOverlayCard).not.toContainText("确认 1/3");
-    await expect(
-      discoveryReveal.getByTestId("betrayal-discovery-continue"),
-    ).toHaveCount(0);
+    const eventRollConfirm = discoveryReveal.getByTestId(
+      "betrayal-discovery-continue",
+    );
+    await expect(eventRollConfirm).toBeVisible();
+    await expect(eventRollConfirm).toBeEnabled();
+    await expect(eventRollConfirm).toHaveText("确认 0/1");
+    await expect(eventRollConfirm).toHaveAttribute(
+      "data-event-roll-confirmed-count",
+      "0",
+    );
+    await expect(eventRollConfirm).toHaveAttribute(
+      "data-event-roll-required-count",
+      "1",
+    );
     const postRerollDamageAllocationPanel = page.getByTestId(
       "betrayal-damage-allocation-panel",
     );
-    await expect(postRerollDamageAllocationPanel).toBeVisible({
-      timeout: 15000,
-    });
-    await expect(postRerollDamageAllocationPanel).toContainText(
-      "分配 1 点物理伤害",
-    );
+    await expect(postRerollDamageAllocationPanel).toHaveCount(0);
     const hasPostRerollDiceTotal = await discoveryRollPanel
       .getByTestId("betrayal-recent-roll-total")
       .isVisible()
@@ -4418,6 +4424,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       STEP_16,
       "兔脚重投过程图和完成图",
     );
+    await eventRollConfirm.click();
     await waitForStep(page, "finish", 10000);
     await expect(tutorialOverlayCard).toContainText("承受 1 点物理伤害");
     await expect(tutorialOverlayCard).not.toContainText("兔脚");

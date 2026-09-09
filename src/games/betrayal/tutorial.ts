@@ -1,9 +1,12 @@
 import type {
+    MatchState,
     TutorialCollection,
     TutorialManifest,
+    TutorialStepSnapshot,
 } from '../../engine/types';
 import { CHEAT_COMMANDS } from '../../engine/systems/CheatSystem';
 import { BETRAYAL_COMMANDS } from './commands';
+import type { BetrayalCore } from './game';
 import {
     createExchangeReadyTutorialCore,
     createHeroAttackTraitorReadyTutorialCore,
@@ -17,10 +20,28 @@ import {
     createStartedFirstScenarioTutorialCore,
 } from './testing/firstScenarioTestUtils';
 
+const isRabbitFootAlreadyUsed = (core: Partial<BetrayalCore> | undefined): boolean =>
+    Boolean(
+        core?.usedCardIdsThisTurn?.includes('rope')
+        || core?.recentRoll?.consumedRabbitFootCardIds?.includes('rope'),
+    );
+
+const validateBetrayalBasicSetupStep = (
+    state: MatchState<unknown>,
+    step: TutorialStepSnapshot,
+): boolean => {
+    const core = state.core as Partial<BetrayalCore> | undefined;
+    if (step.id === 'use-rabbit-foot') {
+        return !isRabbitFootAlreadyUsed(core);
+    }
+    return true;
+};
+
 const BETRAYAL_BASIC_SETUP_AND_TURN: TutorialManifest = {
     id: 'basic-setup-and-turn',
     numPlayers: 3,
     allowManualSkip: true,
+    stepValidator: validateBetrayalBasicSetupStep,
     steps: [
         {
             id: 'setup-runtime',
@@ -685,6 +706,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
     id: 'basic-setup-and-turn',
     numPlayers: 3,
     allowManualSkip: true,
+    stepValidator: validateBetrayalBasicSetupStep,
     steps: [
         ...BETRAYAL_BASIC_SETUP_AND_TURN.steps,
         {

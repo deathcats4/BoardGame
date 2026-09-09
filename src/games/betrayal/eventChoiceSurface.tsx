@@ -193,7 +193,6 @@ export function BetrayalEventChoiceSurface({
               diceClassName={
                 isPhoneLandscapeLayout ? "min-h-[156px]" : "min-h-[236px]"
               }
-              animateInitialRoll={false}
               effectiveLocale={locale}
               actorLabel={rollActorLabel}
               showSource={false}

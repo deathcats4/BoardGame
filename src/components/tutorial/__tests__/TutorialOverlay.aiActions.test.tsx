@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TutorialOverlay } from '../TutorialOverlay';
 import type { TutorialStepSnapshot } from '../../../engine/types';
@@ -41,18 +41,37 @@ vi.mock('react-i18next', () => ({
     }),
 }));
 
-const renderWithStep = (step: TutorialStepSnapshot) => {
+const renderWithStep = (
+    step: TutorialStepSnapshot,
+    options: { stepIndex?: number; isLastStep?: boolean; steps?: TutorialStepSnapshot[] } = {},
+) => {
+    const nextStep = vi.fn();
+    const previousStep = vi.fn();
+    const stepIndex = options.stepIndex ?? 0;
+    const steps = options.steps ?? (
+        stepIndex > 0
+            ? [{ id: 'intro', content: 'tutorial.intro' }, step]
+            : [step]
+    );
     useTutorialMock.mockReturnValue({
         isActive: true,
         currentStep: step,
-        nextStep: vi.fn(),
-        isLastStep: false,
+        nextStep,
+        previousStep,
+        isLastStep: options.isLastStep ?? false,
         tutorial: {
+            active: true,
+            stepIndex,
+            steps,
             skippedStepIds: [],
         },
     });
 
-    return render(<TutorialOverlay />);
+    return {
+        ...render(<TutorialOverlay />),
+        nextStep,
+        previousStep,
+    };
 };
 
 describe('TutorialOverlay aiActions visibility', () => {
@@ -106,5 +125,50 @@ describe('TutorialOverlay aiActions visibility', () => {
         expect(legend.getAttribute('src')).toBe('mage-wars/references/spell-card-legend');
         expect(screen.getByTestId('tutorial-overlay-visual-caption').textContent)
             .toBe('game-mage-wars:tutorial.visuals.spellCardLegendCaption');
+    });
+
+    it('首张教程卡不显示上一步按钮', () => {
+        renderWithStep({
+            id: 'intro',
+            content: 'tutorial.intro',
+        }, { stepIndex: 0 });
+
+        expect(screen.queryByTestId('tutorial-previous-button')).toBeNull();
+        expect(screen.getByTestId('tutorial-next-button')).toBeTruthy();
+    });
+
+    it('首张玩家可见教程卡前面只有纯自动步骤时不显示上一步按钮', () => {
+        const visibleStep: TutorialStepSnapshot = {
+            id: 'setup-overview',
+            content: 'tutorial.setupOverview',
+        };
+
+        renderWithStep(visibleStep, {
+            stepIndex: 1,
+            steps: [
+                {
+                    id: 'setup-ai',
+                    content: 'tutorial.setupAi',
+                    aiActions: [{ commandType: 'AI_SETUP' }],
+                },
+                visibleStep,
+            ],
+        });
+
+        expect(screen.queryByTestId('tutorial-previous-button')).toBeNull();
+        expect(screen.getByTestId('tutorial-next-button')).toBeTruthy();
+    });
+
+    it('后续教程卡可以点击上一步，只触发教程回退', () => {
+        const { previousStep, nextStep } = renderWithStep({
+            id: 'second-step',
+            content: 'tutorial.secondStep',
+        }, { stepIndex: 1 });
+
+        fireEvent.click(screen.getByTestId('tutorial-previous-button'));
+
+        expect(previousStep).toHaveBeenCalledTimes(1);
+        expect(nextStep).not.toHaveBeenCalled();
+        expect(playSoundMock).toHaveBeenCalledTimes(1);
     });
 });

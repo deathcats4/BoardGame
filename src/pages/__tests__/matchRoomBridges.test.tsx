@@ -1,7 +1,8 @@
 /* @vitest-environment happy-dom */
 import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MatchState, TutorialState } from '../../engine/types';
+import type { MatchState, TutorialManifest, TutorialState } from '../../engine/types';
+import { TUTORIAL_COMMANDS } from '../../engine/systems/TutorialSystem';
 import { TutorialDispatchBridge } from '../matchRoomBridges';
 
 let gameClientState: MatchState<unknown>;
@@ -105,5 +106,36 @@ describe('TutorialDispatchBridge', () => {
                 aiActions: undefined,
             }),
         );
+    });
+
+    it('恢复教程进度时会把当前清单重新绑定回教程系统', async () => {
+        const manifest: TutorialManifest = {
+            id: 'basic-setup-and-turn',
+            revision: 2,
+            steps: [
+                { id: 'use-rabbit-foot', content: 'use-rabbit-foot', allowedCommands: ['USE_RABBIT_FOOT'] },
+                { id: 'rabbit-foot-result', content: 'rabbit-foot-result', allowedCommands: ['FINALIZE_EVENT_ROLL'] },
+            ],
+            stepValidator: () => true,
+        };
+        gameClientState = buildState({
+            active: true,
+            manifestId: manifest.id,
+            manifestRevision: manifest.revision,
+            stepIndex: 0,
+            steps: manifest.steps,
+            step: manifest.steps[0],
+        });
+
+        render(
+            <TutorialDispatchBridge tutorialManifest={manifest}>
+                <div />
+            </TutorialDispatchBridge>,
+        );
+
+        await waitFor(() => expect(dispatch).toHaveBeenCalledWith(
+            TUTORIAL_COMMANDS.BIND_MANIFEST,
+            { manifest },
+        ));
     });
 });

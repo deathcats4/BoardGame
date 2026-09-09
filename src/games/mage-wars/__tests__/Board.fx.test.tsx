@@ -1440,25 +1440,25 @@ describe('MageWarsBoard FX wiring', () => {
         }
     });
 
-    it('renders ordinary movement left along the mover anchor row', () => {
+    it('renders multi-zone ordinary movement as a local trail, not a ranged projectile', () => {
         vi.useFakeTimers();
         const onImpact = vi.fn();
         const onComplete = vi.fn();
         const event: FxEvent = {
-            id: 'fx-move-left',
+            id: 'fx-move-long-left',
             cue: 'mage-wars.move',
             ctx: { cell: { row: 1, col: 1 }, intensity: 'normal' },
             params: {
-                source: { row: 1, col: 2 },
-                objectId: 'mwobj-left-moving-cat',
-                targetObjectId: 'mwobj-left-moving-cat',
-                sourceSnapshot: anchorSnapshot('mwobj-left-moving-cat', 'entity', {
-                    left: 62,
+                source: { row: 1, col: 3 },
+                objectId: 'mwobj-long-moving-cat',
+                targetObjectId: 'mwobj-long-moving-cat',
+                sourceSnapshot: anchorSnapshot('mwobj-long-moving-cat', 'entity', {
+                    left: 72,
                     top: 40,
                     width: 8,
                     height: 10,
                 }),
-                targetSnapshot: anchorSnapshot('mwobj-left-moving-cat', 'entity', {
+                targetSnapshot: anchorSnapshot('mwobj-long-moving-cat', 'entity', {
                     left: 37,
                     top: 40,
                     width: 8,
@@ -1477,16 +1477,17 @@ describe('MageWarsBoard FX wiring', () => {
                 />,
             );
 
-            const travel = screen.getByTestId('mage-wars-fx-move-travel');
-            const cone = screen.getByTestId('mock-cone-blast');
-            expect(travel.getAttribute('data-source-row')).toBe('1');
-            expect(travel.getAttribute('data-target-row')).toBe('1');
-            expect(travel.getAttribute('data-source-col')).toBe('2');
-            expect(travel.getAttribute('data-target-col')).toBe('1');
-            expect(travel.getAttribute('data-source-snapshot-anchor-id')).toBe('mwobj-left-moving-cat');
-            expect(travel.getAttribute('data-target-snapshot-anchor-id')).toBe('mwobj-left-moving-cat');
-            expect(Number(cone.getAttribute('data-start-x'))).toBeGreaterThan(Number(cone.getAttribute('data-end-x')));
-            expect(cone.getAttribute('data-start-y')).toBe(cone.getAttribute('data-end-y'));
+            const trail = screen.getByTestId('mage-wars-fx-move-trail');
+            expect(screen.queryByTestId('mage-wars-fx-move-travel')).toBeNull();
+            expect(screen.queryByTestId('mock-cone-blast')).toBeNull();
+            expect(trail.getAttribute('data-source-row')).toBe('1');
+            expect(trail.getAttribute('data-target-row')).toBe('1');
+            expect(trail.getAttribute('data-source-col')).toBe('3');
+            expect(trail.getAttribute('data-target-col')).toBe('1');
+            expect(trail.getAttribute('data-source-snapshot-anchor-id')).toBe('mwobj-long-moving-cat');
+            expect(trail.getAttribute('data-target-snapshot-anchor-id')).toBe('mwobj-long-moving-cat');
+            expect(screen.getAllByTestId('mage-wars-fx-move-step')).toHaveLength(5);
+            expect(screen.queryByTestId('mage-wars-fx-move-arrival')).not.toBeNull();
 
             act(() => {
                 advanceSharedFxClockDelay(900);

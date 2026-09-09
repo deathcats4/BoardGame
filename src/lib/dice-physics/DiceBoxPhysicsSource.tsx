@@ -219,6 +219,7 @@ export function DiceBoxPhysicsSource({
             state.motion.rotateX.toFixed(2),
             state.motion.rotateY.toFixed(2),
             state.motion.rotateZ.toFixed(2),
+            state.value ?? 'null',
             state.settled ? '1' : '0',
         ].join(':')).join('|');
 
@@ -408,10 +409,6 @@ export function DiceBoxPhysicsSource({
                     previousDiceIdsRef.current = dice.map((die) => die.id);
                     setSettledState(true);
                     return;
-                }
-                if (!engine.hasDice(dice.length) && values.length > 0) {
-                    await restoreVisibleSettledDice(engine, values);
-                    previousDiceIdsRef.current = dice.map((die) => die.id);
                 }
                 setSettledState(false);
                 if (activeMotionRef.current?.type !== 'roll' || activeMotionRef.current.key !== rollingKey) {

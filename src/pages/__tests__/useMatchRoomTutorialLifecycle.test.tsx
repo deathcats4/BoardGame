@@ -66,6 +66,8 @@ const persistTutorialSnapshot = (args: {
     active?: boolean;
     manifestId?: string;
     stepId?: string;
+    legacySeed?: boolean;
+    includeManifestRevision?: boolean;
 }) => {
     const {
         gameId,
@@ -76,8 +78,15 @@ const persistTutorialSnapshot = (args: {
         active = true,
         manifestId = manifest.id,
         stepId = manifest.steps[stepIndex]?.id,
+        legacySeed = false,
+        includeManifestRevision = !legacySeed,
     } = args;
-    const seed = buildTutorialProgressSeed(gameId, tutorialId, manifest.id);
+    const seed = buildTutorialProgressSeed(
+        gameId,
+        tutorialId,
+        manifest.id,
+        legacySeed ? undefined : manifest.revision,
+    );
     if (!seed) {
         throw new Error('expected tutorial progress seed');
     }
@@ -93,6 +102,9 @@ const persistTutorialSnapshot = (args: {
                 tutorial: {
                     active,
                     manifestId,
+                    ...(includeManifestRevision && Number.isInteger(manifest.revision)
+                        ? { manifestRevision: manifest.revision }
+                        : undefined),
                     stepIndex,
                     steps: manifest.steps,
                     step: stepId
@@ -324,8 +336,12 @@ describe('useMatchRoomTutorialLifecycle', () => {
     it('教程进度 seed 会按游戏与章节隔离', () => {
         expect(buildTutorialProgressSeed('qidahen', 'basic-opening', 'basic-opening'))
             .toBe('tutorial-progress:v1:qidahen:basic-opening');
+        expect(buildTutorialProgressSeed('qidahen', 'basic-opening', 'basic-opening', 2))
+            .toBe('tutorial-progress:v1:qidahen:basic-opening:r2');
         expect(buildTutorialProgressSeed('qidahen', 'basic-opening', 'basic-opening'))
             .not.toBe(buildTutorialProgressSeed('qidahen', 'attack-and-battle', 'attack-and-battle'));
+        expect(buildTutorialProgressSeed('qidahen', 'basic-opening', 'basic-opening'))
+            .not.toBe(buildTutorialProgressSeed('qidahen', 'basic-opening', 'basic-opening', 2));
         expect(buildTutorialProgressSeed('qidahen', undefined, 'basic-opening'))
             .toBe('tutorial-progress:v1:qidahen:basic-opening');
     });
@@ -401,6 +417,76 @@ describe('useMatchRoomTutorialLifecycle', () => {
             manifest,
             numPlayers: 2,
         })).toBeNull();
+    });
+
+    it('manifest revision 变化后不会把旧教程快照识别为可恢复进度', () => {
+        const manifest: TutorialManifest = {
+            ...makeManifest('basic-opening', ['intro', 'play-card', 'finish']),
+            revision: 2,
+        };
+        const legacySeed = persistTutorialSnapshot({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+            stepIndex: 1,
+            legacySeed: true,
+        });
+
+        expect(readRestorableTutorialProgress({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+            numPlayers: 2,
+        })).toBeNull();
+        expect(window.localStorage.getItem(buildLocalMatchSnapshotKey('qidahen', legacySeed))).not.toBeNull();
+
+        const currentSeed = persistTutorialSnapshot({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+            stepIndex: 1,
+        });
+
+        expect(currentSeed).toBe('tutorial-progress:v1:qidahen:basic-opening:r2');
+        expect(readRestorableTutorialProgress({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+            numPlayers: 2,
+        })).toMatchObject({
+            seed: currentSeed,
+            stepIndex: 1,
+            stepId: 'play-card',
+            totalSteps: 3,
+        });
+    });
+
+    it('清理带 revision 的教程进度时也会移除同章节旧 seed 快照', () => {
+        const manifest: TutorialManifest = {
+            ...makeManifest('basic-opening', ['intro', 'play-card']),
+            revision: 2,
+        };
+        const legacySeed = persistTutorialSnapshot({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+            legacySeed: true,
+        });
+        const currentSeed = persistTutorialSnapshot({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifest,
+        });
+
+        clearTutorialProgress({
+            gameId: 'qidahen',
+            tutorialId: 'basic-opening',
+            manifestId: manifest.id,
+            manifestRevision: manifest.revision,
+        });
+
+        expect(window.localStorage.getItem(buildLocalMatchSnapshotKey('qidahen', legacySeed))).toBeNull();
+        expect(window.localStorage.getItem(buildLocalMatchSnapshotKey('qidahen', currentSeed))).toBeNull();
     });
 
     it('存在可恢复进度时，不会自动从第一步重新启动教程', () => {

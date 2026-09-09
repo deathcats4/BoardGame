@@ -20,7 +20,6 @@ import {
   BETRAYAL_REROLL_HIGHLIGHT_SELECTED_SCALE,
   BETRAYAL_REROLL_VISUAL_CONTRACT,
   createBetrayalHouseDiceSkin,
-  getBetrayalRerollTargetOutlinePoints,
   getBetrayalRerollTargetVisualCenter,
   getBetrayalRerollTargetVisualRotation,
   getBetrayalRerollTargetVisibleSize,
@@ -290,6 +289,7 @@ export function BetrayalHouseDice3DGroup({
         motion={diceMotion}
         styleProfile={styleProfile}
         dieSkins={dieSkins}
+        requireDieSkins
         highlightedDice={highlightedRerollDice}
         testId="betrayal-house-dice-physics-source"
         canvasTestId={canvasTestId}
@@ -367,41 +367,9 @@ export function BetrayalHouseDice3DGroup({
             );
             const targetVisualRotation =
               getBetrayalRerollTargetVisualRotation(target.layout);
-            const targetOutlinePoints = getBetrayalRerollTargetOutlinePoints(
-              target.layout,
-            );
             const targetWidth = Math.max(1, targetVisibleSize.width);
             const targetHeight = Math.max(1, targetVisibleSize.height);
             const targetMaxSize = Math.max(targetWidth, targetHeight);
-            const outlineStrokeWidth = isSelectedRerollTarget ? 3.25 : 2.25;
-            const outlineColor = isSelectedRerollTarget ? "#ffd447" : "#00e7ff";
-            const outlineFilter = isSelectedRerollTarget
-              ? "drop-shadow(0 0 1px rgba(74, 46, 0, 0.95)) drop-shadow(0 0 8px rgba(255, 212, 71, 0.8))"
-              : "drop-shadow(0 0 1px rgba(0, 42, 49, 0.95)) drop-shadow(0 0 6px rgba(0, 231, 255, 0.72))";
-            const outlineBleed = 8;
-            const outlineOutset = outlineStrokeWidth / 2;
-            const targetLeft = targetVisualCenter.x - targetWidth / 2;
-            const targetTop = targetVisualCenter.y - targetHeight / 2;
-            const outlinePointString = targetOutlinePoints
-              ?.map((point) => {
-                const dx = point.x - targetVisualCenter.x;
-                const dy = point.y - targetVisualCenter.y;
-                const distance = Math.hypot(dx, dy) || 1;
-                const outsetX = (dx / distance) * outlineOutset;
-                const outsetY = (dy / distance) * outlineOutset;
-                return `${(point.x - targetLeft + outlineBleed + outsetX).toFixed(
-                  2,
-                )},${(point.y - targetTop + outlineBleed + outsetY).toFixed(2)}`;
-              })
-              .join(" ");
-            const outlinePointData =
-              targetOutlinePoints
-                ?.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-                .join(";") ?? "";
-            const outlineRadius = Math.max(
-              6,
-              Math.min(10, Math.min(targetWidth, targetHeight) * 0.18),
-            );
             return (
               <div
                 key={`${roll.id}-reroll-target-${target.dieIndex}`}
@@ -424,18 +392,12 @@ export function BetrayalHouseDice3DGroup({
                 data-reroll-target-outline-width={targetVisibleSize.width.toFixed(2)}
                 data-reroll-target-outline-height={targetVisibleSize.height.toFixed(2)}
                 data-reroll-target-outline-gap="0.00"
-                data-reroll-target-outline-paint={
-                  targetOutlinePoints
-                    ? "projected-face-outside-svg-outline"
-                    : "oriented-outside-outline"
-                }
-                data-reroll-target-outline-point-count={
-                  targetOutlinePoints?.length ?? 0
-                }
-                data-reroll-target-outline-points={outlinePointData}
+                data-reroll-target-outline-paint={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
+                data-reroll-target-outline-point-count={0}
+                data-reroll-target-outline-points=""
                 data-reroll-target-highlight-renderer={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
                 data-reroll-target-visual-contract={BETRAYAL_REROLL_VISUAL_CONTRACT}
-                data-reroll-target-visual-layer={BETRAYAL_REROLL_VISUAL_CONTRACT}
+                data-reroll-target-visual-layer="transparent-hitbox-only"
                 className="group pointer-events-auto absolute outline-none"
                 style={{
                   left:
@@ -448,9 +410,7 @@ export function BetrayalHouseDice3DGroup({
                       : `${targetVisualCenter.y}px`,
                   width: `${targetWidth}px`,
                   height: `${targetHeight}px`,
-                  transform: targetOutlinePoints
-                    ? "translate(-50%, -50%)"
-                    : `translate(-50%, -50%) rotate(${targetVisualRotation}rad)`,
+                  transform: `translate(-50%, -50%) rotate(${targetVisualRotation}rad)`,
                   transformOrigin: "center center",
                 }}
                 onClick={() => rerollSelection.onSelectDie(target.dieIndex)}
@@ -461,62 +421,6 @@ export function BetrayalHouseDice3DGroup({
                 <span className="sr-only">
                   {rerollSelection.getDieActionLabel(target.dieIndex)}
                 </span>
-                {outlinePointString ? (
-                  <svg
-                    aria-hidden="true"
-                    data-reroll-target-candidate-box={
-                      isSelectedRerollTarget ? undefined : "true"
-                    }
-                    data-reroll-target-selected-border={
-                      isSelectedRerollTarget ? "true" : undefined
-                    }
-                    data-reroll-target-outline="true"
-                    data-reroll-target-outline-kind="projected-face-svg"
-                    className="pointer-events-none absolute"
-                    style={{
-                      left: `${-outlineBleed}px`,
-                      top: `${-outlineBleed}px`,
-                      width: `${targetWidth + outlineBleed * 2}px`,
-                      height: `${targetHeight + outlineBleed * 2}px`,
-                      overflow: "visible",
-                      filter: outlineFilter,
-                    }}
-                    viewBox={`0 0 ${targetWidth + outlineBleed * 2} ${
-                      targetHeight + outlineBleed * 2
-                    }`}
-                  >
-                    <polygon
-                      data-reroll-target-outline-stroke="true"
-                      points={outlinePointString}
-                      fill="transparent"
-                      stroke={outlineColor}
-                      strokeWidth={outlineStrokeWidth}
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </svg>
-                ) : (
-                  <span
-                    aria-hidden="true"
-                    data-reroll-target-candidate-box={
-                      isSelectedRerollTarget ? undefined : "true"
-                    }
-                    data-reroll-target-selected-border={
-                      isSelectedRerollTarget ? "true" : undefined
-                    }
-                    data-reroll-target-outline="true"
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background: "transparent",
-                      border: "0",
-                      borderRadius: `${outlineRadius}px`,
-                      boxShadow: outlineFilter,
-                      outline: `${outlineStrokeWidth}px solid ${outlineColor}`,
-                      outlineOffset: "0px",
-                    }}
-                  />
-                )}
               </div>
             );
           })}

@@ -377,7 +377,7 @@ function paladinsSpreadTheOracle(ctx: AbilityContext): AbilityResult {
 function paladinsClimbTheHolyStairs(ctx: AbilityContext): AbilityResult {
     const host = getHostForAttachedTalent(ctx);
     if (!host) return { events: [] };
-    if ((host.minion.powerCounters ?? 0) <= 4) return { events: [] };
+    if (getMinionPower(ctx.state, host.minion, host.baseIndex) < 4) return { events: [] };
     const result = playSeraphimHere(ctx, 'paladins_climb_the_holy_stairs', { currentTalentMinionUid: host.minion.uid });
     const events = result.events;
     if (events.length === 0) return { events: [] };

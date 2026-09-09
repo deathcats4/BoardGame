@@ -267,6 +267,86 @@ async function expectNoRepeatedInvariantMageStats(page: Page) {
     }
 }
 
+async function expectMageSelectionWideNaturalLayout(page: Page) {
+    const audit = await page.getByTestId('mage-wars-mage-selection-gate').evaluate((gate) => {
+        const oldDescription = '为双方各直接选择一本法术书；每本法术书已绑定法师，确认后按所选书初始化开局。';
+        const editButton = gate.querySelector<HTMLElement>('[data-testid="mage-wars-open-spellbook-builder"]');
+        const confirmButton = gate.querySelector<HTMLElement>('[data-testid="mage-wars-mage-selection-confirm"]');
+        const header = gate.querySelector<HTMLElement>('header');
+        const main = gate.querySelector<HTMLElement>('main');
+        const library = gate.querySelector<HTMLElement>('[data-testid="mage-wars-mage-selection-spellbook-library"]');
+        const summary = confirmButton?.closest('aside') as HTMLElement | null;
+        const editRect = editButton?.getBoundingClientRect();
+        const confirmRect = confirmButton?.getBoundingClientRect();
+        const mainRect = main?.getBoundingClientRect();
+        const libraryRect = library?.getBoundingClientRect();
+        const summaryRect = summary?.getBoundingClientRect();
+        const confirmStyle = confirmButton ? window.getComputedStyle(confirmButton) : null;
+
+        return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            oldDescriptionVisible: (gate.textContent ?? '').includes(oldDescription),
+            confirmInHeader: Boolean(confirmButton && header?.contains(confirmButton)),
+            confirmBelowEdit: Boolean(editRect && confirmRect && confirmRect.top > editRect.bottom),
+            confirmSharesActionGroup: Boolean(editButton && confirmButton && editButton.parentElement === confirmButton.parentElement),
+            confirmColor: confirmStyle?.backgroundColor ?? '',
+            mainWithinViewport: Boolean(mainRect
+                && mainRect.left >= -1
+                && mainRect.top >= -1
+                && mainRect.right <= window.innerWidth + 1
+                && mainRect.bottom <= window.innerHeight + 1),
+            libraryWidth: libraryRect?.width ?? 0,
+            summaryWidth: summaryRect?.width ?? 0,
+            bodyOverflow: {
+                x: document.documentElement.scrollWidth - window.innerWidth,
+                y: document.documentElement.scrollHeight - window.innerHeight,
+            },
+        };
+    });
+
+    expect(audit.viewport).toEqual({ width: 2560, height: 1304 });
+    expect(audit.oldDescriptionVisible, `2560x1304 选书页不应继续显示顶部说明废话: ${JSON.stringify(audit)}`).toBe(false);
+    expect(audit.confirmInHeader, `2560x1304 开始游戏按钮不能还在右上 header: ${JSON.stringify(audit)}`).toBe(false);
+    expect(audit.confirmSharesActionGroup, `2560x1304 开始游戏按钮必须和编辑选中书在同一右侧动作组: ${JSON.stringify(audit)}`).toBe(true);
+    expect(audit.confirmBelowEdit, `2560x1304 开始游戏按钮必须在编辑选中书下面: ${JSON.stringify(audit)}`).toBe(true);
+    expect(audit.confirmColor, `2560x1304 开始游戏按钮要换成绿色行动色: ${JSON.stringify(audit)}`).toMatch(/rgb\(\s*(0|16|52),\s*(185|211),\s*(129|153)\s*\)/u);
+    expect(audit.mainWithinViewport, `2560x1304 三栏主体必须自然落在视口内: ${JSON.stringify(audit)}`).toBe(true);
+    expect(audit.libraryWidth, `2560x1304 法术书库主列不能被侧栏挤窄: ${JSON.stringify(audit)}`).toBeGreaterThan(1400);
+    expect(audit.summaryWidth, `2560x1304 右侧摘要栏必须保留自然宽度: ${JSON.stringify(audit)}`).toBeGreaterThan(300);
+    expect(audit.bodyOverflow.x, `2560x1304 不能产生横向页面溢出: ${JSON.stringify(audit)}`).toBeLessThanOrEqual(2);
+}
+
+test('Mage Wars 选书页：2560x1304 非 16:9 视口自然适配按钮和说明文案', async ({ context, page }, testInfo) => {
+    await clearEvidenceScreenshotsForTest(testInfo);
+    await page.setViewportSize({ width: 2560, height: 1304 });
+    await initContext(context, {
+        storageKey: 'mage-wars-mage-selection-2560x1304',
+        skipImageGate: false,
+        blockCdnAssets: false,
+        locale: 'zh-CN',
+    });
+    const diagnostics = attachPageDiagnostics(page);
+
+    await page.goto('/play/mage-wars?setupGate=true&seed=mage-selection-2560x1304&disableLocalAiAutomation=true', {
+        waitUntil: 'domcontentloaded',
+    });
+    await waitForFrontendAssets(page, 45_000);
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+
+    await expect(page.getByTestId('mage-wars-mage-selection-gate')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: '选择双方法术书' })).toBeVisible();
+    await expectMageSelectionPreviewAspectRatios(page);
+    await expectNoRepeatedInvariantMageStats(page);
+    await expectMageSelectionWideNaturalLayout(page);
+    const screenshot = await saveEvidenceScreenshot(page, testInfo, '01-2560x1304-选书页-开始游戏在编辑按钮下方');
+
+    await assertNoFatalFrontendErrors([{ label: 'mage-selection-2560x1304', diagnostics }]);
+    testInfo.annotations.push({
+        type: 'mage-wars-selection-2560x1304-screenshot',
+        description: screenshot,
+    });
+});
+
 test('Mage Wars 法术书选择：双方直接选择法术书后进入对应开局牌桌', async ({ context, page }, testInfo) => {
     await clearEvidenceScreenshotsForTest(testInfo);
     await initContext(context, {

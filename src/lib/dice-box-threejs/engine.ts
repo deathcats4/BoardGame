@@ -1,9 +1,11 @@
 import type DiceBoxModule from '@3d-dice/dice-box-threejs';
 import {
+    AdditiveBlending,
     BackSide,
     Color,
     LinearFilter,
     LinearMipmapLinearFilter,
+    Quaternion,
     SRGBColorSpace,
     ShaderMaterial,
     Vector3,
@@ -67,8 +69,17 @@ export interface DiceBoxEngineConfig {
 }
 
 type DiceBoxThrowVector = {
+    index?: number;
+    type?: string;
     pos?: DiceBoxVectorLike;
     velocity?: DiceBoxVectorLike;
+    angle?: DiceBoxVectorLike;
+    axis?: {
+        x: number;
+        y: number;
+        z: number;
+        a: number;
+    };
 };
 
 type DiceBoxInternalNotationVector = {
@@ -77,13 +88,18 @@ type DiceBoxInternalNotationVector = {
 };
 
 type DiceBoxInternalRuntime = InstanceType<typeof DiceBoxModule> & {
+    strength?: number;
     iteration?: number;
     last_time?: number;
     notationVectors?: DiceBoxInternalNotationVector | null;
-    reroll?: (indices: number[]) => Promise<unknown>;
+    rolling?: boolean;
+    running?: number | boolean;
     startClickThrow?: (notation: string) => DiceBoxInternalNotationVector | null;
     spawnDice?: (vector: DiceBoxThrowVector, die?: DiceBoxDie) => void;
     simulateThrow?: () => void;
+    animateThrow?: (running: number | boolean, callback?: () => void) => void;
+    getDiceResults?: () => unknown;
+    onRollComplete?: (result: unknown) => void;
     steps?: number;
 };
 
@@ -154,6 +170,8 @@ type DiceBoxHighlightMaterial = ShaderMaterial & {
     uniforms: {
         uColor: { value: Color };
         uOpacity: { value: number };
+        uIntensity: { value: number };
+        uOutlineOffset: { value: number };
     };
 };
 
@@ -174,6 +192,14 @@ type DiceBoxDieTransformSnapshot = {
     quaternion: { x: number; y: number; z: number; w: number };
     bodyType?: number;
     bodyMass?: number;
+};
+
+type DiceBoxVisibleRollSnapshot = {
+    die: DiceBoxDieWithBody;
+    startPosition: { x: number; y: number; z: number };
+    startQuaternion: DiceBoxQuaternionSnapshot;
+    end: DiceBoxDieTransformSnapshot;
+    order: number;
 };
 
 type DiceBoxWorldBounds = {
@@ -219,7 +245,7 @@ type DiceBoxColorRepresentation = number | string;
 const DICE_HIGHLIGHT_RENDERER = 'threejs-backside-shader-shell';
 const DEFAULT_DICE_HIGHLIGHT_COLORS: Record<DicePhysicsHighlightVariant, number> = {
     candidate: 0x00e7ff,
-    selected: 0xffd447,
+    selected: 0xff2dfb,
 };
 const DEFAULT_DICE_HIGHLIGHT_SCALE: Record<DicePhysicsHighlightVariant, number> = {
     candidate: 1.075,
@@ -229,17 +255,29 @@ const DEFAULT_DICE_HIGHLIGHT_OPACITY: Record<DicePhysicsHighlightVariant, number
     candidate: 1,
     selected: 1,
 };
+const DEFAULT_DICE_HIGHLIGHT_INTENSITY: Record<DicePhysicsHighlightVariant, number> = {
+    candidate: 1.1,
+    selected: 1.55,
+};
+const DEFAULT_DICE_HIGHLIGHT_OUTLINE_OFFSET: Record<DicePhysicsHighlightVariant, number> = {
+    candidate: 0.014,
+    selected: 0.028,
+};
 const DICE_HIGHLIGHT_VERTEX_SHADER = `
+uniform float uOutlineOffset;
+
 void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 expandedPosition = position + normalize(normal) * uOutlineOffset;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(expandedPosition, 1.0);
 }
 `;
 const DICE_HIGHLIGHT_FRAGMENT_SHADER = `
 uniform vec3 uColor;
 uniform float uOpacity;
+uniform float uIntensity;
 
 void main() {
-    gl_FragColor = vec4(uColor, uOpacity);
+    gl_FragColor = vec4(min(uColor * uIntensity, vec3(1.0)), uOpacity);
 }
 `;
 
@@ -536,6 +574,15 @@ function createNotation(values: number[]): string {
     return `${values.length}d6@${values.join(',')}`;
 }
 
+function clampNumber(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(min, Math.min(max, value));
+}
+
+function resolveFiniteNumber(value: number | undefined, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 function readDieValue(die: DiceBoxDie | undefined): number | null {
     const value = die?.getLastValue?.().value;
     return typeof value === 'number' ? value : null;
@@ -721,6 +768,10 @@ export class DiceBoxThreeEngine {
     }
 
     private finalizeSettledFrame(): void {
+        this.stabilizeProjectedDiceLayout();
+    }
+
+    private stabilizeProjectedDiceLayout(): void {
         this.renderFrame();
         this.nudgeDiceIntoProjectedMargins();
         this.separateProjectedDice();
@@ -997,6 +1048,9 @@ export class DiceBoxThreeEngine {
                 depthWrite: shell.material.depthWrite,
                 transparent: shell.material.transparent,
                 shaderOpacity: shell.material.uniforms.uOpacity.value,
+                shaderIntensity: shell.material.uniforms.uIntensity.value,
+                shaderOutlineOffset: shell.material.uniforms.uOutlineOffset.value,
+                blending: shell.material.blending,
                 renderOrder: shell.mesh.renderOrder,
                 position: {
                     x: shell.mesh.position.x,
@@ -1234,7 +1288,10 @@ export class DiceBoxThreeEngine {
             return;
         }
         this.applyPrimarySkinToDicePreset();
-        await this.box.roll(createNotation(values));
+        const didUseContainedThrow = await this.rollWithContainedThrow(values);
+        if (!didUseContainedThrow) {
+            await this.rollWithThirdPartyDefault(values);
+        }
         this.applyValues(values, undefined, true);
         this.applyCurrentSkins();
         this.syncDiceHighlightShells();
@@ -1259,10 +1316,7 @@ export class DiceBoxThreeEngine {
         this.freezeDice(lockedSnapshots);
         let shouldFinalize = false;
         try {
-            const didUsePhysicalReroll = await this.playPhysicalReroll(indices);
-            if (!didUsePhysicalReroll) {
-                await this.playContainedRerollSpin(indices);
-            }
+            await this.playContainedRerollSpin(indices);
             this.restoreDieTransforms(lockedSnapshots, true);
             this.applyValues(values, indices, true);
             this.applyCurrentSkins();
@@ -1274,49 +1328,6 @@ export class DiceBoxThreeEngine {
                 this.finalizeSettledFrame();
             }
         }
-    }
-
-    private async playPhysicalReroll(indices: number[]): Promise<boolean> {
-        const runtime = this.box as DiceBoxInternalRuntime;
-        if (typeof runtime.reroll !== 'function') return false;
-
-        // dice-box-threejs does not reset this clock in reroll(); a stale value can
-        // make the first animation tick simulate the whole throw and look like a flash.
-        runtime.last_time = 0;
-        runtime.steps = 0;
-
-        const stopSyncLoop = this.startPhysicalRerollSyncLoop();
-        try {
-            await runtime.reroll.call(runtime, indices);
-        } finally {
-            stopSyncLoop();
-            this.syncDiceHighlightShells();
-            this.renderFrame();
-        }
-        return true;
-    }
-
-    private startPhysicalRerollSyncLoop(): () => void {
-        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
-            return () => undefined;
-        }
-
-        let frameId: number | null = null;
-        let stopped = false;
-        const step = () => {
-            if (stopped) return;
-            this.syncDiceHighlightShells();
-            frameId = window.requestAnimationFrame(step);
-        };
-        frameId = window.requestAnimationFrame(step);
-
-        return () => {
-            stopped = true;
-            if (frameId !== null && typeof window.cancelAnimationFrame === 'function') {
-                window.cancelAnimationFrame(frameId);
-            }
-            frameId = null;
-        };
     }
 
     private async playContainedRerollSpin(indices: number[], durationMs = 900): Promise<void> {
@@ -1357,12 +1368,14 @@ export class DiceBoxThreeEngine {
         if (snapshots.length === 0) return;
 
         const baseScale = this.styleProfile.baseScale ?? DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ?? 64;
-        const lift = Math.max(5, Math.min(9, baseScale * 0.1));
-        const sideTravel = Math.max(3.5, Math.min(8, baseScale * 0.075));
+        const lift = Math.max(5.5, Math.min(11, baseScale * 0.14));
+        const sideTravel = Math.max(7, Math.min(14, baseScale * 0.19));
+        const forwardTravel = Math.max(2.8, Math.min(7, baseScale * 0.08));
         const duration = Math.max(240, durationMs);
+        const totalSteps = Math.max(18, Math.ceil(duration / 33));
 
         await new Promise<void>((resolve) => {
-            let startAt: number | null = null;
+            let stepIndex = 0;
             let frameId: number | null = null;
             let timerId: number | null = null;
             let completed = false;
@@ -1378,20 +1391,17 @@ export class DiceBoxThreeEngine {
             };
             const scheduleStep = () => {
                 frameId = window.requestAnimationFrame(step);
-                timerId = window.setTimeout(() => step(performance.now()), 33);
+                timerId = window.setTimeout(() => step(), 33);
             };
-            const step = (now: number) => {
+            const step = () => {
                 if (completed) return;
                 clearScheduledStep();
-                if (startAt === null) {
-                    startAt = now;
-                }
-                const progress = Math.min(1, Math.max(0, (now - startAt) / duration));
+                const progress = Math.min(1, stepIndex / totalSteps);
                 const eased = progress < 0.5
                     ? 2 * progress * progress
                     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
                 const liftPulse = Math.sin(progress * Math.PI);
-                const spin = eased * Math.PI * 4;
+                const spin = eased * Math.PI * 5.5;
 
                 for (const snapshot of snapshots) {
                     const direction = snapshot.order % 2 === 0 ? 1 : -1;
@@ -1399,7 +1409,7 @@ export class DiceBoxThreeEngine {
                     const forwardPulse = Math.sin(progress * Math.PI);
                     this.setVector(snapshot.die.position, {
                         x: snapshot.position.x + sideTravel * lateralPulse * direction,
-                        y: snapshot.position.y + sideTravel * 0.36 * forwardPulse,
+                        y: snapshot.position.y + forwardTravel * forwardPulse,
                         z: snapshot.position.z + lift * liftPulse,
                     });
                     if (snapshot.rotation && snapshot.die.rotation) {
@@ -1458,6 +1468,7 @@ export class DiceBoxThreeEngine {
                     return;
                 }
 
+                stepIndex += 1;
                 scheduleStep();
             };
             scheduleStep();
@@ -1835,6 +1846,8 @@ export class DiceBoxThreeEngine {
             uniforms: {
                 uColor: { value: new Color(color) },
                 uOpacity: { value: opacity },
+                uIntensity: { value: DEFAULT_DICE_HIGHLIGHT_INTENSITY.candidate },
+                uOutlineOffset: { value: DEFAULT_DICE_HIGHLIGHT_OUTLINE_OFFSET.candidate },
             },
             vertexShader: DICE_HIGHLIGHT_VERTEX_SHADER,
             fragmentShader: DICE_HIGHLIGHT_FRAGMENT_SHADER,
@@ -1842,6 +1855,7 @@ export class DiceBoxThreeEngine {
             transparent: true,
             depthTest: true,
             depthWrite: false,
+            blending: AdditiveBlending,
             toneMapped: false,
         }) as DiceBoxHighlightMaterial;
         material.opacity = opacity;
@@ -1852,15 +1866,19 @@ export class DiceBoxThreeEngine {
         material: DiceBoxHighlightMaterial,
         color: DiceBoxColorRepresentation,
         opacity: number,
+        variant: DicePhysicsHighlightVariant,
     ): void {
         material.name = 'DiceHighlightShellMaterial';
         material.uniforms.uColor.value.set(color);
         material.uniforms.uOpacity.value = opacity;
+        material.uniforms.uIntensity.value = DEFAULT_DICE_HIGHLIGHT_INTENSITY[variant];
+        material.uniforms.uOutlineOffset.value = DEFAULT_DICE_HIGHLIGHT_OUTLINE_OFFSET[variant];
         material.opacity = opacity;
         material.transparent = true;
         material.side = BackSide;
         material.depthTest = true;
         material.depthWrite = false;
+        material.blending = AdditiveBlending;
         material.toneMapped = false;
         material.needsUpdate = true;
     }
@@ -1879,7 +1897,7 @@ export class DiceBoxThreeEngine {
         shell.color = color;
         shell.mesh.name = `dice-highlight-shell-${shell.dieIndex}-${highlight.variant}`;
         shell.mesh.visible = true;
-        this.configureDiceHighlightMaterial(shell.material, color, opacity);
+        this.configureDiceHighlightMaterial(shell.material, color, opacity, highlight.variant);
     }
 
     private syncDiceHighlightShellTransform(shell: DiceBoxHighlightShell, die: DiceBoxDie): void {
@@ -1990,12 +2008,339 @@ export class DiceBoxThreeEngine {
         });
     }
 
+    private async rollWithThirdPartyDefault(values: number[]): Promise<void> {
+        await this.box.roll(createNotation(values));
+    }
+
+    private async rollWithContainedThrow(values: number[]): Promise<boolean> {
+        const runtime = this.box as DiceBoxInternalRuntime;
+        if (!runtime.startClickThrow || !runtime.spawnDice || !runtime.simulateThrow) {
+            return false;
+        }
+
+        const previousStrength = runtime.strength;
+        let notationVectors: DiceBoxInternalNotationVector | null;
+        try {
+            runtime.strength = this.resolveContainedThrowStrength();
+            notationVectors = runtime.startClickThrow(createNotation(values));
+        } finally {
+            runtime.strength = previousStrength;
+        }
+        const vectors = notationVectors?.vectors;
+        if (!notationVectors || !Array.isArray(vectors) || vectors.length === 0) {
+            return false;
+        }
+
+        this.constrainThrowVectorsToVisibleTray(vectors);
+        runtime.notationVectors = notationVectors;
+        this.clear();
+        for (const vector of vectors) {
+            runtime.spawnDice(vector);
+        }
+        runtime.simulateThrow();
+        runtime.steps = 0;
+        runtime.iteration = 0;
+
+        this.applyValues(values, undefined, true);
+        this.applyCurrentSkins();
+        this.syncDiceHighlightShells();
+        this.stabilizeProjectedDiceLayout();
+        const targetSnapshots = this.captureDieTransforms(
+            vectors.map((_, index) => index),
+        );
+        vectors.forEach((vector, index) => {
+            const die = this.box.diceList[index];
+            if (die) {
+                runtime.spawnDice?.(vector, die);
+            }
+        });
+        this.applyValues(values, undefined, false);
+        this.applyCurrentSkins();
+        this.syncDiceHighlightShells();
+        this.renderFrame();
+        await this.playContainedRollToSettledTransforms(targetSnapshots, 1000);
+        this.applyValues(values, undefined, true);
+        this.applyCurrentSkins();
+        this.syncDiceHighlightShells();
+        this.renderFrame();
+
+        runtime.rolling = false;
+        runtime.running = false;
+        const result = runtime.getDiceResults?.();
+        runtime.onRollComplete?.(result);
+        if (typeof document !== 'undefined') {
+            document.dispatchEvent(new CustomEvent('rollComplete', { detail: result }));
+        }
+        return true;
+    }
+
+    private async playContainedRollToSettledTransforms(
+        targetSnapshots: Map<number, DiceBoxDieTransformSnapshot>,
+        durationMs = 900,
+    ): Promise<void> {
+        const snapshots: DiceBoxVisibleRollSnapshot[] = Array.from(targetSnapshots.entries())
+            .map(([index, end], order): DiceBoxVisibleRollSnapshot | null => {
+                const die = this.box.diceList[index] as DiceBoxDieWithBody | undefined;
+                const quaternion = die?.quaternion as DiceBoxQuaternionLike | undefined;
+                if (!die) return null;
+                return {
+                    die,
+                    startPosition: {
+                        x: die.position.x,
+                        y: die.position.y,
+                        z: die.position.z,
+                    },
+                    startQuaternion: {
+                        x: quaternion?.x ?? 0,
+                        y: quaternion?.y ?? 0,
+                        z: quaternion?.z ?? 0,
+                        w: quaternion?.w ?? 1,
+                    },
+                    end,
+                    order,
+                };
+            })
+            .filter((snapshot): snapshot is DiceBoxVisibleRollSnapshot => Boolean(snapshot));
+        if (snapshots.length === 0) return;
+
+        const baseScale = this.styleProfile.baseScale ?? DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ?? 64;
+        const lift = Math.max(2.4, Math.min(5.2, baseScale * 0.06));
+        const sideTravel = Math.max(2.4, Math.min(5.6, baseScale * 0.07));
+        const duration = Math.max(360, durationMs);
+        const totalSteps = Math.max(24, Math.ceil(duration / 33));
+        const canvas = this.box.renderer?.domElement;
+        const canvasWidth = canvas?.clientWidth || canvas?.width || 0;
+        const canvasHeight = canvas?.clientHeight || canvas?.height || 0;
+        const motionScreenMargin = Math.max(2, Math.min(6, baseScale * 0.06));
+
+        await new Promise<void>((resolve) => {
+            let stepIndex = 0;
+            let frameId: number | null = null;
+            let timerId: number | null = null;
+            let completed = false;
+            const clearScheduledStep = () => {
+                if (frameId !== null) {
+                    window.cancelAnimationFrame(frameId);
+                    frameId = null;
+                }
+                if (timerId !== null) {
+                    window.clearTimeout(timerId);
+                    timerId = null;
+                }
+            };
+            const scheduleStep = () => {
+                frameId = window.requestAnimationFrame(step);
+                timerId = window.setTimeout(() => step(), 33);
+            };
+            const step = () => {
+                if (completed) return;
+                clearScheduledStep();
+                const progress = Math.min(1, stepIndex / totalSteps);
+                const eased = progress < 0.5
+                    ? 2 * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                const liftPulse = Math.sin(progress * Math.PI);
+
+                for (const snapshot of snapshots) {
+                    const direction = snapshot.order % 2 === 0 ? 1 : -1;
+                    const wobble = Math.sin(progress * Math.PI * 2) * sideTravel * (1 - progress);
+                    const nextPosition = {
+                        x: snapshot.startPosition.x + (snapshot.end.position.x - snapshot.startPosition.x) * eased + wobble * direction,
+                        y: snapshot.startPosition.y + (snapshot.end.position.y - snapshot.startPosition.y) * eased + wobble * 0.42,
+                        z: snapshot.startPosition.z + (snapshot.end.position.z - snapshot.startPosition.z) * eased + lift * liftPulse,
+                    };
+                    this.setVector(snapshot.die.position, nextPosition);
+                    const startQuaternion = new Quaternion(
+                        snapshot.startQuaternion.x,
+                        snapshot.startQuaternion.y,
+                        snapshot.startQuaternion.z,
+                        snapshot.startQuaternion.w,
+                    );
+                    const endQuaternion = new Quaternion(
+                        snapshot.end.quaternion.x,
+                        snapshot.end.quaternion.y,
+                        snapshot.end.quaternion.z,
+                        snapshot.end.quaternion.w,
+                    );
+                    const currentQuaternion = startQuaternion.slerp(endQuaternion, eased);
+                    const tumble = new Quaternion().setFromAxisAngle(
+                        new Vector3(1, 1, 0.35).normalize(),
+                        Math.sin(progress * Math.PI) * Math.PI * 1.35,
+                    );
+                    currentQuaternion.multiply(tumble);
+                    this.setQuaternion(snapshot.die.quaternion as DiceBoxQuaternionLike | undefined, currentQuaternion);
+                    if (snapshot.die.body) {
+                        this.setVector(snapshot.die.body.position, nextPosition);
+                        this.setQuaternion(snapshot.die.body.quaternion, currentQuaternion);
+                        this.setVector(snapshot.die.body.velocity, { x: 0, y: 0, z: 0 });
+                        this.setVector(snapshot.die.body.angularVelocity, { x: 0, y: 0, z: 0 });
+                        snapshot.die.body.aabbNeedsUpdate = true;
+                    }
+                    snapshot.die.updateMatrixWorld?.(true);
+                    if (canvasWidth > 0 && canvasHeight > 0) {
+                        this.keepProjectedDieInsideCanvas(
+                            snapshot.die,
+                            canvasWidth,
+                            canvasHeight,
+                            motionScreenMargin,
+                        );
+                    }
+                }
+
+                this.box.scene?.updateMatrixWorld?.(true);
+                this.syncDiceHighlightShells();
+                this.renderFrame();
+
+                if (progress >= 1) {
+                    completed = true;
+                    targetSnapshots.forEach((snapshot, index) => {
+                        const die = this.box.diceList[index] as DiceBoxDieWithBody | undefined;
+                        if (!die) return;
+                        this.applyDieTransform(die, snapshot);
+                        if (die.body) {
+                            if (typeof snapshot.bodyType === 'number') {
+                                die.body.type = snapshot.bodyType;
+                            }
+                            if (typeof snapshot.bodyMass === 'number') {
+                                die.body.mass = snapshot.bodyMass;
+                            }
+                            die.body.updateMassProperties?.();
+                            die.body.sleep?.();
+                        }
+                    });
+                    this.box.scene?.updateMatrixWorld?.(true);
+                    this.syncDiceHighlightShells();
+                    this.renderFrame();
+                    resolve();
+                    return;
+                }
+
+                stepIndex += 1;
+                scheduleStep();
+            };
+            scheduleStep();
+        });
+    }
+
+    private constrainThrowVectorsToVisibleTray(vectors: DiceBoxThrowVector[]): void {
+        const baseScale = this.styleProfile.baseScale ?? DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ?? 90;
+        const bounds = this.resolveVisibleTrayBounds();
+        const count = Math.max(1, vectors.length);
+        const halfX = Math.max(baseScale * 0.72, bounds.width * 0.26);
+        const halfY = Math.max(baseScale * 0.58, bounds.height * 0.24);
+        const laneSpacing = Math.min(
+            baseScale * 0.74,
+            Math.max(baseScale * 0.48, bounds.width / Math.max(3.2, count + 1.4)),
+        );
+        const startRowY = -Math.min(halfY * 0.28, baseScale * 0.28);
+        const throwHeight = Math.max(
+            baseScale * 0.18,
+            Math.min(baseScale * 0.3, Math.min(bounds.width, bounds.height) * 0.07),
+        );
+        const maxVelocityX = Math.max(baseScale * 0.28, bounds.width * 0.12);
+        const maxVelocityY = Math.max(baseScale * 0.24, bounds.height * 0.1);
+        const verticalVelocity = -Math.max(2.2, baseScale * 0.045);
+        const maxAngularVelocity = Math.max(5.5, baseScale * 0.1);
+
+        vectors.forEach((vector, index) => {
+            const orderOffset = index - (count - 1) / 2;
+            const targetX = clampNumber(orderOffset * laneSpacing, -halfX, halfX);
+            const targetY = clampNumber(
+                startRowY + (index % 2 === 0 ? -1 : 1) * Math.min(baseScale * 0.08, halfY * 0.12),
+                -halfY,
+                halfY,
+            );
+            if (vector.pos) {
+                this.setVector(vector.pos, {
+                    x: targetX,
+                    y: targetY,
+                    z: throwHeight + (index % 3) * baseScale * 0.02,
+                });
+            }
+            if (vector.velocity) {
+                const scaledVelocity = {
+                    x: -targetX * 0.72 + (index % 2 === 0 ? 1 : -1) * baseScale * 0.1,
+                    y: -targetY * 0.68 + Math.sin(index + 1) * baseScale * 0.08,
+                };
+                this.setVector(vector.velocity, {
+                    x: clampNumber(scaledVelocity.x, -maxVelocityX, maxVelocityX),
+                    y: clampNumber(scaledVelocity.y, -maxVelocityY, maxVelocityY),
+                    z: verticalVelocity,
+                });
+            }
+            if (vector.angle) {
+                this.setVector(vector.angle, {
+                    x: clampNumber(vector.angle.x * 0.72, -maxAngularVelocity, maxAngularVelocity),
+                    y: clampNumber(vector.angle.y * 0.72, -maxAngularVelocity, maxAngularVelocity),
+                    z: clampNumber(vector.angle.z * 0.72, -maxAngularVelocity, maxAngularVelocity),
+                });
+            }
+        });
+    }
+
+    private resolveContainedThrowStrength(): number {
+        const configuredStrength = resolveFiniteNumber(
+            this.styleProfile.strength,
+            DEFAULT_DICE_BOX_STYLE_PROFILE.strength ?? 1,
+        );
+        return clampNumber(configuredStrength, 0.08, 0.32);
+    }
+
+    private keepProjectedDieInsideCanvas(
+        die: DiceBoxDieWithBody,
+        canvasWidth: number,
+        canvasHeight: number,
+        margin: number,
+    ): void {
+        const layout = this.getProjectedLayout(this.box.diceList.indexOf(die), -1);
+        if (!layout) return;
+        const visualWidth = layout.visualWidth ?? layout.width;
+        const visualHeight = layout.visualHeight ?? layout.height;
+        let dx = 0;
+        let dy = 0;
+
+        if (layout.x - visualWidth / 2 < margin) {
+            dx = margin - (layout.x - visualWidth / 2);
+        } else if (layout.x + visualWidth / 2 > canvasWidth - margin) {
+            dx = canvasWidth - margin - (layout.x + visualWidth / 2);
+        }
+        if (layout.y - visualHeight / 2 < margin) {
+            dy = margin - (layout.y - visualHeight / 2);
+        } else if (layout.y + visualHeight / 2 > canvasHeight - margin) {
+            dy = canvasHeight - margin - (layout.y + visualHeight / 2);
+        }
+        if (Math.abs(dx) < 0.25 && Math.abs(dy) < 0.25) return;
+        this.translateDieByScreenDelta(die, layout, dx, dy, canvasWidth, canvasHeight);
+    }
+
+    private resolveVisibleTrayBounds(): DiceBoxWorldBounds {
+        const runtimeDisplay = (this.box as unknown as {
+            display?: { containerWidth?: number; containerHeight?: number };
+        }).display;
+        const width =
+            this.worldBounds.width ||
+            this.container.clientWidth ||
+            runtimeDisplay?.containerWidth ||
+            DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ||
+            90;
+        const height =
+            this.worldBounds.height ||
+            this.container.clientHeight ||
+            runtimeDisplay?.containerHeight ||
+            DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ||
+            90;
+        return {
+            width: Math.max(1, width),
+            height: Math.max(1, height),
+        };
+    }
+
     private async restoreDiceWithoutVisibleThrow(values: number[]): Promise<void> {
         const box = this.box as DiceBoxInternalRuntime;
         const notationVectors = box.startClickThrow?.(createNotation(values));
         const vectors = notationVectors?.vectors;
         if (!notationVectors || !Array.isArray(vectors) || vectors.length === 0 || !box.spawnDice || !box.simulateThrow) {
-            await this.rollToValues(values);
+            await this.rollWithThirdPartyDefault(values);
             return;
         }
 

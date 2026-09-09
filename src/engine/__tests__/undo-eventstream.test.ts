@@ -6,7 +6,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { executePipeline, createInitialSystemState, createSeededRandom } from '../pipeline';
+import { createActionLogSystem } from '../systems/ActionLogSystem';
 import { createEventStreamSystem, computeEventStreamDelta, getEventStreamEntries } from '../systems/EventStreamSystem';
+import { createTutorialSystem, TUTORIAL_COMMANDS } from '../systems/TutorialSystem';
 import { createUndoSystem, setUndoAiSeatIds, UNDO_COMMANDS } from '../systems/UndoSystem';
 import type { Command, DomainCore, GameEvent, MatchState, ValidationResult } from '../types';
 
@@ -53,6 +55,10 @@ function makeState(): MatchState<TestCore> {
 
 function exec(state: MatchState<TestCore>, command: TestCommand) {
   return executePipeline({ domain: testDomain, systems }, state, command, random, playerIds);
+}
+
+function execWithSystems(state: MatchState<TestCore>, command: TestCommand, activeSystems = systems) {
+  return executePipeline({ domain: testDomain, systems: activeSystems }, state, command, random, playerIds);
 }
 
 describe('撤回后 EventStream 行为', () => {
@@ -231,5 +237,74 @@ describe('撤回后 EventStream 行为', () => {
 
     expect(state.core.counter).toBe(2);
     expect(state.sys.undo.snapshots).toHaveLength(1);
+  });
+
+  it('教程上一步命令不应占用正式撤回快照', () => {
+    const tutorialSystems = [
+      createEventStreamSystem<TestCore>(),
+      createActionLogSystem<TestCore>({
+        commandAllowlist: ['INCREMENT'],
+        formatEntry: ({ command }) => ({
+          id: `log-${command.type}-${command.timestamp ?? 0}`,
+          timestamp: command.timestamp ?? 0,
+          actorId: command.playerId,
+          kind: command.type,
+          segments: [{ type: 'text', text: 'increment' }],
+        }),
+      }),
+      createUndoSystem<TestCore>({
+        requireApproval: true,
+        requiredApprovals: 1,
+        snapshotCommandAllowlist: ['INCREMENT'],
+      }),
+      createTutorialSystem<TestCore>(),
+    ];
+    let state: MatchState<TestCore> = {
+      core: testDomain.setup(),
+      sys: createInitialSystemState(playerIds, tutorialSystems, 'test-match'),
+    };
+
+    const domainCommand = execWithSystems(state, { type: 'INCREMENT', playerId: '0', payload: {} }, tutorialSystems);
+    expect(domainCommand.success).toBe(true);
+    state = domainCommand.state;
+    expect(state.sys.undo.snapshots).toHaveLength(1);
+    expect(state.sys.actionLog.entries).toHaveLength(1);
+
+    const manifest = {
+      id: 'tutorial-previous',
+      allowManualSkip: true,
+      steps: [
+        { id: 'intro', content: 'intro' },
+        { id: 'second', content: 'second' },
+      ],
+    };
+    const started = execWithSystems(state, {
+      type: TUTORIAL_COMMANDS.START,
+      playerId: '0',
+      payload: { manifest },
+    }, tutorialSystems);
+    expect(started.success).toBe(true);
+    state = started.state;
+
+    const next = execWithSystems(state, {
+      type: TUTORIAL_COMMANDS.NEXT,
+      playerId: '0',
+      payload: {},
+    }, tutorialSystems);
+    expect(next.success).toBe(true);
+    state = next.state;
+    expect(state.sys.tutorial.stepIndex).toBe(1);
+
+    const previous = execWithSystems(state, {
+      type: TUTORIAL_COMMANDS.PREVIOUS,
+      playerId: '0',
+      payload: {},
+    }, tutorialSystems);
+    expect(previous.success).toBe(true);
+    state = previous.state;
+
+    expect(state.sys.tutorial.stepIndex).toBe(0);
+    expect(state.sys.undo.snapshots).toHaveLength(1);
+    expect(state.sys.actionLog.entries).toHaveLength(1);
   });
 });

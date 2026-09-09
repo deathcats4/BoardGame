@@ -28,6 +28,14 @@ function resolveObjectCell(core: MageWarsCore, objectId?: string): FxCellCoord |
     return resolveZoneCell(core, core.objects[objectId]?.zoneId);
 }
 
+function measureCellDistance(source: FxCellCoord, target: FxCellCoord): number {
+    return Math.abs(source.row - target.row) + Math.abs(source.col - target.col);
+}
+
+function shouldRenderOrdinaryMoveCue(source: FxCellCoord, target: FxCellCoord): boolean {
+    return measureCellDistance(source, target) > 1;
+}
+
 function resolveIntensity(amount: number | undefined): FxContext['intensity'] {
     return amount !== undefined && amount >= 6 ? 'strong' : 'normal';
 }
@@ -183,6 +191,7 @@ export function mapMageWarsEventToFx(
         const source = resolveZoneCell(core, payload.fromZoneId);
         const target = resolveZoneCell(core, payload.toZoneId);
         if (!source || !target) return null;
+        if (!shouldRenderOrdinaryMoveCue(source, target)) return null;
 
         return {
             sourceEventId: entry.id,
@@ -207,13 +216,16 @@ export function mapMageWarsEventToFx(
         const source = resolveZoneCell(core, payload.fromZoneId);
         const target = resolveZoneCell(core, payload.toZoneId);
         if (!source || !target) return null;
+        const usesTeleportMovement = payload.movementMode === 'teleport';
+        const distance = measureCellDistance(source, target);
+        if (!usesTeleportMovement && !shouldRenderOrdinaryMoveCue(source, target)) return null;
 
         return {
             sourceEventId: entry.id,
-            cue: MW_FX.MOVE,
+            cue: usesTeleportMovement ? MW_FX.SPELL_TELEPORT : MW_FX.MOVE,
             ctx: {
                 cell: target,
-                intensity: payload.movementMode === 'teleport' ? 'strong' : 'normal',
+                intensity: usesTeleportMovement && distance > 1 ? 'strong' : 'normal',
             },
             params: {
                 source,
@@ -225,6 +237,7 @@ export function mapMageWarsEventToFx(
                 movementMode: payload.movementMode ?? 'normal',
                 actionCost: payload.actionCost,
                 sourceAbilityId: payload.sourceAbilityId,
+                ...(usesTeleportMovement ? { distance } : {}),
             },
         };
     }

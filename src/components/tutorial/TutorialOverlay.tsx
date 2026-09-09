@@ -7,6 +7,7 @@ import { HudPortal, UI_Z_INDEX } from "../../core";
 import { MOBILE_MAX_VIEWPORT_WIDTH } from "../../shared/mobileSupport";
 import { useRuntimeViewport } from "../../hooks/ui/useRuntimeViewport";
 import { OptimizedImage } from "../common/media/OptimizedImage";
+import type { TutorialStepSnapshot } from "../../engine/types";
 
 const TUTORIAL_NEXT_SOUND_KEY =
   "ui.general.khron_studio_rpg_interface_essentials_inventory_dialog_ucs_system_192khz.buttons.tab_switching_button.uiclick_tab_switching_button_01_krst_none";
@@ -128,8 +129,25 @@ const escapeTutorialTargetSelector = (value: string): string => {
   return value.replace(/["\\]/g, "\\$&");
 };
 
+const isPureAutomaticTutorialStep = (
+  step: TutorialStepSnapshot | null | undefined,
+) => Boolean(step?.aiActions?.length) && !step.requireAction && !step.infoStep;
+
+const hasPreviousVisibleTutorialStep = (
+  steps: TutorialStepSnapshot[],
+  currentIndex: number,
+) => {
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    const step = steps[index];
+    if (step && !isPureAutomaticTutorialStep(step)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const TutorialOverlay: React.FC = () => {
-  const { isActive, currentStep, nextStep, isLastStep, tutorial } = useTutorial();
+  const { isActive, currentStep, nextStep, previousStep, isLastStep, tutorial } = useTutorial();
   const stepNamespaces = [
     currentStep?.content,
     currentStep?.visual?.alt,
@@ -201,8 +219,10 @@ export const TutorialOverlay: React.FC = () => {
       }
     }
 
-    let resizeObserver: ResizeObserver | null = null;
+    let targetResizeObserver: ResizeObserver | null = null;
+    let tooltipResizeObserver: ResizeObserver | null = null;
     let rafId: number | null = null;
+    const canObserveResize = typeof ResizeObserver !== "undefined";
 
     const commitTooltipLayout = (nextStyles: TutorialTooltipStyles) => {
       setTooltipStyles((prev) =>
@@ -507,12 +527,21 @@ export const TutorialOverlay: React.FC = () => {
         return;
       }
 
-      const padding = 12;
+      const padding = currentStep.requireAction ? 20 : 12;
       const tooltipWidth = hasStepVisual ? 520 : 384;
-      // 用实际 DOM 尺寸，首次渲染前 fallback 到估算值
+      // 用实际 DOM 尺寸；首次渲染前使用偏保守的高度，避免提示卡短暂压住玩家要点的目标。
       const measured = tooltipRef.current?.getBoundingClientRect();
-      const tooltipHeight = measured ? measured.height : 160;
-      const actualTooltipWidth = measured ? measured.width : tooltipWidth;
+      const hasMeasuredTooltip = Boolean(
+        measured && measured.width > 1 && measured.height > 1,
+      );
+      const tooltipHeight = hasMeasuredTooltip
+        ? measured!.height
+        : hasStepVisual
+          ? 480
+          : 220;
+      const actualTooltipWidth = hasMeasuredTooltip
+        ? measured!.width
+        : tooltipWidth;
 
       const spaceRight = viewportWidth - rect.right;
       const spaceLeft = rect.left;
@@ -699,9 +728,9 @@ export const TutorialOverlay: React.FC = () => {
             }
             hasAutoScrolledRef.current = true;
           }
-          if (!resizeObserver) {
-            resizeObserver = new ResizeObserver(() => updateLayout());
-            resizeObserver.observe(el);
+          if (canObserveResize && !targetResizeObserver) {
+            targetResizeObserver = new ResizeObserver(() => updateLayout());
+            targetResizeObserver.observe(el);
           }
         } else {
           applyLayout(null);
@@ -723,10 +752,15 @@ export const TutorialOverlay: React.FC = () => {
       rafId = requestAnimationFrame(poll);
     };
     rafId = requestAnimationFrame(poll);
+    if (canObserveResize && tooltipRef.current) {
+      tooltipResizeObserver = new ResizeObserver(() => updateLayout());
+      tooltipResizeObserver.observe(tooltipRef.current);
+    }
 
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
-      resizeObserver?.disconnect();
+      targetResizeObserver?.disconnect();
+      tooltipResizeObserver?.disconnect();
     };
   }, [
     currentStep,
@@ -792,6 +826,23 @@ export const TutorialOverlay: React.FC = () => {
   const visualCaption = currentVisual?.caption
     ? t(currentVisual.caption)
     : undefined;
+  const canGoPrevious =
+    tutorial.active &&
+    hasPreviousVisibleTutorialStep(tutorial.steps ?? [], tutorial.stepIndex);
+  const navigationButtonSizeClass = isBottomConfirmStep
+    ? "rounded-sm py-2.5 text-xs tracking-[0.12em]"
+    : isCompactTutorialLayout
+      ? "rounded-lg py-2 text-[12px] tracking-[0.14em]"
+      : "py-2 text-sm tracking-widest";
+  const navigationButtonBaseClass = `touch-target-min font-bold uppercase transition-all cursor-pointer flex items-center justify-center text-center relative z-10 pointer-events-auto ${navigationButtonSizeClass}`;
+  const previousButtonClass = `${navigationButtonBaseClass} shrink-0 border border-[#c9b995] bg-[#fcfbf9] px-3 text-[#5f4a2f] hover:bg-[#f3f0e6]`;
+  const nextButtonClass = `${navigationButtonBaseClass} ${canGoPrevious ? "flex-1" : "w-full"} bg-[#433422] hover:bg-[#2b2114] text-[#fcfbf9] ${
+    isBottomConfirmStep ? "border border-[#f3e8cc]/70 shadow-[0_6px_18px_rgba(0,0,0,0.34)]" : ""
+  }`;
+  const handlePreviousStep = () => {
+    playSound(TUTORIAL_NEXT_SOUND_KEY);
+    previousStep();
+  };
 
   const overlay = (
     <div
@@ -917,35 +968,51 @@ export const TutorialOverlay: React.FC = () => {
           ) : null}
 
           {!currentStep.requireAction && (
-            <button
-              data-testid="tutorial-next-button"
-              onClick={() => {
-                playSound(TUTORIAL_NEXT_SOUND_KEY);
-                nextStep("manual");
-              }}
-              className={`touch-target-min w-full bg-[#433422] hover:bg-[#2b2114] text-[#fcfbf9] font-bold uppercase transition-all cursor-pointer flex items-center justify-center text-center relative z-10 pointer-events-auto ${
-                isBottomConfirmStep
-                  ? "rounded-sm border border-[#f3e8cc]/70 py-2.5 text-xs tracking-[0.12em] shadow-[0_6px_18px_rgba(0,0,0,0.34)]"
-                  : isCompactTutorialLayout
-                    ? "py-2 text-[12px] tracking-[0.14em] rounded-lg"
-                    : "py-2 text-sm tracking-widest"
-              }`}
-            >
-              {isBottomConfirmStep
-                ? t("overlay.next")
-                : isLastStep
-                  ? t("overlay.finish")
-                  : t("overlay.next")}
-            </button>
+            <div className="flex w-full items-stretch gap-2">
+              {canGoPrevious ? (
+                <button
+                  data-testid="tutorial-previous-button"
+                  onClick={handlePreviousStep}
+                  className={previousButtonClass}
+                >
+                  {t("overlay.previous")}
+                </button>
+              ) : null}
+              <button
+                data-testid="tutorial-next-button"
+                onClick={() => {
+                  playSound(TUTORIAL_NEXT_SOUND_KEY);
+                  nextStep("manual");
+                }}
+                className={nextButtonClass}
+              >
+                {isBottomConfirmStep
+                  ? t("overlay.next")
+                  : isLastStep
+                    ? t("overlay.finish")
+                    : t("overlay.next")}
+              </button>
+            </div>
           )}
 
           {currentStep.requireAction && (
-            <div
-              data-testid="tutorial-action-hint"
-              className={`flex items-center gap-2 font-bold text-[#8c7b64] bg-[#f3f0e6]/50 border border-[#e5e0d0]/50 justify-center italic ${isCompactTutorialLayout ? "text-[11px] rounded-lg p-2" : "text-sm p-2"}`}
-            >
-              <span className="animate-pulse w-2 h-2 rounded-full bg-[#c0a080]"></span>
-              {t("overlay.clickToContinue")}
+            <div className="flex w-full items-stretch gap-2">
+              {canGoPrevious ? (
+                <button
+                  data-testid="tutorial-previous-button"
+                  onClick={handlePreviousStep}
+                  className={previousButtonClass}
+                >
+                  {t("overlay.previous")}
+                </button>
+              ) : null}
+              <div
+                data-testid="tutorial-action-hint"
+                className={`flex items-center gap-2 font-bold text-[#8c7b64] bg-[#f3f0e6]/50 border border-[#e5e0d0]/50 justify-center italic ${canGoPrevious ? "flex-1" : "w-full"} ${isCompactTutorialLayout ? "text-[11px] rounded-lg p-2" : "text-sm p-2"}`}
+              >
+                <span className="animate-pulse w-2 h-2 rounded-full bg-[#c0a080]"></span>
+                {t("overlay.clickToContinue")}
+              </div>
             </div>
           )}
         </div>

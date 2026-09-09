@@ -2,6 +2,7 @@
   "overlay": {
     "finish": "Finish and return",
     "next": "Next",
+    "previous": "Back",
     "clickToContinue": "Complete the current action to continue",
     "skipped": "{{count}} step(s) do not apply to this situation and were skipped."
   },

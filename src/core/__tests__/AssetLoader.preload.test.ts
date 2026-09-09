@@ -152,6 +152,46 @@ describe('preloadCriticalImages', () => {
         vi.useRealTimers();
     });
 
+    it('慢速本地图片超时后不继续请求远端或回退候选', async () => {
+        vi.useFakeTimers();
+
+        const requestedUrls: string[] = [];
+        vi.stubGlobal('Image', class {
+            onload: (() => void) | null = null;
+            onerror: (() => void) | null = null;
+            naturalWidth = 0;
+            naturalHeight = 0;
+            complete = false;
+            private _src = '';
+
+            get src() { return this._src; }
+            set src(value: string) {
+                this._src = value;
+                requestedUrls.push(value);
+            }
+        });
+
+        registerGameAssets('test-slow-local-primary', {
+            criticalImages: ['mage-wars/cards/mages/mages-core-atlas'],
+        });
+
+        const promise = preloadCriticalImages('test-slow-local-primary', undefined, 'zh-CN');
+
+        await vi.advanceTimersByTimeAsync(30_001);
+        await vi.runAllTimersAsync();
+
+        const warm = await promise;
+        expect(warm).toEqual([]);
+        expect(requestedUrls.length).toBeGreaterThan(0);
+        expect(requestedUrls.every((url) => (
+            url.includes('/assets/i18n/zh-CN/mage-wars/cards/mages/compressed/mages-core-atlas.webp')
+        ))).toBe(true);
+        expect(requestedUrls.some((url) => url.includes('assets.easyboardgame.top'))).toBe(false);
+        expect(requestedUrls.some((url) => url.includes('/i18n/en/'))).toBe(false);
+
+        vi.useRealTimers();
+    });
+
     it('图片 naturalWidth 已可用但 onload 不触发时，也应视为加载成功', async () => {
         vi.stubGlobal('Image', class {
             onload: (() => void) | null = null;

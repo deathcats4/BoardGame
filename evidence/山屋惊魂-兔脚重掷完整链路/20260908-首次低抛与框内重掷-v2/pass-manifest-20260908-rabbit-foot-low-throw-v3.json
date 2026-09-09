@@ -1,0 +1,71 @@
+{
+  "verdict": "PASS",
+  "scope": "current-user-request",
+  "display": {
+    "purpose": "final-user-visible-delivery",
+    "trigger": "user-requested-open",
+    "viewer": "pureref",
+    "finalPassBeforeOpen": true
+  },
+  "requirements": [
+    {
+      "requirement": "第一次投掷也要改力度，投掷过程要在骰盘内低空可见",
+      "status": "PASS",
+      "evidence": [
+        "01-首次投掷动画进行中.jpg 显示首次投掷低空在框内可见",
+        "E2E motion capture 覆盖首次 roll motion"
+      ]
+    },
+    {
+      "requirement": "兔脚可选骰子方框清楚、贴边、不遮挡骰子、不产生大间隙",
+      "status": "PASS",
+      "evidence": [
+        "03-兔脚选中后可选骰子方框.jpg 显示三颗候选骰子青色贴边 shader 外壳",
+        "端到端断言验证 DOM 层无可见大框且命中区贴合骰子投影"
+      ]
+    },
+    {
+      "requirement": "选中后高亮清楚可见，仍不遮挡骰子",
+      "status": "PASS",
+      "evidence": [
+        "04-选中骰子等待确认使用.jpg 显示选中骰子洋红 shader 外壳",
+        "端到端断言验证 selected 高亮色为 0xff2dfb 且 shader 外扩"
+      ]
+    },
+    {
+      "requirement": "兔脚重掷不能闪现，动画过程要在框内可见",
+      "status": "PASS",
+      "evidence": [
+        "05-兔脚重掷动画进行中.jpg 显示重掷运动帧在骰盘内可见",
+        "E2E motion capture 覆盖 reroll motion"
+      ]
+    },
+    {
+      "requirement": "兔脚重投完毕后必须仍有确认骰面步骤",
+      "status": "PASS",
+      "evidence": [
+        "06-兔脚重掷后确认骰面仍可见.jpg 显示新骰面和确认 0/1",
+        "07-确认骰面后结算返回牌桌.jpg 证明确认后才结算退场"
+      ]
+    }
+  ],
+  "sourceImages": [
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/01-首次投掷动画进行中.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/02-兔脚重掷前最近投骰可见.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/03-兔脚选中后可选骰子方框.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/04-选中骰子等待确认使用.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/05-兔脚重掷动画进行中.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/06-兔脚重掷后确认骰面仍可见.jpg",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/07-确认骰面后结算返回牌桌.jpg"
+  ],
+  "images": [
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/00-sequence-index.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/01-labeled-01-首次投掷动画进行中.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/02-labeled-02-兔脚重掷前最近投骰可见.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/03-labeled-03-兔脚选中后可选骰子方框.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/04-labeled-04-选中骰子等待确认使用.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/05-labeled-05-兔脚重掷动画进行中.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/06-labeled-06-兔脚重掷后确认骰面仍可见.png",
+    "D:/gongzuo/webgame/BoardGame/evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2/_labeled-for-user/07-labeled-07-确认骰面后结算返回牌桌.png"
+  ]
+}

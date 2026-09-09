@@ -7,6 +7,7 @@ import type {
   BetrayalCore,
   BetrayalInventoryCard,
 } from "../../src/games/betrayal/game";
+import { BETRAYAL_DISCOVERY_POOLS } from "../../src/games/betrayal/scenarioConfig";
 import {
   armPhysicalDiceRerollMotionCapture,
   clickDiscoveryBackdropAndExpectStillVisible,
@@ -23,18 +24,28 @@ import {
   warmBetrayalFrontend,
 } from "./betrayalTestHelpers";
 
-const EVIDENCE_DIR = "evidence/山屋惊魂-兔脚重掷完整链路/20260908-真实单骰重掷-v1";
-const BEFORE_REROLL_SCREENSHOT = `${EVIDENCE_DIR}/01-兔脚重掷前最近投骰可见.jpg`;
-const RABBIT_FOOT_SELECTED_SCREENSHOT = `${EVIDENCE_DIR}/02-兔脚选中后可选骰子方框.jpg`;
-const REROLL_SELECTED_SCREENSHOT = `${EVIDENCE_DIR}/03-选中骰子等待确认使用.jpg`;
-const REROLL_MOTION_SCREENSHOT = `${EVIDENCE_DIR}/04-兔脚重掷动画进行中.jpg`;
-const REROLL_FINALIZED_SCREENSHOT = `${EVIDENCE_DIR}/05-自动结算后返回牌桌.jpg`;
+const EVIDENCE_DIR = "evidence/山屋惊魂-兔脚重掷完整链路/20260908-首次低抛与框内重掷-v2";
+const INITIAL_ROLL_MOTION_SCREENSHOT = `${EVIDENCE_DIR}/01-首次投掷动画进行中.jpg`;
+const BEFORE_REROLL_SCREENSHOT = `${EVIDENCE_DIR}/02-兔脚重掷前最近投骰可见.jpg`;
+const RABBIT_FOOT_SELECTED_SCREENSHOT = `${EVIDENCE_DIR}/03-兔脚选中后可选骰子方框.jpg`;
+const REROLL_SELECTED_SCREENSHOT = `${EVIDENCE_DIR}/04-选中骰子等待确认使用.jpg`;
+const REROLL_MOTION_SCREENSHOT = `${EVIDENCE_DIR}/05-兔脚重掷动画进行中.jpg`;
+const REROLL_RESULT_CONFIRM_SCREENSHOT = `${EVIDENCE_DIR}/06-兔脚重掷后确认骰面仍可见.jpg`;
+const REROLL_FINALIZED_SCREENSHOT = `${EVIDENCE_DIR}/07-确认骰面后结算返回牌桌.jpg`;
 const REROLL_HIGHLIGHT_RENDERER = "threejs-backside-shader-shell";
 const REROLL_VISUAL_CONTRACT =
-  "projected-face-svg-outline-plus-threejs-shell";
+  "threejs-shader-shell-plus-transparent-hitbox";
+const REROLL_CANDIDATE_COLOR = 0x00e7ff;
+const REROLL_SELECTED_COLOR = 0xff2dfb;
 
 function createRabbitFootRerollCore(): BetrayalCore {
   const core = createRuntimeCore();
+  const alienGeometryEvent = BETRAYAL_DISCOVERY_POOLS.events.find(
+    (event) => event.name === "外星几何",
+  );
+  if (!alienGeometryEvent) {
+    throw new Error("E2E 需要正式事件牌：外星几何");
+  }
   const rabbitFoot: BetrayalInventoryCard = {
     id: "rope",
     name: "兔脚",
@@ -52,54 +63,26 @@ function createRabbitFootRerollCore(): BetrayalCore {
   core.turnStartInventoryCardIds = ["rope"];
   core.usedCardIdsThisTurn = [];
   core.recommendedAction = "use";
+  core.eventOrder = [
+    alienGeometryEvent,
+    ...core.eventOrder.filter((event) => event.name !== alienGeometryEvent.name),
+  ];
   core.latestDiscovery = {
     kind: "event",
     title: "外星几何",
-    summary: "知识检定失败",
-    detail: "知识检定 2：失去 1 点速度；等待可介入结果",
-    tone: "warning",
+    summary: "等待知识检定",
+    detail: "知识检定：等待投骰",
+    tone: "accent",
   };
   core.latestDiscoveryOwnerPlayerId = "0";
-  core.recentRoll = {
-    id: "rabbit-foot-reroll-e2e-roll",
-    kind: "eventTraitCheck",
+  core.recentRoll = null;
+  core.pendingEventRollStart = {
     playerId: "0",
+    roomId: core.currentExplorer.roomId,
     sourceTitle: "外星几何",
-    trait: "knowledge",
-    rollLabel: "知识检定",
-    dice: [2, 0, 0],
-    passiveBonus: 0,
-    latestLabel: "失去 1 点速度",
-    consumedRabbitFootCardIds: [],
-    branchThresholds: [
-      {
-        min: 4,
-        label: "获得 1 点知识",
-        effect: {
-          mode: "trait",
-          trait: "knowledge",
-          amount: 1,
-          recommendedAction: "explore",
-        },
-      },
-      {
-        min: 0,
-        label: "失去 1 点速度",
-        effect: {
-          mode: "trait",
-          trait: "speed",
-          amount: -1,
-          recommendedAction: "endTurn",
-        },
-      },
-    ],
+    eventDescription: alienGeometryEvent.description,
   };
-  core.pendingEventRollResolution = {
-    rollId: core.recentRoll.id,
-    playerId: "0",
-    sourceTitle: "外星几何",
-    effect: { mode: "trait", trait: "speed", amount: -1, recommendedAction: "endTurn" },
-  };
+  core.pendingEventRollResolution = null;
 
   return core;
 }
@@ -137,6 +120,7 @@ async function expectRabbitFootRerollHighlightState(
               diceHighlights?: Array<{
                 dieIndex?: number;
                 variant?: string;
+                color?: number;
                 scale?: number;
                 opacity?: number;
               }>;
@@ -152,6 +136,9 @@ async function expectRabbitFootRerollHighlightState(
                 depthWrite?: boolean;
                 transparent?: boolean;
                 shaderOpacity?: number;
+                shaderIntensity?: number;
+                shaderOutlineOffset?: number;
+                blending?: number;
               }>;
             } | null>;
           }
@@ -186,46 +173,6 @@ async function expectRabbitFootRerollHighlightState(
           const hitHeight = Number(target.dataset.rerollTargetHitHeight);
           const visibleWidth = Number(target.dataset.rerollTargetVisualWidth);
           const visibleHeight = Number(target.dataset.rerollTargetVisualHeight);
-          const candidateOutline = target.querySelector<Element>(
-            '[data-reroll-target-candidate-box="true"]',
-          );
-          const selectedOutline = target.querySelector<Element>(
-            '[data-reroll-target-selected-border="true"]',
-          );
-          const visibleOutline = candidateOutline ?? selectedOutline;
-          const outlineStyle = visibleOutline
-            ? getComputedStyle(visibleOutline)
-            : null;
-          const outlineStroke =
-            visibleOutline?.querySelector<Element>(
-              '[data-reroll-target-outline-stroke="true"]',
-            ) ?? visibleOutline;
-          const outlineStrokeStyle = outlineStroke
-            ? getComputedStyle(outlineStroke)
-            : null;
-          const parsePx = (value: string | undefined) =>
-            Number.parseFloat(value ?? "0") || 0;
-          const parseAlpha = (value: string | undefined) => {
-            if (!value || value === "transparent") return 0;
-            const parts = value
-              .replace(/[^\d.,]/g, "")
-              .split(",")
-              .filter(Boolean)
-              .map(Number);
-            return parts.length >= 4 ? parts[3] : 1;
-          };
-          const outlineBorderMaxPx = outlineStyle
-            ? Math.max(
-                parsePx(outlineStyle.borderTopWidth),
-                parsePx(outlineStyle.borderRightWidth),
-                parsePx(outlineStyle.borderBottomWidth),
-                parsePx(outlineStyle.borderLeftWidth),
-              )
-            : 0;
-          const outlineEffect =
-            outlineStyle && outlineStyle.filter !== "none"
-              ? outlineStyle.filter
-              : outlineStyle?.boxShadow ?? "";
           return {
             dieIndex,
             selected: target.dataset.rerollTargetSelected === "true",
@@ -255,22 +202,14 @@ async function expectRabbitFootRerollHighlightState(
               (hitWidth - visibleWidth) / 2,
               (hitHeight - visibleHeight) / 2,
             ),
-            domCandidateVisual: Boolean(candidateOutline),
-            domSelectedBorder: Boolean(selectedOutline),
-            outlineExists: Boolean(visibleOutline),
-            outlineWidth: outlineStrokeStyle
-              ? parsePx(outlineStrokeStyle.strokeWidth)
-              : outlineStyle
-                ? parsePx(outlineStyle.outlineWidth)
-                : 0,
-            outlineOffset: outlineStyle ? parsePx(outlineStyle.outlineOffset) : 0,
-            outlineColor:
-              outlineStrokeStyle?.stroke ?? outlineStyle?.outlineColor ?? "",
-            outlineBorderMaxPx,
-            outlineBackgroundAlpha: parseAlpha(
-              outlineStrokeStyle?.fill ?? outlineStyle?.backgroundColor,
+            domCandidateVisualExists: Boolean(
+              target.querySelector(
+                '[data-reroll-target-candidate-underline="true"], [data-reroll-target-candidate-box="true"]',
+              ),
             ),
-            outlineBoxShadow: outlineEffect,
+            domSelectedBorderExists: Boolean(
+              target.querySelector('[data-reroll-target-selected-border="true"]'),
+            ),
             highlight:
               highlights.find((highlight) => highlight.dieIndex === dieIndex) ??
               null,
@@ -314,7 +253,7 @@ async function expectRabbitFootRerollHighlightState(
           return `source:${metrics.sourceRenderer}`;
         if (metrics.canvasRenderer !== REROLL_HIGHLIGHT_RENDERER)
           return `canvas:${metrics.canvasRenderer}`;
-        if (metrics.domVisualBoxCount !== targetCount)
+        if (metrics.domVisualBoxCount !== 0)
           return `dom-boxes:${metrics.domVisualBoxCount}`;
         if (metrics.targets.length !== targetCount)
           return `targets:${metrics.targets.length}/${targetCount}`;
@@ -337,21 +276,19 @@ async function expectRabbitFootRerollHighlightState(
     for (let rightIndex = leftIndex + 1; rightIndex < metrics.targets.length; rightIndex += 1) {
       const leftTarget = metrics.targets[leftIndex];
       const rightTarget = metrics.targets[rightIndex];
-      const leftInflate = Math.max(0, leftTarget.outlineOffset + leftTarget.outlineWidth);
-      const rightInflate = Math.max(0, rightTarget.outlineOffset + rightTarget.outlineWidth);
       const overlapWidth = Math.max(
         0,
-        Math.min(leftTarget.right + leftInflate, rightTarget.right + rightInflate) -
-          Math.max(leftTarget.left - leftInflate, rightTarget.left - rightInflate),
+        Math.min(leftTarget.right, rightTarget.right) -
+          Math.max(leftTarget.left, rightTarget.left),
       );
       const overlapHeight = Math.max(
         0,
-        Math.min(leftTarget.bottom + leftInflate, rightTarget.bottom + rightInflate) -
-          Math.max(leftTarget.top - leftInflate, rightTarget.top - rightInflate),
+        Math.min(leftTarget.bottom, rightTarget.bottom) -
+          Math.max(leftTarget.top, rightTarget.top),
       );
       expect(
         overlapWidth * overlapHeight,
-        `第 ${leftTarget.dieIndex + 1} 颗和第 ${rightTarget.dieIndex + 1} 颗改骰方框不能重叠：${JSON.stringify(metrics)}`,
+        `第 ${leftTarget.dieIndex + 1} 颗和第 ${rightTarget.dieIndex + 1} 颗改骰透明热区不能重叠：${JSON.stringify(metrics)}`,
       ).toBeLessThanOrEqual(1);
     }
   }
@@ -364,35 +301,30 @@ async function expectRabbitFootRerollHighlightState(
       `WebGL 辅助高亮必须继续来自 Three.js 骰体描边：${evidence}`,
     ).toBe(REROLL_HIGHLIGHT_RENDERER);
     expect(target.visualContract).toBe(REROLL_VISUAL_CONTRACT);
-    expect(target.visualLayer).toBe(REROLL_VISUAL_CONTRACT);
-    expect(target.outlinePaint).toBe("projected-face-outside-svg-outline");
+    expect(target.visualLayer).toBe("transparent-hitbox-only");
+    expect(target.outlinePaint).toBe(REROLL_HIGHLIGHT_RENDERER);
     expect(Number.isFinite(target.outlineRotateZ)).toBe(true);
     expect(
       target.outlinePointCount,
-      `可见方框必须由当前可见骰面四角投影生成：${evidence}`,
-    ).toBeGreaterThanOrEqual(4);
+      `DOM 层不再绘制可见方框，方框必须由 Three.js shader 外壳承担：${evidence}`,
+    ).toBe(0);
     expect(
       target.outlinePoints,
-      `可见方框必须暴露屏幕投影点，避免退回离体矩形：${evidence}`,
-    ).toMatch(/\d/);
+      `DOM 层不再保存可见方框投影点，避免和 shader 外壳形成双框：${evidence}`,
+    ).toBe("");
     expect(target.targetTransform).not.toBe("none");
     expect(Math.abs(target.targetWidth - target.visibleWidth)).toBeLessThanOrEqual(1.5);
     expect(Math.abs(target.targetHeight - target.visibleHeight)).toBeLessThanOrEqual(1.5);
     expect(target.hitBoxPadding).toBeGreaterThanOrEqual(0);
     expect(target.hitBoxPadding).toBeLessThanOrEqual(1);
     expect(
-      target.domCandidateVisual,
-      `未选候选必须有可见外描边，选中后候选描边退场：${evidence}`,
-    ).toBe(!isSelected);
+      target.domCandidateVisualExists,
+      `DOM 层不得保留候选底线或候选框，避免遮挡骰子或和 shader 外壳错位：${evidence}`,
+    ).toBe(false);
     expect(
-      target.domSelectedBorder,
-      `只有选中骰子显示选中外描边：${evidence}`,
-    ).toBe(isSelected);
-    expect(target.outlineExists, `骰子外描边必须真实存在：${evidence}`).toBe(true);
-    expect(target.outlineOffset, `外描边必须贴边，不能产生离体空隙：${evidence}`).toBe(0);
-    expect(target.outlineBorderMaxPx, `外描边不得用 border 向内盖住骰面：${evidence}`).toBe(0);
-    expect(target.outlineBackgroundAlpha, `外描边内部必须透明，不得盖住骰子：${evidence}`).toBe(0);
-    expect(target.outlineBoxShadow, `外描边需要发光辅助，不能弱到看不清：${evidence}`).not.toBe("none");
+      target.domSelectedBorderExists,
+      `DOM 层不得保留选中边框，选中高亮必须由 shader 外壳承担：${evidence}`,
+    ).toBe(false);
     expect(target.selected, `选中状态必须只落在目标骰子：${evidence}`).toBe(isSelected);
     expect(target.highlight, `缺少 WebGL 高亮状态：${evidence}`).not.toBeNull();
     expect(target.shell, `缺少 WebGL 描边外壳：${evidence}`).not.toBeNull();
@@ -403,30 +335,36 @@ async function expectRabbitFootRerollHighlightState(
     expect(target.shell?.depthWrite).toBe(false);
     expect(target.shell?.transparent).toBe(true);
     expect(target.shell?.shaderOpacity).toBe(target.shell?.opacity);
+    expect(target.shell?.blending).toBe(2);
     if (isSelected) {
-      expect(target.outlineColor).toMatch(/255,\s*212,\s*71/);
-      expect(target.outlineWidth).toBeGreaterThanOrEqual(3);
-      expect(target.outlineWidth).toBeLessThanOrEqual(4);
       expect(target.highlight?.variant).toBe("selected");
+      expect(
+        target.highlight?.color,
+        "选中骰子的高亮色必须和黄色骰子本体强对比，不能退回黄色外壳",
+      ).toBe(REROLL_SELECTED_COLOR);
       expect(target.shell?.variant).toBe("selected");
-      expect(target.shell?.scale).toBeGreaterThanOrEqual(1.06);
-      expect(target.shell?.scale).toBeLessThanOrEqual(1.075);
+      expect(target.shell?.scale).toBeGreaterThanOrEqual(1.07);
+      expect(target.shell?.scale).toBeLessThanOrEqual(1.08);
       expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.95);
+      expect(target.shell?.shaderIntensity).toBeGreaterThanOrEqual(1.5);
+      expect(target.shell?.shaderOutlineOffset).toBeGreaterThanOrEqual(0.024);
     } else {
-      expect(target.outlineColor).toMatch(/0,\s*231,\s*255/);
-      expect(target.outlineWidth).toBeGreaterThanOrEqual(2);
-      expect(target.outlineWidth).toBeLessThanOrEqual(3);
       expect(target.highlight?.variant).toBe("candidate");
+      expect(target.highlight?.color).toBe(REROLL_CANDIDATE_COLOR);
       expect(target.shell?.variant).toBe("candidate");
       expect(target.shell?.scale).toBeGreaterThanOrEqual(1.04);
       expect(target.shell?.scale).toBeLessThanOrEqual(1.055);
       expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.95);
+      expect(target.shell?.shaderIntensity).toBeGreaterThanOrEqual(1.05);
+      expect(target.shell?.shaderIntensity).toBeLessThan(1.3);
+      expect(target.shell?.shaderOutlineOffset).toBeGreaterThanOrEqual(0.012);
+      expect(target.shell?.shaderOutlineOffset).toBeLessThan(0.02);
     }
   }
 }
 
 test.describe("山屋惊魂兔脚重掷完整链路", () => {
-  test("兔脚从最近投骰选择骰子、确认使用并等待自动结算", async ({
+  test("兔脚确认使用后显示新骰面并等待确认结果", async ({
     page,
     context,
   }) => {
@@ -446,12 +384,99 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
     await expect(page.getByTestId("betrayal-board")).toBeVisible({
       timeout: 30000,
     });
-    await expect(page.getByTestId("betrayal-discovery-panel")).toBeVisible();
+    const discoveryPanel = page.getByTestId("betrayal-discovery-panel");
+    await expect(discoveryPanel).toBeVisible();
+    await expect(page.getByTestId("betrayal-discovery-detail")).toContainText(
+      "知识检定：等待投骰",
+    );
+    const eventRollStart = page.getByTestId("betrayal-event-roll-start");
+    await expect(eventRollStart).toBeVisible();
+    await expect(eventRollStart).toBeEnabled();
+    await setHarnessRandomQueue(page, [0.99, 0.01, 0.01]);
+    const rollPanel = page.getByTestId("betrayal-recent-roll-panel");
+    const initialRollMotionCapture = await armPhysicalDiceRerollMotionCapture(discoveryPanel, {
+      motionType: "roll",
+      dieIndex: 1,
+      minScreenShiftPx: 8,
+    });
+    try {
+      await eventRollStart.click();
+      await expect(rollPanel).toBeVisible();
+      const initialRollMotionEvidence = (await initialRollMotionCapture.saveVisibleFrame(
+        INITIAL_ROLL_MOTION_SCREENSHOT,
+      )) as {
+        motionEvidenceType?: string;
+        screenShiftPx?: number;
+        screenBoundsShiftPx?: number;
+        positionShift?: number;
+        rotationShift?: number;
+        screenshotFrame?: {
+          canvasWidth?: number;
+          canvasHeight?: number;
+          currentLayout?: {
+            minX: number;
+            maxX: number;
+            minY: number;
+            maxY: number;
+          } | null;
+          visibleShiftPx?: number;
+          positionShift?: number;
+          rotationShift?: number;
+          motionEvidenceType?: string;
+          motionType?: string;
+        };
+      };
+      const initialMotionAmount = Math.max(
+        initialRollMotionEvidence.screenShiftPx ?? 0,
+        initialRollMotionEvidence.screenBoundsShiftPx ?? 0,
+        initialRollMotionEvidence.positionShift ?? 0,
+        initialRollMotionEvidence.rotationShift ?? 0,
+        initialRollMotionEvidence.screenshotFrame?.visibleShiftPx ?? 0,
+        initialRollMotionEvidence.screenshotFrame?.positionShift ?? 0,
+        initialRollMotionEvidence.screenshotFrame?.rotationShift ?? 0,
+      );
+      expect(
+        initialRollMotionEvidence.motionEvidenceType ??
+          initialRollMotionEvidence.screenshotFrame?.motionEvidenceType ??
+          "",
+        `首次投掷动画截图必须来自真实投掷过程中的位移、位置变化或旋转变化：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toMatch(/^(screen-shift|position-shift|rotation-shift)$/);
+      expect(
+        initialMotionAmount,
+        `首次投掷动画截图必须有可见运动量，不能只截停稳骰盘：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBeGreaterThan(0);
+      const initialMotionFrame = initialRollMotionEvidence.screenshotFrame;
+      const initialMotionLayout = initialMotionFrame?.currentLayout;
+      expect(
+        initialMotionFrame?.motionType,
+        `首次投掷过程帧必须绑定 roll 运动态：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBe("roll");
+      expect(
+        initialMotionLayout,
+        `首次投掷过程帧必须能读到目标骰子的屏幕投影：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).not.toBeNull();
+      expect(
+        initialMotionLayout!.minX,
+        `首次投掷过程帧不能水平离开骰盘画布：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBeGreaterThanOrEqual(-2);
+      expect(
+        initialMotionLayout!.maxX,
+        `首次投掷过程帧不能水平离开骰盘画布：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBeLessThanOrEqual((initialMotionFrame?.canvasWidth ?? 0) + 2);
+      expect(
+        initialMotionLayout!.minY,
+        `首次投掷过程帧不能在俯视方向飞出可见画布：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBeGreaterThanOrEqual(-2);
+      expect(
+        initialMotionLayout!.maxY,
+        `首次投掷过程帧不能在俯视方向飞出可见画布：${JSON.stringify(initialRollMotionEvidence)}`,
+      ).toBeLessThanOrEqual((initialMotionFrame?.canvasHeight ?? 0) + 2);
+    } finally {
+      await initialRollMotionCapture.stop();
+    }
     await expect(page.getByTestId("betrayal-discovery-detail")).toContainText(
       "知识检定 2",
     );
-    const rollPanel = page.getByTestId("betrayal-recent-roll-panel");
-    await expect(rollPanel).toBeVisible();
     await expectVisiblePhysicalDiceBox(rollPanel);
     await waitForPhysicalDiceSettled(rollPanel);
     await expectPhysicalDiceSeparated(rollPanel, {
@@ -472,7 +497,6 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
       "data-roll-modifier-available",
       "true",
     );
-    const discoveryPanel = page.getByTestId("betrayal-discovery-panel");
     await clickDiscoveryBackdropAndExpectStillVisible(page, discoveryPanel);
     await expect(rollPanel).toBeVisible();
     await saveScreenshot(page, BEFORE_REROLL_SCREENSHOT);
@@ -517,8 +541,8 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
     });
     expect(
       targetBox.outlinePaint,
-      "选骰方框必须使用当前可见骰面投影生成的外描边",
-    ).toBe("projected-face-outside-svg-outline");
+      "选骰高亮必须来自 Three.js 骰体 shader 外壳，DOM 层只做透明命中区",
+    ).toBe(REROLL_HIGHLIGHT_RENDERER);
     expect(
       Number.isFinite(targetBox.outlineRotateZ),
       "选骰方框必须暴露当前屏幕旋转角，不能退回轴对齐大框",
@@ -586,10 +610,21 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
         positionShift?: number;
         rotationShift?: number;
         screenshotFrame?: {
+          canvasWidth?: number;
+          canvasHeight?: number;
+          currentLayout?: {
+            minX: number;
+            maxX: number;
+            minY: number;
+            maxY: number;
+          } | null;
           visibleShiftPx?: number;
           positionShift?: number;
           rotationShift?: number;
           motionEvidenceType?: string;
+          currentValue?: number | null;
+          currentValues?: Array<number | null>;
+          visibleRuleValues?: string;
         };
       };
       const rerollMotionAmount = Math.max(
@@ -611,6 +646,32 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
         rerollMotionAmount,
         `兔脚重掷动画截图必须有可见运动量，而不是稳定骰盘或贴图闪切：${JSON.stringify(rerollMotionEvidence)}`,
       ).toBeGreaterThan(0);
+      const motionFrame = rerollMotionEvidence.screenshotFrame;
+      const motionLayout = motionFrame?.currentLayout;
+      expect(
+        motionLayout,
+        `兔脚重掷过程帧必须能读到目标骰子的屏幕投影：${JSON.stringify(rerollMotionEvidence)}`,
+      ).not.toBeNull();
+      expect(
+        motionLayout!.minX,
+        `兔脚重掷过程帧不能水平离开骰盘画布：${JSON.stringify(rerollMotionEvidence)}`,
+      ).toBeGreaterThanOrEqual(-2);
+      expect(
+        motionLayout!.maxX,
+        `兔脚重掷过程帧不能水平离开骰盘画布：${JSON.stringify(rerollMotionEvidence)}`,
+      ).toBeLessThanOrEqual((motionFrame?.canvasWidth ?? 0) + 2);
+      expect(
+        motionLayout!.minY,
+        `兔脚重掷过程帧不能在俯视方向飞出可见画布：${JSON.stringify(rerollMotionEvidence)}`,
+      ).toBeGreaterThanOrEqual(-2);
+      expect(
+        motionLayout!.maxY,
+        `兔脚重掷过程帧不能在俯视方向飞出可见画布：${JSON.stringify(rerollMotionEvidence)}`,
+      ).toBeLessThanOrEqual((motionFrame?.canvasHeight ?? 0) + 2);
+      expect(
+        motionFrame?.currentValue,
+        `兔脚重掷过程帧必须仍显示旧骰面在翻转，不能动画一开始就闪切到目标骰面：${JSON.stringify(rerollMotionEvidence)}`,
+      ).toBe(1);
       await expect(rabbitFootDice).toBeHidden();
     } finally {
       await rerollMotionCapture.stop();
@@ -626,6 +687,72 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
       page.getByTestId("betrayal-rabbit-foot-dice"),
       "兔脚重掷后选骰层必须清空",
     ).toHaveCount(0);
+    await waitForPhysicalDiceSettled(rollPanel);
+    await expect(
+      rollPanel.getByTestId("betrayal-house-dice-3d-group"),
+      "兔脚重掷停稳后必须展示新骰面，再进入确认骰面",
+    ).toHaveAttribute("data-dice-visible-rule-values", "2,2,0");
+    await expect
+      .poll(async () => {
+        const state = await page.evaluate(() => {
+          const harness = (
+            window as Window & {
+              __BG_TEST_HARNESS__?: {
+                state?: { get?: () => { core?: BetrayalCore } };
+              };
+            }
+          ).__BG_TEST_HARNESS__;
+          const core = harness?.state?.get?.().core;
+          return {
+            pending: Boolean(core?.pendingEventRollResolution),
+            knowledge: core?.currentExplorer.traits.knowledge ?? null,
+            speed: core?.currentExplorer.traits.speed ?? null,
+            rabbitFootUsed: core?.usedCardIdsThisTurn.includes("rope") ?? false,
+            recentRollDice: core?.recentRoll?.dice ?? null,
+            recentRollRerolledDieIndex:
+              core?.recentRoll?.lastRabbitFootRerollDieIndex ?? null,
+            confirmedCount:
+              core?.pendingEventRollResolution?.acknowledgedPlayerIds?.length ??
+              null,
+            requiredCount:
+              core?.pendingEventRollResolution?.requiredPlayerIds?.length ??
+              null,
+          };
+        });
+        return state.pending &&
+          state.knowledge === 3 &&
+          state.speed === 4 &&
+          state.rabbitFootUsed &&
+          Array.isArray(state.recentRollDice) &&
+          state.recentRollDice.join(",") === "2,2,0" &&
+          state.recentRollRerolledDieIndex === 1 &&
+          state.confirmedCount === 0 &&
+          state.requiredCount === 1
+          ? "waiting-result-confirmation"
+          : JSON.stringify(state);
+      }, { timeout: 8000 })
+      .toBe("waiting-result-confirmation");
+
+    await expect(page.getByTestId("betrayal-event-roll-finalize")).toHaveCount(0);
+    const eventRollConfirm = page.getByTestId("betrayal-discovery-continue");
+    await expect(eventRollConfirm).toBeVisible();
+    await expect(eventRollConfirm).toBeEnabled();
+    await expect(eventRollConfirm).toHaveText("确认 0/1");
+    await expect(eventRollConfirm).toHaveAttribute(
+      "data-event-roll-confirmed-count",
+      "0",
+    );
+    await expect(eventRollConfirm).toHaveAttribute(
+      "data-event-roll-required-count",
+      "1",
+    );
+    await expectEventRollWorkbenchReadable(page, "兔脚重掷后确认骰面", {
+      expectedEventFrameIndex: "24",
+    });
+    await saveScreenshot(page, REROLL_RESULT_CONFIRM_SCREENSHOT);
+
+    await eventRollConfirm.click();
+
     await expect
       .poll(async () => {
         const state = await page.evaluate(() => {
@@ -650,11 +777,14 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
         return !state.pending &&
           state.knowledge === 4 &&
           state.speed === 4 &&
-          state.rabbitFootUsed
-          ? "auto-finalized"
+          state.rabbitFootUsed &&
+          Array.isArray(state.recentRollDice) &&
+          state.recentRollDice.join(",") === "2,2,0" &&
+          state.recentRollRerolledDieIndex === 1
+          ? "finalized-after-confirm"
           : JSON.stringify(state);
       }, { timeout: 8000 })
-      .toBe("auto-finalized");
+      .toBe("finalized-after-confirm");
 
     const finalizedState = await page.evaluate(() => {
       const harness = (

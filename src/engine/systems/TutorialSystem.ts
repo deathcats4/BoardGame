@@ -19,7 +19,9 @@ import { SYSTEM_IDS } from './types';
 
 export const TUTORIAL_COMMANDS = {
     START: 'SYS_TUTORIAL_START',
+    BIND_MANIFEST: 'SYS_TUTORIAL_BIND_MANIFEST',
     NEXT: 'SYS_TUTORIAL_NEXT',
+    PREVIOUS: 'SYS_TUTORIAL_PREVIOUS',
     CLOSE: 'SYS_TUTORIAL_CLOSE',
     AI_CONSUMED: 'SYS_TUTORIAL_AI_CONSUMED',
     ANIMATION_COMPLETE: 'SYS_TUTORIAL_ANIMATION_COMPLETE',
@@ -40,6 +42,10 @@ export const TUTORIAL_ERRORS = {
 } as const;
 
 export interface TutorialStartPayload {
+    manifest: TutorialManifest;
+}
+
+export interface TutorialBindManifestPayload {
     manifest: TutorialManifest;
 }
 
@@ -85,6 +91,7 @@ const deriveStepState = (manifest: TutorialManifest, stepIndex: number, currentC
     return {
         active: true,
         manifestId: manifest.id ?? null,
+        manifestRevision: manifest.revision,
         stepIndex,
         steps: manifest.steps,
         step,
@@ -104,6 +111,48 @@ const applyTutorialState = <TCore>(state: MatchState<TCore>, tutorial: TutorialS
         tutorial,
     },
 });
+
+const bindManifestToExistingTutorialState = <TCore>(
+    state: MatchState<TCore>,
+    manifest: TutorialManifest,
+): MatchState<TCore> => {
+    const tutorial = state.sys.tutorial;
+    if (!tutorial.active || tutorial.manifestId !== manifest.id) {
+        return state;
+    }
+    if (
+        Number.isInteger(manifest.revision)
+        && Number.isInteger(tutorial.manifestRevision)
+        && tutorial.manifestRevision !== manifest.revision
+    ) {
+        return state;
+    }
+
+    const stepIndex = Number.isInteger(tutorial.stepIndex) ? tutorial.stepIndex : 0;
+    const manifestStep = manifest.steps[stepIndex];
+    if (!manifestStep) {
+        return state;
+    }
+
+    const reboundTutorial = deriveStepState(manifest, stepIndex, tutorial.randomPolicy?.cursor);
+    const shouldPreserveConsumedAiActions = Boolean(
+        tutorial.step?.id === manifestStep.id
+        && !tutorial.step?.aiActions
+        && !tutorial.aiActions
+        && manifestStep.aiActions?.length,
+    );
+    const reboundStep = shouldPreserveConsumedAiActions && reboundTutorial.step
+        ? { ...reboundTutorial.step, aiActions: undefined }
+        : reboundTutorial.step;
+
+    return applyTutorialState(state, {
+        ...reboundTutorial,
+        step: reboundStep,
+        aiActions: shouldPreserveConsumedAiActions ? undefined : reboundTutorial.aiActions,
+        pendingAnimationAdvance: tutorial.pendingAnimationAdvance,
+        skippedStepIds: tutorial.skippedStepIds,
+    });
+};
 
 const resolveTimestamp = (command?: Command, events?: GameEvent[]): number => {
     if (command && typeof command.timestamp === 'number') return command.timestamp;
@@ -170,6 +219,9 @@ const shouldAdvance = (events: GameEvent[], advanceOnEvents?: TutorialEventMatch
     return advanceOnEvents.some((matcher) => events.some((event) => isEventMatch(event, matcher)));
 };
 
+const isPureAutomaticStep = (step: TutorialStepSnapshot): boolean =>
+    Boolean(step.aiActions?.length) && !step.requireAction && !step.infoStep;
+
 const isAuthoredTutorialAiAction = (tutorial: TutorialState | undefined, command: Command): boolean => {
     if (!tutorial?.active || command.skipValidation !== true) return false;
     const aiActions = tutorial.step?.aiActions ?? tutorial.aiActions ?? [];
@@ -191,6 +243,7 @@ const buildManifestFromState = (
     }
     return {
         id: tutorial.manifestId,
+        revision: tutorial.manifestRevision,
         steps: tutorial.steps,
         allowManualSkip: tutorial.manifestAllowManualSkip,
         randomPolicy: tutorial.manifestRandomPolicy,
@@ -251,6 +304,43 @@ const advanceStep = <TCore>(
     };
 };
 
+const isValidTutorialManifest = (manifest: TutorialManifest | undefined): manifest is TutorialManifest =>
+    Boolean(manifest && Array.isArray(manifest.steps) && manifest.steps.length > 0);
+
+const retreatStep = <TCore>(
+    state: MatchState<TCore>,
+    timestamp: number,
+    validator?: StepValidatorFn,
+    fallbackManifest?: TutorialManifest,
+): HookResult<TCore> => {
+    const tutorial = state.sys.tutorial;
+    if (!tutorial.active) return { state };
+
+    const manifest = buildManifestFromState(tutorial, fallbackManifest);
+    if (!manifest) {
+        return { state: applyTutorialState(state, { ...DEFAULT_TUTORIAL_STATE }) };
+    }
+
+    let previousIndex = tutorial.stepIndex - 1;
+    while (previousIndex >= 0) {
+        const previousStep = manifest.steps[previousIndex];
+        if (
+            previousStep
+            && !isPureAutomaticStep(previousStep)
+            && (!validator || validator(state, previousStep))
+        ) {
+            const previousTutorial = deriveStepState(manifest, previousIndex, tutorial.randomPolicy?.cursor);
+            return {
+                state: applyTutorialState(state, previousTutorial),
+                events: [createStepChangedEvent(tutorial.stepIndex, previousIndex, previousTutorial.step, timestamp)],
+            };
+        }
+        previousIndex--;
+    }
+
+    return { state };
+};
+
 const shouldBlockCommand = (tutorial: TutorialState | undefined, command: Command): boolean => {
     if (!tutorial?.active) return false;
     // 系统命令不拦截（SYS_ 前缀，包括 CHEAT 命令和教程命令）
@@ -305,7 +395,7 @@ export function createTutorialSystem<TCore>(): EngineSystem<TCore> {
             if (command.type === TUTORIAL_COMMANDS.START) {
                 const payload = command.payload as TutorialStartPayload;
                 const manifest = payload?.manifest;
-                if (!manifest || !Array.isArray(manifest.steps) || manifest.steps.length === 0) {
+                if (!isValidTutorialManifest(manifest)) {
                     return { halt: true, error: TUTORIAL_ERRORS.INVALID_MANIFEST };
                 }
 
@@ -319,6 +409,37 @@ export function createTutorialSystem<TCore>(): EngineSystem<TCore> {
                     halt: true,
                     state: applyTutorialState(state, nextTutorial),
                     events: [createStartedEvent(manifest, nextTutorial.step, timestamp)],
+                };
+            }
+
+            if (command.type === TUTORIAL_COMMANDS.BIND_MANIFEST) {
+                const payload = command.payload as TutorialBindManifestPayload | undefined;
+                const manifest = payload?.manifest;
+                if (!isValidTutorialManifest(manifest)) {
+                    return { halt: true, error: TUTORIAL_ERRORS.INVALID_MANIFEST };
+                }
+
+                activeManifestById.set(manifest.id, manifest);
+                activeStepValidator = manifest.stepValidator;
+                const reboundState = bindManifestToExistingTutorialState(state, manifest);
+                if (
+                    activeStepValidator
+                    && reboundState.sys.tutorial.active
+                    && reboundState.sys.tutorial.step
+                    && !activeStepValidator(reboundState, reboundState.sys.tutorial.step)
+                ) {
+                    const timestamp = resolveTimestamp(command);
+                    const result = advanceStep(
+                        reboundState,
+                        timestamp,
+                        activeStepValidator,
+                        manifest,
+                    );
+                    return { ...result, halt: true };
+                }
+                return {
+                    halt: true,
+                    state: reboundState,
                 };
             }
 
@@ -358,6 +479,15 @@ export function createTutorialSystem<TCore>(): EngineSystem<TCore> {
                 return { ...result, halt: true };
             }
 
+            if (command.type === TUTORIAL_COMMANDS.PREVIOUS) {
+                if (!state.sys.tutorial.active) {
+                    return { halt: true, state };
+                }
+                const timestamp = resolveTimestamp(command);
+                const result = retreatStep(state, timestamp, activeStepValidator, resolveActiveManifest(state.sys.tutorial));
+                return { ...result, halt: true };
+            }
+
             // 动画完成：触发等待中的步骤推进
             if (command.type === TUTORIAL_COMMANDS.ANIMATION_COMPLETE) {
                 if (!state.sys.tutorial.active || !state.sys.tutorial.pendingAnimationAdvance) {
@@ -368,8 +498,41 @@ export function createTutorialSystem<TCore>(): EngineSystem<TCore> {
                 return { ...result, halt: true };
             }
 
-            if (shouldBlockCommand(state.sys.tutorial, command)) {
-                return { halt: true, error: TUTORIAL_ERRORS.COMMAND_BLOCKED };
+            let commandState = state;
+            let staleStepEvents: GameEvent[] | undefined;
+            if (
+                activeStepValidator
+                && commandState.sys.tutorial.active
+                && commandState.sys.tutorial.step
+                && !activeStepValidator(commandState, commandState.sys.tutorial.step)
+            ) {
+                const timestamp = resolveTimestamp(command);
+                const result = advanceStep(
+                    commandState,
+                    timestamp,
+                    activeStepValidator,
+                    resolveActiveManifest(commandState.sys.tutorial),
+                );
+                if (result.state) {
+                    commandState = result.state;
+                }
+                staleStepEvents = result.events;
+            }
+
+            if (shouldBlockCommand(commandState.sys.tutorial, command)) {
+                return {
+                    ...(commandState !== state ? { state: commandState } : {}),
+                    ...(staleStepEvents && staleStepEvents.length > 0 ? { events: staleStepEvents } : {}),
+                    halt: true,
+                    error: TUTORIAL_ERRORS.COMMAND_BLOCKED,
+                };
+            }
+
+            if (commandState !== state || (staleStepEvents && staleStepEvents.length > 0)) {
+                return {
+                    state: commandState,
+                    ...(staleStepEvents && staleStepEvents.length > 0 ? { events: staleStepEvents } : {}),
+                };
             }
         },
 

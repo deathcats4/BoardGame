@@ -426,6 +426,13 @@ export interface TutorialStepSnapshot {
 
 export interface TutorialManifest {
     id: string;
+    /**
+     * 教程进度版本。
+     *
+     * 当教程步骤、交互承接或可恢复局面发生不兼容变化时递增。
+     * 页面层用它隔离本地教程进度，避免旧快照恢复到新版提示里形成步骤错位。
+     */
+    revision?: number;
     steps: TutorialStepSnapshot[];
     allowManualSkip?: boolean;
     randomPolicy?: TutorialRandomPolicy;
@@ -479,6 +486,8 @@ export type GameTutorialSource = TutorialManifest | TutorialCollection;
 export interface TutorialState {
     active: boolean;
     manifestId: string | null;
+    /** 启动该教程状态时的 manifest revision，用于本地恢复兼容性校验。 */
+    manifestRevision?: number;
     stepIndex: number;
     steps: TutorialStepSnapshot[];
     step: TutorialStepSnapshot | null;

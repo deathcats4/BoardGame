@@ -264,8 +264,8 @@ function MageWarsMageSelectionGateContent({
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(245,158,11,0.24),transparent_34%),radial-gradient(circle_at_12%_84%,rgba(22,163,74,0.2),transparent_28%),linear-gradient(135deg,#180604_0%,#3b1409_55%,#070201_100%)]" />
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.58)_0%,rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62)_100%)]" />
 
-            <div className="relative z-10 flex h-full min-h-0 flex-col px-12 py-8">
-                <header className="flex shrink-0 items-start justify-between gap-8">
+            <div className="relative z-10 flex h-full min-h-0 flex-col px-[clamp(2rem,2.8vw,3rem)] py-[clamp(1.5rem,2.2vw,2rem)]">
+                <header className="shrink-0">
                     <div>
                         <div className="text-sm font-black uppercase tracking-[0.24em] text-amber-200/70">
                             {t('setup.mageSelection.eyebrow')}
@@ -273,21 +273,10 @@ function MageWarsMageSelectionGateContent({
                         <h1 className="mt-2 text-4xl font-black leading-none text-amber-100 drop-shadow-[0_4px_18px_rgba(0,0,0,0.62)]">
                             {t('setup.mageSelection.title')}
                         </h1>
-                        <p className="mt-3 max-w-3xl text-sm font-semibold leading-relaxed text-stone-200/75">
-                            {t('setup.mageSelection.description')}
-                        </p>
                     </div>
-                    <button
-                        type="button"
-                        className="rounded-[0.35rem] border border-amber-200/50 bg-amber-400 px-7 py-3 text-base font-black text-stone-950 shadow-[0_12px_28px_rgba(0,0,0,0.42)] transition hover:bg-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-100"
-                        data-testid="mage-wars-mage-selection-confirm"
-                        onClick={handleConfirm}
-                    >
-                        {t('setup.mageSelection.confirm')}
-                    </button>
                 </header>
 
-                <main className="mt-8 grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_20rem] gap-6">
+                <main className="mt-[clamp(1rem,2vw,1.5rem)] grid min-h-0 flex-1 grid-cols-[clamp(14rem,13vw,16rem)_minmax(0,1fr)_clamp(20rem,17vw,22rem)] gap-[clamp(1rem,1.8vw,1.5rem)]">
                     <section
                         className="min-h-0 rounded-[0.55rem] border border-amber-100/10 bg-black/40 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.34)]"
                         aria-label={t('setup.mageSelection.seats')}
@@ -638,14 +627,24 @@ function MageWarsMageSelectionGateContent({
                                 );
                             })}
                         </div>
-                        <button
-                            type="button"
-                            className="mt-5 rounded-[0.35rem] border border-amber-200/60 bg-amber-300 px-3 py-2.5 text-sm font-black text-stone-950 shadow-[0_10px_20px_rgba(0,0,0,0.32)] transition hover:bg-amber-200"
-                            data-testid="mage-wars-open-spellbook-builder"
-                            onClick={openSelectedSpellbookBuilder}
-                        >
-                            {t('setup.mageSelection.editCurrentSpellbook')}
-                        </button>
+                        <div className="mt-5 grid gap-2.5">
+                            <button
+                                type="button"
+                                className="rounded-[0.35rem] border border-amber-200/60 bg-amber-300 px-3 py-2.5 text-sm font-black text-stone-950 shadow-[0_10px_20px_rgba(0,0,0,0.32)] transition hover:bg-amber-200"
+                                data-testid="mage-wars-open-spellbook-builder"
+                                onClick={openSelectedSpellbookBuilder}
+                            >
+                                {t('setup.mageSelection.editCurrentSpellbook')}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded-[0.35rem] border border-emerald-200/60 bg-emerald-500 px-3 py-3 text-sm font-black text-white shadow-[0_10px_22px_rgba(6,95,70,0.34)] transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-100"
+                                data-testid="mage-wars-mage-selection-confirm"
+                                onClick={handleConfirm}
+                            >
+                                {t('setup.mageSelection.confirm')}
+                            </button>
+                        </div>
                     </aside>
                 </main>
             </div>

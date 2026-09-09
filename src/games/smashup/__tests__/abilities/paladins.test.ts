@@ -162,7 +162,7 @@ describe('Paladins DIY faction playable behavior', () => {
             titans: [makeSeraphim('0')],
             bases: [makeBase('test_base', [
                 makeMinion('host', 'paladins_novice_knight', '0', 2, {
-                    powerCounters: 5,
+                    powerCounters: 3,
                     attachedActions: [{ uid: 'stairs', defId: 'paladins_climb_the_holy_stairs', ownerId: '0' }],
                 }),
             ])],

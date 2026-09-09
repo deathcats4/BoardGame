@@ -16,6 +16,7 @@ const advancePhase = (playerId: string): TutorialAiAction => ({
 
 export const MageWarsTutorial: TutorialManifest = {
     id: 'mage-wars-basic',
+    revision: 2,
     numPlayers: 2,
     allowManualSkip: true,
     randomPolicy: {
@@ -153,6 +154,18 @@ export const MageWarsTutorial: TutorialManifest = {
             infoStep: true,
         },
         {
+            id: 'attack-bar-reading',
+            content: 'game-mage-wars:tutorial.steps.attackBarReading',
+            visual: {
+                src: 'mage-wars/references/attack-bar-legend',
+                alt: 'game-mage-wars:tutorial.visuals.attackBarLegendAlt',
+                caption: 'game-mage-wars:tutorial.visuals.attackBarLegendCaption',
+            },
+            highlightTarget: `mw-prepared-card-${JUNGLE_WOLF_CARD_ID}`,
+            position: 'top',
+            infoStep: true,
+        },
+        {
             id: 'deploy-select-wolf',
             content: 'game-mage-wars:tutorial.steps.deploySelectWolf',
             highlightTarget: `mw-prepared-card-${JUNGLE_WOLF_CARD_ID}`,
@@ -174,18 +187,6 @@ export const MageWarsTutorial: TutorialManifest = {
         {
             id: 'wolf-summoned',
             content: 'game-mage-wars:tutorial.steps.wolfSummoned',
-            highlightTarget: `mw-field-object-${JUNGLE_WOLF_CARD_ID}`,
-            position: 'top',
-            infoStep: true,
-        },
-        {
-            id: 'attack-bar-reading',
-            content: 'game-mage-wars:tutorial.steps.attackBarReading',
-            visual: {
-                src: 'mage-wars/references/attack-bar-legend',
-                alt: 'game-mage-wars:tutorial.visuals.attackBarLegendAlt',
-                caption: 'game-mage-wars:tutorial.visuals.attackBarLegendCaption',
-            },
             highlightTarget: `mw-field-object-${JUNGLE_WOLF_CARD_ID}`,
             position: 'top',
             infoStep: true,

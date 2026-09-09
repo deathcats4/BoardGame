@@ -58,6 +58,7 @@ const TutorialLocalGameRuntime = ({
         runtime.gameId,
         runtime.tutorialId,
         runtime.tutorialManifest?.id,
+        runtime.tutorialManifest?.revision,
     ) ?? `tutorial-${runtime.gameId ?? 'unknown'}`;
     const restorableProgress = useMemo(() => readRestorableTutorialProgress({
         gameId: runtime.gameId,
@@ -118,6 +119,7 @@ const TutorialLocalGameRuntime = ({
                             gameId: runtime.gameId,
                             tutorialId: runtime.tutorialId,
                             manifestId: runtime.tutorialManifest?.id,
+                            manifestRevision: runtime.tutorialManifest?.revision,
                         });
                         notifyTutorialProgressStorageChanged();
                         close();
@@ -151,6 +153,7 @@ const TutorialLocalGameRuntime = ({
         runtime.gameId,
         runtime.tutorialId,
         runtime.tutorialManifest?.id,
+        runtime.tutorialManifest?.revision,
         tLobby,
     ]);
 
@@ -179,7 +182,7 @@ const TutorialLocalGameRuntime = ({
             persistSession={Boolean(runtime.gameId)}
             persistGameId={runtime.gameId}
         >
-            <TutorialDispatchBridge>
+            <TutorialDispatchBridge tutorialManifest={runtime.tutorialManifest}>
                 <BoardBridge
                     board={runtime.board}
                     renderer={runtime.boardRenderer}

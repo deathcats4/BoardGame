@@ -537,6 +537,7 @@ export const expectEventRollWorkbenchReadable = async (
                 dieId?: number;
                 dieIndex?: number;
                 variant?: string;
+                color?: number;
                 scale?: number;
                 opacity?: number;
               }>;
@@ -554,6 +555,8 @@ export const expectEventRollWorkbenchReadable = async (
                 depthWrite?: boolean;
                 transparent?: boolean;
                 shaderOpacity?: number;
+                shaderIntensity?: number;
+                shaderOutlineOffset?: number;
               }>;
             }
           | null
@@ -886,8 +889,8 @@ export const expectEventRollWorkbenchReadable = async (
     ).toBe("threejs-backside-shader-shell");
     expect(
       metrics.rerollVisualContract,
-      `${label}兔脚改骰必须使用骰面投影 SVG 外描边 + Three.js 外壳的当前视觉合同：${JSON.stringify(metrics)}`,
-    ).toBe("projected-face-svg-outline-plus-threejs-shell");
+      `${label}兔脚改骰必须使用 Three.js shader 外壳 + 透明命中区的当前视觉合同：${JSON.stringify(metrics)}`,
+    ).toBe("threejs-shader-shell-plus-transparent-hitbox");
     expect(
       metrics.diceHighlightSourceRenderer,
       `${label}物理骰源必须声明 WebGL 高亮渲染器：${JSON.stringify(metrics)}`,
@@ -898,8 +901,8 @@ export const expectEventRollWorkbenchReadable = async (
     ).toBe("threejs-backside-shader-shell");
     expect(
       metrics.rerollDomVisualBoxCount,
-      `${label}每个可选骰子都必须有一个玩家可见、贴投影边缘的外描边：${JSON.stringify(metrics)}`,
-    ).toBe(metrics.rerollTargets.length);
+      `${label}DOM 层不能再绘制可见方框，避免遮挡骰子或和 shader 外壳形成双框：${JSON.stringify(metrics)}`,
+    ).toBe(0);
     expect(
       metrics.diceHighlightCount,
       `${label}每个可选骰子都必须有一个 Three.js 高亮状态：${JSON.stringify(metrics)}`,
@@ -941,28 +944,28 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe("threejs-backside-shader-shell");
       expect(
         target.visualContract,
-        `${label}改骰目标必须使用当前骰面投影 SVG 外描边视觉合同：${evidence}`,
-      ).toBe("projected-face-svg-outline-plus-threejs-shell");
+        `${label}改骰目标必须使用 Three.js shader 外壳 + 透明命中区视觉合同：${evidence}`,
+      ).toBe("threejs-shader-shell-plus-transparent-hitbox");
       expect(
         target.visualLayer,
-        `${label}可见方框必须是骰面投影 SVG 外描边加 Three.js 外壳，不得回到离体大框：${evidence}`,
-      ).toBe("projected-face-svg-outline-plus-threejs-shell");
+        `${label}DOM 层只能做透明命中区，不得绘制遮挡骰子的可见边框：${evidence}`,
+      ).toBe("transparent-hitbox-only");
       expect(
         target.outlinePaint,
-        `${label}可见方框必须来自当前可见骰面四角投影，不能退回轴对齐大框：${evidence}`,
-      ).toBe("projected-face-outside-svg-outline");
+        `${label}玩家可见高亮必须来自 Three.js shader 外壳，而不是 DOM/CSS 可见框：${evidence}`,
+      ).toBe("threejs-backside-shader-shell");
       expect(
         Number.isFinite(target.outlineRotateZ),
         `${label}可见方框必须暴露屏幕旋转角，证明不是固定轴对齐框：${evidence}`,
       ).toBe(true);
       expect(
         target.outlinePointCount,
-        `${label}可见方框必须有当前可见骰面的四角投影点：${evidence}`,
-      ).toBeGreaterThanOrEqual(4);
+        `${label}DOM 层不再保存可见方框投影点，避免旧 SVG 框回归：${evidence}`,
+      ).toBe(0);
       expect(
         target.outlinePoints,
-        `${label}可见方框必须暴露屏幕投影点，避免退回离体矩形：${evidence}`,
-      ).toMatch(/\d/);
+        `${label}DOM 层不再保存可见方框投影点，避免旧 SVG 框回归：${evidence}`,
+      ).toBe("");
       expect(
         target.targetTransform,
         `${label}可见方框必须应用投影旋转 transform：${evidence}`,
@@ -993,16 +996,16 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBeLessThanOrEqual(1);
       expect(
         target.domCandidateVisualExists,
-        `${label}未选候选必须有清晰外描边，选中后候选描边退场：${evidence}`,
-      ).toBe(!target.selected);
+        `${label}DOM 层不得保留候选底线或候选框，避免遮挡骰子或和 shader 外壳错位：${evidence}`,
+      ).toBe(false);
       expect(
         target.selectedBorderExists,
-        `${label}只有选中骰子显示选中外描边：${evidence}`,
-      ).toBe(target.selected);
+        `${label}DOM 层不得保留选中边框，选中高亮必须由 shader 外壳承担：${evidence}`,
+      ).toBe(false);
       expect(
         target.outlineExists,
-        `${label}骰子必须有玩家可见外描边：${evidence}`,
-      ).toBe(true);
+        `${label}DOM 层不得绘制玩家可见外描边，玩家可见边界由 shader 外壳承担：${evidence}`,
+      ).toBe(false);
       expect(
         target.outlineOffset,
         `${label}外描边必须贴边，不能产生离体空隙：${evidence}`,
@@ -1017,8 +1020,8 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe(0);
       expect(
         target.outlineBoxShadow,
-        `${label}外描边需要发光辅助，不能弱到看不清：${evidence}`,
-      ).not.toBe("none");
+        `${label}DOM 层不得使用 box-shadow 画第二层方框：${evidence}`,
+      ).toBe("");
       expect(
         target.webglHighlight,
         `${label}必须能从 Three.js 快照读到当前骰子的高亮状态：${evidence}`,
@@ -1057,21 +1060,13 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe(target.webglShell?.opacity);
       if (target.selected) {
         expect(
-          target.outlineColor,
-          `${label}选中外描边必须是清晰黄色：${evidence}`,
-        ).toMatch(/255,\s*212,\s*71/);
-        expect(
-          target.outlineWidth,
-          `${label}选中外描边必须比候选态更粗：${evidence}`,
-        ).toBeGreaterThanOrEqual(3);
-        expect(
-          target.outlineWidth,
-          `${label}选中外描边不能粗到盖住骰子归属：${evidence}`,
-        ).toBeLessThanOrEqual(4);
-        expect(
           target.webglHighlight?.variant,
           `${label}选中骰子必须升级为 selected WebGL 高亮：${evidence}`,
         ).toBe("selected");
+        expect(
+          target.webglHighlight?.color,
+          `${label}选中骰子的高亮色必须和黄色骰子本体强对比，不能退回黄色外壳：${evidence}`,
+        ).toBe(0xff2dfb);
         expect(
           target.webglShell?.variant,
           `${label}选中骰子的外壳必须同步为 selected：${evidence}`,
@@ -1088,23 +1083,23 @@ export const expectEventRollWorkbenchReadable = async (
           target.webglShell?.opacity,
           `${label}选中描边必须清晰可见：${evidence}`,
         ).toBeGreaterThanOrEqual(0.9);
+        expect(
+          target.webglShell?.shaderIntensity,
+          `${label}选中 shader 必须明显强于候选态：${evidence}`,
+        ).toBeGreaterThanOrEqual(1.5);
+        expect(
+          target.webglShell?.shaderOutlineOffset,
+          `${label}选中描边必须由 shader 向外扩出清楚边界：${evidence}`,
+        ).toBeGreaterThanOrEqual(0.024);
       } else {
-        expect(
-          target.outlineColor,
-          `${label}候选外描边必须是清晰青色：${evidence}`,
-        ).toMatch(/0,\s*231,\s*255/);
-        expect(
-          target.outlineWidth,
-          `${label}候选外描边必须清晰可见：${evidence}`,
-        ).toBeGreaterThanOrEqual(2);
-        expect(
-          target.outlineWidth,
-          `${label}候选外描边不能粗到像已选中：${evidence}`,
-        ).toBeLessThanOrEqual(3);
         expect(
           target.webglHighlight?.variant,
           `${label}未选骰子必须显示 candidate WebGL 高亮：${evidence}`,
         ).toBe("candidate");
+        expect(
+          target.webglHighlight?.color,
+          `${label}候选骰子的高亮色必须保持青色，和选中态区分：${evidence}`,
+        ).toBe(0x00e7ff);
         expect(
           target.webglShell?.variant,
           `${label}未选骰子的外壳必须同步为 candidate：${evidence}`,
@@ -1121,6 +1116,14 @@ export const expectEventRollWorkbenchReadable = async (
           target.webglShell?.opacity,
           `${label}候选描边不能弱到看不清：${evidence}`,
         ).toBeGreaterThanOrEqual(0.9);
+        expect(
+          target.webglShell?.shaderIntensity,
+          `${label}候选 shader 必须比选中态弱，避免误认已选中：${evidence}`,
+        ).toBeLessThan(1.3);
+        expect(
+          target.webglShell?.shaderOutlineOffset,
+          `${label}候选描边必须贴边外扩，不能产生大间隙：${evidence}`,
+        ).toBeLessThan(0.02);
       }
     }
   }
@@ -1473,6 +1476,7 @@ type PhysicalDiceRerollMotionCapture = {
 export const armPhysicalDiceRerollMotionCapture = async (
   rollPanel: Locator,
   options: {
+    motionType?: "roll" | "reroll";
     dieIndex?: number;
     timeout?: number;
     minRotationShiftRad?: number;
@@ -1480,17 +1484,21 @@ export const armPhysicalDiceRerollMotionCapture = async (
     minScreenShiftPx?: number;
   } = {},
 ): Promise<PhysicalDiceRerollMotionCapture> => {
+  const motionType = options.motionType ?? "reroll";
+  const motionLabel = motionType === "roll" ? "首次投掷" : "兔脚重投";
+  const visibleStatus = `visible-${motionType}-motion`;
   const dieIndex = options.dieIndex ?? 0;
   const minRotationShiftRad = options.minRotationShiftRad ?? 0.08;
   const minPositionShiftPx = options.minPositionShiftPx ?? 0.75;
   const minScreenShiftPx = options.minScreenShiftPx ?? 14;
-  const key = `reroll-motion-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const key = `${motionType}-motion-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   await rollPanel.evaluate(
     (
       node,
       captureOptions: {
         key: string;
+        motionType: "roll" | "reroll";
         dieIndex: number;
         minRotationShiftRad: number;
         minPositionShiftPx: number;
@@ -1538,6 +1546,11 @@ export const armPhysicalDiceRerollMotionCapture = async (
         timerId: number | null;
         samples: Sample[];
         latestVisibleEvidence: unknown;
+        frozenFrame: {
+          dataUrl: string;
+          rect: { left: number; top: number; width: number; height: number };
+          screenshotFrame: unknown;
+        } | null;
       };
       const pageWindow = window as typeof window & {
         __betrayalDiceRerollMotionCaptures?: Record<string, Capture>;
@@ -1610,6 +1623,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
         timerId: null,
         samples: [readSample(performance.now())],
         latestVisibleEvidence: null,
+        frozenFrame: null,
       };
       const clearScheduledStep = () => {
         if (capture.frameId !== null) {
@@ -1634,8 +1648,8 @@ export const armPhysicalDiceRerollMotionCapture = async (
         if (capture.samples.length > 180) {
           capture.samples.shift();
         }
-        const sampleIsRerolling =
-          sample.motionType === "reroll" && sample.settled === "false";
+        const sampleIsTargetMotion =
+          sample.motionType === captureOptions.motionType && sample.settled === "false";
         const baselineSample =
           [...capture.samples]
             .reverse()
@@ -1644,7 +1658,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
                 candidate !== sample &&
                 Boolean(candidate.layout) &&
                 !(
-                  candidate.motionType === "reroll" &&
+                  candidate.motionType === captureOptions.motionType &&
                   candidate.settled === "false"
                 ),
             ) ??
@@ -1716,7 +1730,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
               : rotationShift >= captureOptions.minRotationShiftRad
                 ? "rotation-shift"
                 : "";
-        if (sampleIsRerolling && motionEvidenceType) {
+        if (sampleIsTargetMotion && motionEvidenceType) {
           capture.latestVisibleEvidence = {
             detectedAt: now,
             motionEvidenceType,
@@ -1728,6 +1742,43 @@ export const armPhysicalDiceRerollMotionCapture = async (
             before: previous,
             after: sample,
           };
+          if (!capture.frozenFrame) {
+            const canvas = sample.activeCanvasTestId
+              ? Array.from(document.querySelectorAll("canvas")).find(
+                (candidate): candidate is HTMLCanvasElement =>
+                  candidate instanceof HTMLCanvasElement &&
+                  candidate.dataset.testid === sample.activeCanvasTestId,
+              ) ?? null
+              : null;
+            const rect = canvas?.getBoundingClientRect();
+            if (canvas && rect && rect.width > 0 && rect.height > 0) {
+              capture.frozenFrame = {
+                dataUrl: canvas.toDataURL("image/png"),
+                rect: {
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                },
+                screenshotFrame: {
+                  at: now,
+                  motionType: sample.motionType,
+                  motionId: sample.motionId,
+                  settled: sample.settled,
+                  canvasWidth: Math.round(rect.width),
+                  canvasHeight: Math.round(rect.height),
+                  baselineLayout: baselineSample?.layouts[captureOptions.dieIndex] ?? baselineSample?.layout ?? null,
+                  currentLayout: sample.layouts[captureOptions.dieIndex] ?? sample.layout ?? null,
+                  screenShiftPx,
+                  screenBoundsShiftPx,
+                  visibleShiftPx: Math.max(screenShiftPx, screenBoundsShiftPx),
+                  positionShift,
+                  rotationShift,
+                  motionEvidenceType,
+                },
+              };
+            }
+          }
         }
         scheduleStep();
       };
@@ -1735,11 +1786,11 @@ export const armPhysicalDiceRerollMotionCapture = async (
       pageWindow.__betrayalDiceRerollMotionCaptures[captureOptions.key] =
         capture;
     },
-    { key, dieIndex, minRotationShiftRad, minPositionShiftPx, minScreenShiftPx },
+    { key, motionType, dieIndex, minRotationShiftRad, minPositionShiftPx, minScreenShiftPx },
   );
 
   const readCaptureState = async () =>
-    rollPanel.page().evaluate((captureKey) => {
+    rollPanel.page().evaluate((captureOptions) => {
       const pageWindow = window as typeof window & {
         __betrayalDiceRerollMotionCaptures?: Record<
           string,
@@ -1772,18 +1823,18 @@ export const armPhysicalDiceRerollMotionCapture = async (
         >;
       };
       const capture =
-        pageWindow.__betrayalDiceRerollMotionCaptures?.[captureKey];
+        pageWindow.__betrayalDiceRerollMotionCaptures?.[captureOptions.key];
       if (!capture) {
         return { status: "missing" as const };
       }
       const now = performance.now();
       const latest = capture.samples.at(-1) ?? null;
-      const rerollingSamples = capture.samples.filter(
+      const targetMotionSamples = capture.samples.filter(
         (sample) =>
-          sample.motionType === "reroll" && sample.settled === "false",
+          sample.motionType === captureOptions.motionType && sample.settled === "false",
       );
-      const shiftedDiceSummary = rerollingSamples.flatMap((sample, sampleIndex) => {
-        const previous = rerollingSamples[sampleIndex - 1] ?? null;
+      const shiftedDiceSummary = targetMotionSamples.flatMap((sample, sampleIndex) => {
+        const previous = targetMotionSamples[sampleIndex - 1] ?? null;
         const baseline =
           capture.samples
             .slice(0, capture.samples.indexOf(sample))
@@ -1792,7 +1843,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
               (candidate) =>
                 Boolean(candidate.layout) &&
                 !(
-                  candidate.motionType === "reroll" &&
+                  candidate.motionType === captureOptions.motionType &&
                   candidate.settled === "false"
                 ),
             ) ?? null;
@@ -1864,29 +1915,76 @@ export const armPhysicalDiceRerollMotionCapture = async (
         typeof visibleEvidence.detectedAt === "number" &&
         now - visibleEvidence.detectedAt <= 180 &&
         latest?.at === visibleEvidence.after?.at &&
-        latest?.motionType === "reroll" &&
+        latest?.motionType === captureOptions.motionType &&
         latest?.settled === "false";
       return {
-        status: recentVisible ? "visible-reroll-motion" : "waiting",
+        status: recentVisible ? captureOptions.visibleStatus : "waiting",
         now,
         latest,
         sampleCount: capture.samples.length,
-        rerollingSampleCount: rerollingSamples.length,
+        rerollingSampleCount: targetMotionSamples.length,
         shiftedDiceSummary,
-        rerollingSamples: rerollingSamples.slice(0, 8),
+        rerollingSamples: targetMotionSamples.slice(0, 8),
         latestVisibleEvidence: capture.latestVisibleEvidence,
         recentSamples: capture.samples.slice(-8),
       };
-    }, key);
+    }, { key, motionType, visibleStatus });
 
   const waitForCurrentRerollFrame = async (): Promise<unknown> => {
     const frame = await rollPanel.page().waitForFunction(
       (captureOptions) => {
+        const earlyPageWindow = window as typeof window & {
+          __betrayalDiceRerollMotionCaptures?: Record<
+            string,
+            {
+              frozenFrame?: {
+                dataUrl?: string;
+                rect?: { left: number; top: number; width: number; height: number };
+                screenshotFrame?: unknown;
+              } | null;
+            }
+          >;
+        };
+        const frozenFrame =
+          earlyPageWindow.__betrayalDiceRerollMotionCaptures?.[captureOptions.key]
+            ?.frozenFrame ?? null;
+        if (
+          frozenFrame?.dataUrl &&
+          frozenFrame.rect &&
+          frozenFrame.rect.width > 0 &&
+          frozenFrame.rect.height > 0
+        ) {
+          document
+            .querySelectorAll(
+              '[data-betrayal-reroll-motion-frame-overlay="true"]',
+            )
+            .forEach((element) => element.remove());
+          const overlay = document.createElement("img");
+          overlay.dataset.testid = "betrayal-reroll-motion-frame-freeze";
+          overlay.dataset.betrayalRerollMotionFrameOverlay = "true";
+          overlay.alt = "";
+          overlay.src = frozenFrame.dataUrl;
+          Object.assign(overlay.style, {
+            position: "fixed",
+            left: `${frozenFrame.rect.left}px`,
+            top: `${frozenFrame.rect.top}px`,
+            width: `${frozenFrame.rect.width}px`,
+            height: `${frozenFrame.rect.height}px`,
+            objectFit: "fill",
+            pointerEvents: "none",
+            zIndex: "2147483647",
+          });
+          document.body.appendChild(overlay);
+          return frozenFrame.screenshotFrame ?? {
+            motionType: captureOptions.motionType,
+            restoredFromFrozenFrame: true,
+          };
+        }
         const source = document.querySelector<HTMLElement>(
           '[data-testid="betrayal-house-dice-physics-source"]',
         );
         if (
-          source?.dataset.diceMotionType !== "reroll" ||
+          source?.dataset.diceMotionType !== captureOptions.motionType ||
           source.dataset.diceSettled !== "false"
         ) {
           return null;
@@ -1908,6 +2006,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
           rotateZ: number;
         };
         type Layout = { x: number; y: number; minX: number; maxX: number; minY: number; maxY: number };
+        type DebugDie = { layout?: Layout | null; motion?: Motion | null; value?: number | null };
         type Sample = {
           motionType: string;
           settled: string;
@@ -1926,32 +2025,45 @@ export const armPhysicalDiceRerollMotionCapture = async (
           >;
           __diceBoxThreeDebug?: Record<
             string,
-            () => { dice?: Array<{ layout?: Layout | null; motion?: Motion | null }> } | null
+            () => { dice?: DebugDie[] } | null
           >;
         };
         const capture =
           pageWindow.__betrayalDiceRerollMotionCaptures?.[
             captureOptions.key
           ] ?? null;
-        const baseline =
+        const hasReferenceFrame = (candidate: Sample) =>
+          Boolean(
+            (candidate.layouts?.[captureOptions.dieIndex] ?? candidate.layout) &&
+              (candidate.motions?.[captureOptions.dieIndex] ?? candidate.motion),
+          );
+        const stableBaseline =
           capture?.samples?.find(
             (candidate) =>
-              candidate.layout &&
+              hasReferenceFrame(candidate) &&
               !(
-                candidate.motionType === "reroll" &&
+                candidate.motionType === captureOptions.motionType &&
                 candidate.settled === "false"
               ),
-          ) ??
-          capture?.samples?.find((candidate) => Boolean(candidate.layout)) ??
+          ) ?? null;
+        const earlyMotionBaseline =
+          capture?.samples?.find(
+            (candidate) =>
+              hasReferenceFrame(candidate) &&
+              candidate.motionType === captureOptions.motionType &&
+              candidate.settled === "false",
+          ) ?? null;
+        const baseline =
+          stableBaseline ??
+          earlyMotionBaseline ??
+          capture?.samples?.find(hasReferenceFrame) ??
           null;
         const debugRegistry = pageWindow.__diceBoxThreeDebug ?? {};
+        const group = document.querySelector<HTMLElement>(
+          '[data-testid="betrayal-house-dice-3d-group"]',
+        );
         const activeCanvasTestId =
-          canvas.dataset.testid ??
-          document
-            .querySelector<HTMLElement>(
-              '[data-testid="betrayal-house-dice-3d-group"]',
-            )
-            ?.dataset.diceDebugKey;
+          canvas.dataset.testid ?? group?.dataset.diceDebugKey;
         const snapshot = activeCanvasTestId
           ? debugRegistry[activeCanvasTestId]?.() ?? null
           : null;
@@ -1959,6 +2071,9 @@ export const armPhysicalDiceRerollMotionCapture = async (
           snapshot?.dice?.[captureOptions.dieIndex]?.layout ?? null;
         const currentMotion =
           snapshot?.dice?.[captureOptions.dieIndex]?.motion ?? null;
+        const currentValue =
+          snapshot?.dice?.[captureOptions.dieIndex]?.value ?? null;
+        const currentValues = snapshot?.dice?.map((die) => die.value ?? null) ?? [];
         const baselineLayout =
           baseline?.layouts?.[captureOptions.dieIndex] ??
           baseline?.layout ??
@@ -2052,16 +2167,19 @@ export const armPhysicalDiceRerollMotionCapture = async (
           positionShift,
           rotationShift,
           motionEvidenceType,
+          currentValue,
+          currentValues,
+          visibleRuleValues: group?.dataset.diceVisibleRuleValues ?? "",
         };
       },
-      { key, dieIndex, minScreenShiftPx, minPositionShiftPx, minRotationShiftRad },
+      { key, motionType, dieIndex, minScreenShiftPx, minPositionShiftPx, minRotationShiftRad },
       {
         timeout: options.timeout ?? 7000,
         polling: 16,
       },
     );
     const value = await frame.jsonValue();
-    expect(value, "兔脚重投过程图必须在骰盘仍处于重投运动态时抓拍").not.toBeNull();
+    expect(value, `${motionLabel}过程图必须在骰盘仍处于运动态时抓拍`).not.toBeNull();
     return value;
   };
 
@@ -2102,7 +2220,7 @@ export const armPhysicalDiceRerollMotionCapture = async (
           const state = await readCaptureState();
           if (state.latestVisibleEvidence) {
             visibleEvidence = state.latestVisibleEvidence;
-            return "visible-reroll-motion";
+            return visibleStatus;
           }
           return JSON.stringify({
             status: state.status,
@@ -2118,8 +2236,8 @@ export const armPhysicalDiceRerollMotionCapture = async (
           intervals: [40, 60, 80, 120],
         },
       )
-      .toBe("visible-reroll-motion");
-    expect(visibleEvidence, "兔脚重投过程截图必须有玩家可见的运动或翻转证据").not.toBeNull();
+      .toBe(visibleStatus);
+    expect(visibleEvidence, `${motionLabel}过程截图必须有玩家可见的运动或翻转证据`).not.toBeNull();
     return visibleEvidence;
   };
 
@@ -2129,9 +2247,9 @@ export const armPhysicalDiceRerollMotionCapture = async (
       .poll(
         async () => {
           const state = await readCaptureState();
-          if (state.status === "visible-reroll-motion") {
+          if (state.status === visibleStatus) {
             visibleEvidence = state.latestVisibleEvidence;
-            return "visible-reroll-motion";
+            return visibleStatus;
           }
           return JSON.stringify(state);
         },
@@ -2140,15 +2258,24 @@ export const armPhysicalDiceRerollMotionCapture = async (
           intervals: [40, 60, 80, 120],
         },
       )
-      .toBe("visible-reroll-motion");
-    expect(visibleEvidence, "兔脚重投过程截图必须绑定当前仍在运动的可见位移帧").not.toBeNull();
+      .toBe(visibleStatus);
+    expect(visibleEvidence, `${motionLabel}过程截图必须绑定当前仍在运动的可见位移帧`).not.toBeNull();
     return visibleEvidence;
   };
 
-  return {
+    return {
     expectVisible,
     saveVisibleFrame: async (path: string) => {
-      const screenshotFrame = await waitForCurrentRerollFrame();
+      let screenshotFrame: unknown;
+      try {
+        screenshotFrame = await waitForCurrentRerollFrame();
+      } catch (error) {
+        const state = await readCaptureState();
+        throw new Error(
+          `${motionLabel}过程图没有抓到真实运动态：${JSON.stringify(state)}`,
+          { cause: error },
+        );
+      }
       await rollPanel
         .page()
         .waitForFunction(
