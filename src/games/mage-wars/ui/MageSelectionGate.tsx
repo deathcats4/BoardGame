@@ -11,7 +11,6 @@ import type { MageId } from '../domain/ids';
 import {
     buildMageWarsMageSetupData,
     buildMageWarsMageSetupSelections,
-    getMageWarsDefaultSpellbookEntries,
     getMageWarsSelectableMageIds,
     resolveMageWarsSelectedMageIdForSeat,
     resolveMageWarsSpellbookEntriesForSeat,
@@ -94,27 +93,6 @@ function MageWarsMageSelectionGateContent({
     }, [savedLibraryRevision]);
     const savedSpellbookLimitReached = savedSpellbooks.length >= MAGE_WARS_SAVED_SPELLBOOK_LIMIT;
     const activeSavedSpellbookId = seatSavedSpellbookIds[activeSeatIndex];
-
-    const applyStandardSpellbookToActiveSeat = (mageId: MageId) => {
-        setSeatMageIds((current) => {
-            const next: [MageId, MageId] = [...current];
-            next[activeSeatIndex] = mageId;
-            return next;
-        });
-        setSeatSpellbookEntries((current) => {
-            const next: [MageWarsPlayerSpellbookEntry[], MageWarsPlayerSpellbookEntry[]] = [
-                [...current[0]],
-                [...current[1]],
-            ];
-            next[activeSeatIndex] = getMageWarsDefaultSpellbookEntries(mageId);
-            return next;
-        });
-        setSeatSavedSpellbookIds((current) => {
-            const next: [string | null, string | null] = [...current];
-            next[activeSeatIndex] = null;
-            return next;
-        });
-    };
 
     const applySavedSpellbookToActiveSeat = (saved: MageWarsSavedSpellbook) => {
         setSeatMageIds((current) => {

@@ -1,5 +1,4 @@
 import {
-    useEffect,
     useLayoutEffect,
     useId,
     useMemo,
@@ -3431,7 +3430,10 @@ function MageWarsInteractionDock({
 export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData, isMultiplayer }: Props) {
     const { t } = useTranslation('game-mage-wars');
     const [selectedSpellCardId, setSelectedSpellCardId] = useState<number | null>(null);
-    const [selectedPlanningSpellCardIds, setSelectedPlanningSpellCardIds] = useState<number[]>([]);
+    const [planningDraftSelection, setPlanningDraftSelection] = useState<{
+        stepId: string | null;
+        cardIds: number[];
+    } | null>(null);
     const [pendingSpellCastSelection, setPendingSpellCastSelection] = useState<PendingSpellCastSelection | null>(null);
     const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
     const [selectedMageId, setSelectedMageId] = useState<PlayerId | null>(null);
@@ -3515,18 +3517,28 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             && (phase === 'planning' || playerID === phaseActorId);
     const canPlanSpells = isCommandAllowed(MAGE_WARS_COMMANDS.PLAN_SPELLS);
     const canEditPlanningDrafts = canPlanSpells || isLocalPlanningTutorialStep;
+    const planningDraftStepId = boardTutorialStep?.id ?? tutorialStep?.id ?? null;
+    const tutorialPlanningDraftCardIds = boardTutorialActive && phase === 'planning' && viewingPlayerId === '0'
+        ? resolveMageWarsTutorialPlanningDraftCardIds(planningDraftStepId ?? undefined)
+        : [];
+    const selectedPlanningSpellCardIds = planningDraftSelection?.stepId === planningDraftStepId
+        ? planningDraftSelection.cardIds
+        : tutorialPlanningDraftCardIds;
+    const setSelectedPlanningSpellCardIds: Dispatch<SetStateAction<number[]>> = (nextValue) => {
+        setPlanningDraftSelection((current) => {
+            const currentCardIds = current?.stepId === planningDraftStepId
+                ? current.cardIds
+                : selectedPlanningSpellCardIds;
+            const cardIds = typeof nextValue === 'function'
+                ? nextValue(currentCardIds)
+                : nextValue;
+            return { stepId: planningDraftStepId, cardIds };
+        });
+    };
     const canSubmitSelectedPlanningSpells = phase === 'planning'
         && canAct
         && canPlanSpells
         && selectedPlanningSpellCardIds.length > 0;
-    useEffect(() => {
-        if (!boardTutorialActive || phase !== 'planning' || viewingPlayerId !== '0') return;
-        const restoredCardIds = resolveMageWarsTutorialPlanningDraftCardIds(boardTutorialStep?.id);
-        if (restoredCardIds.length === 0) return;
-        setSelectedPlanningSpellCardIds((current) => (
-            current.length > 0 ? current : restoredCardIds
-        ));
-    }, [boardTutorialActive, boardTutorialStep?.id, phase, viewingPlayerId]);
     const togglePublicViewTarget = (targetPlayerId: PlayerId | null) => {
         if (!targetPlayerId || targetPlayerId === viewingPlayerId) {
             setPublicViewTargetPlayerId(null);
