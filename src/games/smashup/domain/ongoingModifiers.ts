@@ -310,17 +310,14 @@ function getPodStrategy(
     sourceDefId: string,
     options?: ModifierRegistrationOptions,
 ): PodVariantStrategy {
-    if (options?.podStrategy === 'selfManaged') {
-        return 'selfManaged';
+    if (options?.podStrategy) {
+        return options.podStrategy;
     }
     if (isEntityBackedModifierSource(sourceDefId)) {
         const metadataStrategy = getMetadataPodStrategy(sourceDefId, resolvePowerModifierVariantRelation(sourceDefId));
         if (metadataStrategy) {
             return metadataStrategy;
         }
-    }
-    if (options?.podStrategy) {
-        return options.podStrategy;
     }
     if (options?.variantPolicy === 'baseOnly') {
         return 'baseOnly';
