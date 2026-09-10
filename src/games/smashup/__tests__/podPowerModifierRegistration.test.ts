@@ -35,6 +35,7 @@ describe('POD power modifier registration', () => {
         const { powerModifierIds } = getRegisteredModifierIds();
         expect(powerModifierIds.has('ghost_haunting_pod')).toBe(true);
         expect(powerModifierIds.has('killer_plant_weed_eater_pod')).toBe(true);
+        expect(powerModifierIds.has('all_stars_full_moon_pod')).toBe(true);
         expect(powerModifierIds.has('bear_cavalry_polar_commando_pod')).toBe(false);
         expect(powerModifierIds.has('base_monkey_lab_pod')).toBe(false);
         expect(powerModifierIds.has('fairies_daisy_chain_pod')).toBe(false);
