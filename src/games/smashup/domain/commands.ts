@@ -8,6 +8,7 @@ import type {
     SmashUpCore,
     ActionCardDef,
     FusionCardDef,
+    MinionOnBase,
     PlayConstraint,
     SmashUpActivationKind,
     SmashUpActivationWindow,
@@ -65,6 +66,14 @@ import {
 } from './pregameDraft';
 
 type TitanAbilityKind = SmashUpActivationKind;
+
+const GOBLINS_BLASTER = 'goblins_blaster';
+const GOBLINS_BLASTER_USED_TURN_METADATA_KEY = 'goblinsBlasterUsedTurn';
+
+function isGoblinBlasterUsedThisTurn(core: SmashUpCore, minion: MinionOnBase): boolean {
+    return minion.defId === GOBLINS_BLASTER
+        && Number(minion.metadata?.[GOBLINS_BLASTER_USED_TURN_METADATA_KEY] ?? -1) === core.turnNumber;
+}
 
 function canUseGreatWolfSpiritDoubleTalent(
     core: SmashUpCore,
@@ -1583,6 +1592,9 @@ export function validate(
             // specialLimitGroup 检查
             if (isSpecialLimitBlocked(core, spMinion.defId, spBaseIndex)) {
                 return { valid: false, error: '该基地本回合已使用过同组特殊能力' };
+            }
+            if (isGoblinBlasterUsedThisTurn(core, spMinion)) {
+                return { valid: false, error: '该爆破手本回合已使用过特殊能力' };
             }
             const specialValidation = validateSpecialUse({
                 state: core,

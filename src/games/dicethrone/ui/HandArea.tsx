@@ -18,6 +18,11 @@ import {
     readBoardShellInlineUnitPixelValue,
     readBoardShellScaleValue,
 } from '../../../shared/runtimeLayoutUnits';
+import {
+    isHandCardReleaseOverDiscardPile,
+    resolveHandDragReleaseIntent,
+    type PointerPoint,
+} from './handDragRelease';
 
 const HAND_CARD_WIDTH_UNITS = 12;
 const HAND_CARD_GAP_UNITS = 7;
@@ -115,42 +120,11 @@ const syncDragValueMap = (prevMap: Map<string, DragValues>, cardKeys: string[]) 
     return nextMap;
 };
 
-// 5. Hand Area - 拖拽交互（向上拖拽打出，拖到弃牌堆售卖）
-const DRAG_PLAY_THRESHOLD = -150; // 向上拖拽超过此距离触发打出
 const LONG_PRESS_DURATION_MS = 420;
 const LONG_PRESS_MOVE_CANCEL_PX = 14;
 const LONG_PRESS_CLICK_BLOCK_MS = 450;
-const DISCARD_PILE_MOUSE_HIT_PADDING_PX = 20;
-const DISCARD_PILE_TOUCH_HIT_PADDING_PX = 96;
 
 const canSellCardsInPhase = (phase?: TurnPhase) => phase === 'main1' || phase === 'main2';
-
-type RectLike = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom' | 'width' | 'height'>;
-
-const overlapsExpandedRect = (rect: RectLike, target: RectLike, padding: number) => (
-    rect.right >= target.left - padding &&
-    rect.left <= target.right + padding &&
-    rect.bottom >= target.top - padding &&
-    rect.top <= target.bottom + padding
-);
-
-export const isHandCardOverDiscardPile = (
-    cardRect: RectLike,
-    discardRect: RectLike,
-    options: { isCoarsePointer: boolean },
-) => {
-    const padding = options.isCoarsePointer ? DISCARD_PILE_TOUCH_HIT_PADDING_PX : DISCARD_PILE_MOUSE_HIT_PADDING_PX;
-    if (options.isCoarsePointer) {
-        return overlapsExpandedRect(cardRect, discardRect, padding);
-    }
-
-    const cardCenterX = cardRect.left + cardRect.width / 2;
-    const cardCenterY = cardRect.top + cardRect.height / 2;
-    return cardCenterX >= discardRect.left - padding &&
-        cardCenterX <= discardRect.right + padding &&
-        cardCenterY >= discardRect.top - padding &&
-        cardCenterY <= discardRect.bottom + padding;
-};
 
 const HandCardCostBadge = ({ cost, affordable }: { cost: number; affordable: boolean }) => {
     const gradientId = React.useId();
@@ -298,6 +272,7 @@ export const HandArea = ({
     const dragOffsetRef = React.useRef({ x: 0, y: 0 });
     const draggingCardRef = React.useRef<HandCardEntry | null>(null);
     const dragEndHandledRef = React.useRef(false);
+    const lastPointerPointRef = React.useRef<PointerPoint | null>(null);
     const [showSellHint, setShowSellHint] = React.useState(false);
     const [returningCardMap, setReturningCardMap] = React.useState<
         Record<string, { version: number; offset: { x: number; y: number }; originalIndex: number }>
@@ -345,6 +320,10 @@ export const HandArea = ({
     });
 
     const [handEntries, setHandEntries] = React.useState<HandCardEntry[]>(() => buildNextHandEntries(hand, []));
+
+    const updateDragPointerPoint = React.useCallback((event: React.PointerEvent) => {
+        lastPointerPointRef.current = { x: event.clientX, y: event.clientY };
+    }, []);
 
     React.useLayoutEffect(() => {
         setHandEntries(prevEntries => buildNextHandEntries(hand, prevEntries));
@@ -719,7 +698,10 @@ export const HandArea = ({
         const draggedEl = document.querySelector(`[data-card-key="${activeDraggingCardKey}"]`) as HTMLElement | null;
         if (!draggedEl) return false;
         const cardRect = draggedEl.getBoundingClientRect();
-        return isHandCardOverDiscardPile(cardRect, discardRect, { isCoarsePointer });
+        return isHandCardReleaseOverDiscardPile(cardRect, discardRect, {
+            isCoarsePointer,
+            pointerPoint: lastPointerPointRef.current,
+        });
     }, [discardPileRef, draggingCardKey, isCoarsePointer]);
 
     const handleDragEnd = React.useCallback((entry: HandCardEntry, source: 'drag' | 'window' = 'drag') => {
@@ -732,27 +714,24 @@ export const HandArea = ({
         const currentIndex = handEntries.findIndex(item => item.key === entry.key);
         const offset = { x, y };
         const card = entry.card;
+        const releaseIntent = resolveHandDragReleaseIntent({ overDiscard, yOffset: y });
 
         let actionTaken = false;
-        // 向上拖拽打出：直接调用引擎，由引擎返回错误
-        if (y < DRAG_PLAY_THRESHOLD) {
-            if (onPlayCard) {
-                beginPendingCardAction(entry, offset, currentIndex);
-                const playAccepted = onPlayCard(card);
-                if (playAccepted === false) {
-                    clearPendingPlay();
-                } else {
-                    actionTaken = true;
-                }
-            }
-        }
-
-        if (overDiscard) {
+        if (releaseIntent === 'sell') {
             if (!canSellCards && onError) {
                 onError(t('error.notYourTurn'));
             } else if (onSellCard) {
                 beginPendingCardAction(entry, offset, currentIndex);
                 onSellCard(card.id);
+                actionTaken = true;
+            }
+        } else if (releaseIntent === 'play' && onPlayCard) {
+            // 向上拖拽打出：直接调用引擎，由引擎返回错误
+            beginPendingCardAction(entry, offset, currentIndex);
+            const playAccepted = onPlayCard(card);
+            if (playAccepted === false) {
+                clearPendingPlay();
+            } else {
                 actionTaken = true;
             }
         }
@@ -763,6 +742,7 @@ export const HandArea = ({
         }
         setDraggingCardKey(null);
         draggingCardRef.current = null;
+        lastPointerPointRef.current = null;
         dragOffsetRef.current = { x: 0, y: 0 };
         onPlayHintChange?.(false);
         setShowSellHint(false);
@@ -861,8 +841,9 @@ export const HandArea = ({
     ]);
 
     React.useEffect(() => {
-        const handlePointerEnd = (_event: PointerEvent) => {
+        const handlePointerEnd = (event: PointerEvent) => {
             if (!draggingCardRef.current || dragEndHandledRef.current) return;
+            lastPointerPointRef.current = { x: event.clientX, y: event.clientY };
             handleDragEnd(draggingCardRef.current, 'window');
         };
 
@@ -985,15 +966,25 @@ export const HandArea = ({
                                 drag={canDrag}
                                 dragElastic={0.1}
                                 dragMomentum={false}
-                                onPointerDown={(event) => handleCardPointerDown(event, cardKey, card)}
+                                onPointerDown={(event) => {
+                                    updateDragPointerPoint(event);
+                                    handleCardPointerDown(event, cardKey, card);
+                                }}
                                 onPointerMove={(event) => {
+                                    updateDragPointerPoint(event);
                                     handleCardPointerMove(event, cardKey);
                                     if (canHoverCard && !isDragging && !isReturning) {
                                         setHoveredCardKey(cardKey);
                                     }
                                 }}
-                                onPointerUp={() => handleCardPointerUp(cardKey)}
-                                onPointerCancel={() => handleCardPointerUp(cardKey)}
+                                onPointerUp={(event) => {
+                                    updateDragPointerPoint(event);
+                                    handleCardPointerUp(cardKey);
+                                }}
+                                onPointerCancel={(event) => {
+                                    updateDragPointerPoint(event);
+                                    handleCardPointerUp(cardKey);
+                                }}
                                 onDragStart={() => handleCardDragStart(entry, canDrag, dragValues)}
                                 onDrag={(_, info) => canDrag && handleDrag(cardKey, info)}
                                 onDragEnd={() => canDrag && handleDragEnd(entry, 'drag')}

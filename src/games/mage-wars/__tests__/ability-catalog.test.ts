@@ -251,7 +251,7 @@ describe('mage-wars ability catalog', () => {
         const needsCodeIds = mageWarsAbilityRegistry.getByTag('implementation:needs-code')
             .map((def) => def.id)
             .sort();
-        expect(needsCodeIds).toHaveLength(63);
+        expect(needsCodeIds).toHaveLength(62);
         expect(needsCodeIds).toEqual(expect.arrayContaining([
             getMageWarsSpellAbilityId(1804),
         ]));
@@ -313,15 +313,15 @@ describe('mage-wars ability catalog', () => {
     test('tracks standard starting spell effects separately from code gaps', () => {
         expect(summarizeMageWarsAbilityGaps()).toEqual({
             total: 153,
-            implemented: 90,
-            needsCode: 63,
+            implemented: 91,
+            needsCode: 62,
             bySpellType: {
                 '攻击': { total: 12, implemented: 10, needsCode: 2 },
                 '结界': { total: 38, implemented: 22, needsCode: 16 },
                 '魔物': { total: 15, implemented: 4, needsCode: 11 },
                 '生物': { total: 33, implemented: 25, needsCode: 8 },
                 '咒语': { total: 28, implemented: 15, needsCode: 13 },
-                '装备': { total: 27, implemented: 14, needsCode: 13 },
+                '装备': { total: 27, implemented: 15, needsCode: 12 },
             },
         });
 

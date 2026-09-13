@@ -37,6 +37,7 @@ import {
     estimateDiceThroneDamageAfterExistingPrevention,
 } from './damagePreventionCommit';
 import { buildDiceThroneTokenResponseFrameIdFromPendingDamageId } from './timingOpportunityIdentities';
+import { getActionBlockedByStunLikeStatus } from './statusActionBlocking';
 
 function getArtificerBotAvailableAmount(state: DiceThroneCore, playerId: PlayerId, tokenId: string): number | undefined {
     return isArtificerBotTokenId(tokenId)
@@ -94,6 +95,7 @@ export function getUsableTokenAmountForTiming(
 ): number {
     const player = state.players[playerId];
     if (!player) return 0;
+    if (getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false })) return 0;
 
     const tokenDef = (state.tokenDefinitions ?? []).find(def => def.id === tokenId);
     if (!tokenDef?.activeUse?.timing?.includes(timing)) return 0;

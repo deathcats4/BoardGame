@@ -29,6 +29,7 @@ import {
     grantExtraAction,
     grantExtraMinion,
     grantImmediateExtraPlayForStoredCard,
+    getMinionPower,
     inspectDeck,
     modifyBreakpoint,
     recoverCardsFromDiscard,
@@ -1302,6 +1303,10 @@ function isPrintedPowerAtMost(defId: string, powerMax: number): boolean {
     return power !== undefined && power <= powerMax;
 }
 
+function isCurrentPowerAtMost(core: SmashUpCore, minion: MinionOnBase, baseIndex: number, powerMax: number): boolean {
+    return getMinionPower(core, minion, baseIndex) <= powerMax;
+}
+
 function buildRecoverOrTransferToHandEvent(playerId: PlayerId, card: CardInstance, zone: 'hand' | 'deck' | 'discard', reason: string, now: number): SmashUpEvent | undefined {
     if (zone === 'hand') return undefined;
     if (zone === 'discard') return recoverCardsFromDiscard(playerId, [card.uid], reason, now);
@@ -2507,7 +2512,7 @@ function registerExtramorphsInteractionHandlers(): void {
             state.core,
             playerId,
             'extramorphs_egg_field',
-            (minion, baseIndex) => baseIndex === continuation.sourceBaseIndex && isPrintedPowerAtMost(minion.defId, 3),
+            (minion, baseIndex) => baseIndex === continuation.sourceBaseIndex && isCurrentPowerAtMost(state.core, minion, baseIndex, 3),
             'affect',
         );
         if (minionOptions.length === 0) return { state, events: [] };
@@ -2922,7 +2927,7 @@ function registerExtramorphs(): void {
             ...buildDeckCardOptions(ctx.state, ctx.playerId, card => card.defId === 'extramorphs_head_grabber'),
             ...buildDiscardCardOptions(ctx.state, ctx.playerId, card => card.defId === 'extramorphs_head_grabber'),
         ];
-        const hasTarget = ctx.state.bases[baseIndex]?.minions.some(minion => isPrintedPowerAtMost(minion.defId, 3)) ?? false;
+        const hasTarget = ctx.state.bases[baseIndex]?.minions.some(minion => isCurrentPowerAtMost(ctx.state, minion, baseIndex, 3)) ?? false;
         if (headGrabberOptions.length === 0 || !hasTarget) return { events: [] };
         return {
             events: [],

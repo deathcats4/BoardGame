@@ -1133,10 +1133,6 @@ export default function FantasyRealmsBoard({ G, dispatch, matchData, playerID, i
             return;
         }
         if (canDiscard && isTutorialCommandAllowed('DISCARD_CARD') && isTutorialTargetAllowed(card.id)) {
-            handleFocusCard(card.id);
-            if (isCoarsePointer && core.focusCardId !== card.id) {
-                return;
-            }
             dispatch('DISCARD_CARD', { cardId: card.id });
             return;
         }
@@ -1146,7 +1142,6 @@ export default function FantasyRealmsBoard({ G, dispatch, matchData, playerID, i
         }
     }, [
         canDiscard,
-        core.focusCardId,
         dispatch,
         handleFocusCard,
         isGameOver,

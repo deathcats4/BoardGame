@@ -336,6 +336,9 @@ export function validateActionPlaySemantics(
         if (controllerConstraint === 'opponent' && targetMinion.controller === playerId) {
             return { valid: false, error: '该行动卡需要选择其他玩家的随从' };
         }
+        if (params.defId === 'extramorphs_head_grabber' && getEffectivePower(core, targetMinion, targetBaseIndex) > 3) {
+            return { valid: false, error: '抱头虫只能打到当前力量≤3的佣兵' };
+        }
         if (params.defId === 'mega_troopers_mega_attack') {
             const targetValidation = validateMegaAttackTarget(core, playerId, targetBaseIndex, params.targetMinionUid);
             if (!targetValidation.valid) return targetValidation;
@@ -378,6 +381,9 @@ export function validateActionPlaySemantics(
             }
             if (controllerConstraint === 'opponent' && targetMinion.controller === playerId) {
                 return { valid: false, error: '该行动卡需要选择其他玩家的随从' };
+            }
+            if (params.defId === 'extramorphs_head_grabber' && getEffectivePower(core, targetMinion, targetBaseIndex) > 3) {
+                return { valid: false, error: '抱头虫只能打到当前力量≤3的佣兵' };
             }
         } else if (params.targetMinionUid !== undefined) {
             return { valid: false, error: '该持续行动卡不需要选择随从目标' };

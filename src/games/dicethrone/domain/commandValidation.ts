@@ -74,6 +74,7 @@ import { isDirectDiceInterferenceActor } from './responseWindowGuards';
 import { findCurrentRollDie, getCurrentRollDice, isCurrentBonusRollSettlement, resolveCurrentRollContext } from './rollContext';
 import { isPendingDamageResponseBonusSettlement } from './damageSummary';
 import { getUsableActiveRollToken } from './activeRollTokens';
+import { getActionBlockedByStunLikeStatus } from './statusActionBlocking';
 
 // ============================================================================
 // 验证函数
@@ -124,32 +125,6 @@ const validateCurrentResponseWindowActor = (
     }
 
     return ok();
-};
-
-const getActionBlockedByStunLikeStatus = (
-    state: DiceThroneCore,
-    playerId: PlayerId,
-): string | null => {
-    if (!isMoveAllowed(playerId, state.activePlayerId)) {
-        return null;
-    }
-
-    const player = state.players[playerId];
-    if (!player) {
-        return null;
-    }
-
-    const dazeStacks = player.statusEffects[STATUS_IDS.DAZE] ?? 0;
-    if (dazeStacks > 0) {
-        return 'player_is_dazed';
-    }
-
-    const stunStacks = player.statusEffects[STATUS_IDS.STUN] ?? 0;
-    if (stunStacks > 0) {
-        return 'player_is_stunned';
-    }
-
-    return null;
 };
 
 const isCommandType = <TType extends DiceThroneCommand['type']>(
@@ -1392,6 +1367,8 @@ const validateUseToken = (
         const player = state.players[playerId];
         if (!pendingDamage) return fail('no_pending_damage');
         if (!isMoveAllowed(playerId, pendingDamage.responderId)) return fail('player_mismatch');
+        const blockedError = getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false });
+        if (blockedError) return fail(blockedError);
         if (state.pendingAttack?.isUltimate) return fail('invalid_token_timing');
         if (player?.characterId !== 'lieren' || (player.companion?.hp ?? 0) <= 0) return fail('no_token');
         return cmd.payload.amount === pendingDamage.currentDamage ? ok() : fail('invalid_amount');
@@ -1408,6 +1385,8 @@ const validateUseToken = (
     if (cmd.payload.tokenId === TOKEN_IDS.NYRAS_BOND && pendingDamage) {
         const player = state.players[playerId];
         if (!isMoveAllowed(playerId, pendingDamage.responderId)) return fail('player_mismatch');
+        const blockedError = getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false });
+        if (blockedError) return fail(blockedError);
         if (state.pendingAttack?.isUltimate) return fail('invalid_token_timing');
         if (player?.characterId !== 'lieren' || (player.companion?.hp ?? 0) <= 0) return fail('no_token');
         if ((player.tokens[TOKEN_IDS.NYRAS_BOND] ?? 0) < 1) return fail('no_token');
@@ -1469,6 +1448,10 @@ const validateUseToken = (
     }
     if (!isMoveAllowed(playerId, pendingDamage.responderId)) {
         return fail('player_mismatch');
+    }
+    const blockedError = getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false });
+    if (blockedError) {
+        return fail(blockedError);
     }
 
     const p = state.players[playerId];

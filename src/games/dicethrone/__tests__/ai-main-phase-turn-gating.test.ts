@@ -13,7 +13,7 @@ import { buildDiceThroneAiLegalActions } from '../ai';
 import { engineConfig } from '../game';
 import { canAdvancePhase, checkPlayCard } from '../domain/rules';
 import { RESOURCE_IDS } from '../domain/resources';
-import { TOKEN_IDS } from '../domain/ids';
+import { STATUS_IDS, TOKEN_IDS } from '../domain/ids';
 import type { DiceThroneCommand, DiceThroneCore } from '../domain/types';
 import { cmd, createHeroMatchup, createQueuedRandom, createRunner, createSetupWithHand, fixedRandom, getCardById, testSystems } from './test-utils';
 
@@ -340,6 +340,57 @@ describe('DiceThrone AI 主阶段候选门禁', () => {
             type: 'SKIP_TOKEN_RESPONSE',
             playerId: '1',
             payload: { pendingDamageId: 'online-ai-before-damage-received' },
+            timestamp: 0,
+        } as never)).toEqual({ valid: true });
+    });
+
+    it('线上反馈：AI 处于 daze 时不得生成太极减伤动作，但仍可跳过 Token 响应', () => {
+        const state = createHeroMatchup('barbarian', 'monk')(['0', '1'], fixedRandom);
+        state.sys.phase = 'offensiveRoll';
+        state.sys.flowHalted = true;
+        state.core.activePlayerId = '0';
+        state.core.players['1'].tokens[TOKEN_IDS.TAIJI] = 3;
+        state.core.players['1'].statusEffects[STATUS_IDS.DAZE] = 1;
+        state.core.pendingAttack = {
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'violent-assault',
+            settlementStage: 'preDamage',
+            isDefendable: true,
+            preDefenseResolved: true,
+        };
+        state.core.pendingDamage = {
+            id: 'online-ai-dazed-taiji-response',
+            sourcePlayerId: '0',
+            targetPlayerId: '1',
+            originalDamage: 2,
+            currentDamage: 2,
+            responseType: 'beforeDamageReceived',
+            responderId: '1',
+            sourceAbilityId: 'violent-assault',
+            damageScope: 'attack',
+        };
+
+        const actions = buildDiceThroneAiLegalActions({ playerId: '1', state });
+
+        expect(actions).not.toContainEqual(expect.objectContaining({
+            kind: 'token-response',
+            commands: [expect.objectContaining({
+                type: 'USE_TOKEN',
+                payload: expect.objectContaining({ tokenId: TOKEN_IDS.TAIJI }),
+            })],
+        }));
+        expect(actions).toContainEqual(expect.objectContaining({
+            kind: 'skip-token-response',
+            commands: [{
+                type: 'SKIP_TOKEN_RESPONSE',
+                payload: { pendingDamageId: 'online-ai-dazed-taiji-response' },
+            }],
+        }));
+        expect(DiceThroneDomain.validate(state, {
+            type: 'SKIP_TOKEN_RESPONSE',
+            playerId: '1',
+            payload: { pendingDamageId: 'online-ai-dazed-taiji-response' },
             timestamp: 0,
         } as never)).toEqual({ valid: true });
     });

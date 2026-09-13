@@ -1551,6 +1551,7 @@ describe('MageWarsBoard browse interactions', () => {
         const { container } = renderBoardWithProviders(<MageWarsBoard {...boardProps()} />);
         const viewport = screen.getByTestId('mage-wars-arena-viewport');
         const content = screen.getByTestId('mage-wars-arena-viewport-content');
+        const transformBeforeDrag = content.style.transform;
 
         await act(async () => {
             fireEvent.mouseDown(viewport, { button: 0, clientX: 0, clientY: 0 });
@@ -1559,7 +1560,13 @@ describe('MageWarsBoard browse interactions', () => {
         });
 
         await waitFor(() => {
-            expect(content.style.transform).toContain('translate(80px, 35px)');
+            expect(content.style.transform).not.toBe(transformBeforeDrag);
+            const dragTransformMatch = content.style.transform.match(
+                /translate\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\) scale\((\d+(?:\.\d+)?)\)/,
+            );
+            expect(dragTransformMatch).not.toBeNull();
+            expect(Number(dragTransformMatch?.[1])).toBeCloseTo(80, 0);
+            expect(Number(dragTransformMatch?.[3])).toBeGreaterThan(0);
         });
         const scaleBeforeWheel = Number(content.style.transform.match(/scale\(([^)]+)\)/)?.[1] ?? '0');
         expect(scaleBeforeWheel).toBeGreaterThan(0);

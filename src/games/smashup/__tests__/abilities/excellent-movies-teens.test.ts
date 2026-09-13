@@ -1778,6 +1778,65 @@ describe('异形变体代表性牌库玩法行为', () => {
         expect(attached.finalState.core.bases[0].minions.find(minion => minion.uid === 'too-strong')?.attachedActions).toEqual([]);
     });
 
+    it('反馈回归：卵场检索抱头虫时不能选择当前力量超过 3 的宿主', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('egg-field', 'extramorphs_egg_field', 'action', '0')],
+                    deck: [makeCard('head-grabber', 'extramorphs_head_grabber', 'action', '0')],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_the_jungle', [
+                makeMinion('valid-host', 'pirate_first_mate', '1', 2),
+                makeMinion('boosted-host', 'goblins_gobbo', '1', 2, { powerCounters: 3 }),
+            ])],
+        });
+
+        const played = runCommand(makeMatchState(core), {
+            type: SU_COMMANDS.PLAY_ACTION,
+            playerId: '0',
+            payload: { cardUid: 'egg-field', targetBaseIndex: 0 },
+        } as any, FIXED_RANDOM);
+
+        const headGrabberSelected = respondToPromptOption(
+            played.finalState,
+            option => option.value?.cardUid === 'head-grabber',
+            'head grabber to play',
+            '0',
+            FIXED_RANDOM,
+        );
+        const targetPrompt = getSimpleChoicePrompt(headGrabberSelected.finalState, 'extramorphs_egg_field_target');
+        const targetUids = getPromptOptions(targetPrompt).map(option => option.value?.minionUid);
+
+        expect(targetUids).toContain('valid-host');
+        expect(targetUids).not.toContain('boosted-host');
+    });
+
+    it('反馈回归：抱头虫直接打出时不能附着到当前力量超过 3 的佣兵', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('head-grabber', 'extramorphs_head_grabber', 'action', '0')],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_the_jungle', [
+                makeMinion('boosted-host', 'goblins_gobbo', '1', 2, { powerCounters: 3 }),
+            ])],
+        });
+
+        const played = runCommand(makeMatchState(core), {
+            type: SU_COMMANDS.PLAY_ACTION,
+            playerId: '0',
+            payload: { cardUid: 'head-grabber', targetBaseIndex: 0, targetMinionUid: 'boosted-host' },
+        } as any, FIXED_RANDOM);
+
+        expect(played.success).toBe(false);
+        expect(played.error).toContain('当前力量');
+        expect(core.bases[0].minions[0].attachedActions).toEqual([]);
+    });
+
     it('破胸者同回合刚打出时不能使用天赋', () => {
         const core = makeState({
             players: {

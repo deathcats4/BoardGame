@@ -100,6 +100,7 @@ type GoblinBaseChoice = {
 const CHAOS_LORD = 'goblins_chaos_lord';
 const DIVINER = 'goblins_diviner';
 const BLASTER = 'goblins_blaster';
+const BLASTER_USED_TURN_METADATA_KEY = 'goblinsBlasterUsedTurn';
 const GOBBO = 'goblins_gobbo';
 const MAGIC_HELMET = 'goblins_magic_helmet';
 const RECRUITERS = 'goblins_recruiters';
@@ -239,6 +240,23 @@ function markDivinerChangeUsed(source: LocatedMinion, turnNumber: number, reason
             baseIndex: source.baseIndex,
             metadataUpdate: { goblinsDivinerChangeTurn: turnNumber },
             reason,
+        },
+        timestamp: now,
+    } as SmashUpEvent;
+}
+
+function hasBlasterUsedThisTurn(state: SmashUpCore, source: LocatedMinion): boolean {
+    return Number(source.minion.metadata?.[BLASTER_USED_TURN_METADATA_KEY] ?? -1) === state.turnNumber;
+}
+
+function markBlasterUsed(source: LocatedMinion, turnNumber: number, now: number): SmashUpEvent {
+    return {
+        type: SU_EVENTS.MINION_METADATA_UPDATED,
+        payload: {
+            minionUid: source.minion.uid,
+            baseIndex: source.baseIndex,
+            metadataUpdate: { [BLASTER_USED_TURN_METADATA_KEY]: turnNumber },
+            reason: BLASTER,
         },
         timestamp: now,
     } as SmashUpEvent;
@@ -1168,7 +1186,12 @@ function gobboOnPlay(ctx: AbilityContext): AbilityResult {
 function blasterBeforeScoring(ctx: AbilityContext): AbilityResult {
     const source = findMinionOnBases(ctx.state, ctx.cardUid);
     if (!source) return { events: [] };
+    if (hasBlasterUsedThisTurn(ctx.state, source)) return { events: [] };
     const limitEvent = emitSpecialLimitUsed(ctx.playerId, BLASTER, source.baseIndex, ctx.now);
+    const initialEvents = [
+        markBlasterUsed(source, ctx.state.turnNumber, ctx.now),
+        ...(limitEvent ? [limitEvent] : []),
+    ];
     return runGoblinCoin({
         matchState: ctx.matchState,
         random: ctx.random,
@@ -1176,7 +1199,7 @@ function blasterBeforeScoring(ctx: AbilityContext): AbilityResult {
         now: ctx.now,
         reason: 'goblins_blaster',
         preferredResult: ctx.targetBaseIndex !== undefined ? 'tails' : 'heads',
-        initialEvents: limitEvent ? [limitEvent] : undefined,
+        initialEvents,
         purpose: { kind: 'blaster', sourceCardUid: source.minion.uid, targetBaseIndex: ctx.targetBaseIndex },
     });
 }

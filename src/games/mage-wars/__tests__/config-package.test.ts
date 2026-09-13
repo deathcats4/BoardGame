@@ -63,7 +63,7 @@ describe('mage-wars config package', () => {
         expect(byType('mage')).toHaveLength(4);
         expect(byType('card')).toHaveLength(157);
         expect(byType('card').filter((object) => object.tags?.includes('standard-starting-spell'))).toHaveLength(153);
-        expect(byType('card').filter((object) => object.tags?.includes('apprentice-spell'))).toHaveLength(91);
+        expect(byType('card').filter((object) => object.tags?.includes('apprentice-spell'))).toHaveLength(92);
         expect(byType('board-zone')).toHaveLength(18);
         expect(byType('board-zone').filter((object) => object.tags?.includes('apprentice-2x3'))).toHaveLength(6);
         expect(byType('board-zone').filter((object) => object.tags?.includes('formal-4x3'))).toHaveLength(12);
@@ -374,7 +374,7 @@ describe('mage-wars config package', () => {
 
         const legacySpellObjects = materialized.package.objects.filter((object) => object.tags?.includes('apprentice-spell'));
 
-        expect(legacySpellObjects).toHaveLength(91);
+        expect(legacySpellObjects).toHaveLength(92);
         for (const object of legacySpellObjects) {
             const cardId = object.data?.cardId;
             expect(typeof cardId).toBe('number');
@@ -422,9 +422,9 @@ describe('mage-wars config package', () => {
             3405, 3409,
         ];
 
-        expect(speedByCardId.size).toBe(91);
+        expect(speedByCardId.size).toBe(92);
         expect([...speedByCardId.values()].every((speed) => speed === 'quick' || speed === 'standard')).toBe(true);
-        expect([...speedByCardId.values()].filter((speed) => speed === 'quick')).toHaveLength(61);
+        expect([...speedByCardId.values()].filter((speed) => speed === 'quick')).toHaveLength(62);
         expect([...speedByCardId.entries()]
             .filter(([, speed]) => speed === 'standard')
             .map(([spellCardId]) => spellCardId)

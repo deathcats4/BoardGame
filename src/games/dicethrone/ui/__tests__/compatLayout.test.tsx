@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AbilityCard } from '../../types';
 import { DrawDeck } from '../DrawDeck';
 import { DiscardPile } from '../DiscardPile';
-import { HandArea, isHandCardOverDiscardPile } from '../HandArea';
+import {
+    isHandCardReleaseOverDiscardPile,
+    isHandCardOverDiscardPile,
+    resolveHandDragReleaseIntent,
+} from '../handDragRelease';
+import {
+    HandArea,
+} from '../HandArea';
 
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
@@ -284,6 +291,37 @@ describe('DiceThrone compatibility sizing', () => {
 
         expect(isHandCardOverDiscardPile(nearLeftCardRect, discardRect, { isCoarsePointer: false })).toBe(false);
         expect(isHandCardOverDiscardPile(nearLeftCardRect, discardRect, { isCoarsePointer: true })).toBe(true);
+    });
+
+    it('反馈回归：主阶段拖牌到弃牌堆时，指针命中弃牌堆也应触发卖牌投放', () => {
+        const discardRect = {
+            left: 820,
+            right: 900,
+            top: 120,
+            bottom: 240,
+            width: 80,
+            height: 120,
+        };
+        const laggingCardRect = {
+            left: 600,
+            right: 660,
+            top: 300,
+            bottom: 398,
+            width: 60,
+            height: 98,
+        };
+
+        expect(isHandCardOverDiscardPile(laggingCardRect, discardRect, { isCoarsePointer: false })).toBe(false);
+        expect(isHandCardReleaseOverDiscardPile(
+            laggingCardRect,
+            discardRect,
+            { isCoarsePointer: false, pointerPoint: { x: 850, y: 180 } },
+        )).toBe(true);
+    });
+
+    it('反馈回归：拖到弃牌堆时应优先卖牌，不应被向上拖拽出牌阈值抢走', () => {
+        expect(resolveHandDragReleaseIntent({ overDiscard: true, yOffset: -240 })).toBe('sell');
+        expect(resolveHandDragReleaseIntent({ overDiscard: false, yOffset: -240 })).toBe('play');
     });
 
     it('教程单击出牌模式会直接出牌并跳过预览层', () => {
