@@ -9257,19 +9257,27 @@
       "id": "spell-3707",
       "objectType": "card",
       "name": "重生腰带",
+      "cost": {
+        "mana": 6,
+        "raw": "6"
+      },
       "tags": [
+        "apprentice-spell",
         "standard-starting-spell",
         "deck-37",
         "装备"
       ],
-      "text": "标准起始法术书对象池登记；完整卡面字段、目标细则与机制实现待从正式素材合同补齐。",
+      "text": "法师获得重生2特性。",
       "data": {
         "cardId": 3707,
         "spellType": "装备",
-        "typeLine": "装备",
-        "sourceContract": "docs/games/mage-wars/rule/standard-starting-spellbooks.md",
-        "contractStatus": "blocked",
-        "requiresCodeSupport": true,
+        "typeLine": "装备 / 腰带",
+        "schoolLine": "自然",
+        "level": 1,
+        "targetRule": "0-2` / 法师",
+        "attackOrTraitLine": "法师获得重生2特性",
+        "printCode": "MW1Q23",
+        "contractStatus": "locked",
         "standardStartingRulesName": "重生腰带",
         "standardStartingMageIds": [
           "beastmaster_apprentice"
@@ -9284,7 +9292,12 @@
           "top": 0.25,
           "width": 0.142857,
           "height": 0.25
-        }
+        },
+        "sourceContract": "docs/games/mage-wars/rule/apprentice-card-field-contract.md",
+        "requiresCodeSupport": false,
+        "spellActionSpeed": "quick",
+        "rawCost": "6",
+        "manaCost": 6
       },
       "assetRefs": [
         "spell-card-3707-frame",

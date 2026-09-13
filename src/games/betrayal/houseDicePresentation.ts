@@ -14,7 +14,7 @@ export const BETRAYAL_HOUSE_DICE_STYLE_PROFILE = {
   lightIntensity: 1.08,
   baseScale: 64,
   cameraZoom: 0.9,
-  strength: 0.12,
+  strength: 0.1,
   iterationLimit: 900,
   projectedLayoutMargin: 18,
   projectedLayoutMinGap: 12,

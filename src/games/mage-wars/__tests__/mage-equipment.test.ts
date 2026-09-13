@@ -164,6 +164,75 @@ describe('mage-wars mage equipment', () => {
         expect(equipped.state.core.players['0'].discardSpellCardIds).toEqual([equipmentSpellId]);
     });
 
+    it('casts Regrowth Belt as mage-attached passive equipment with regeneration text', () => {
+        const equipmentSpellId = 3707;
+        const planningState = setupState('planning');
+        const planned = runCommand({
+            core: withPlayerMage(planningState.core, '0', MAGE_IDS.BEASTMASTER_APPRENTICE),
+            sys: planningState.sys,
+        }, planCommand([equipmentSpellId]));
+        const state: MatchState<MageWarsCore> = {
+            core: withPlayerInZone(planned.state.core, '1', PLAYER_ZERO_START_ZONE),
+            sys: { ...planned.state.sys, phase: 'initiativeQuickcast' },
+        };
+
+        const equipped = runCommand(state, {
+            type: MAGE_WARS_COMMANDS.CAST_SPELL,
+            playerId: '0',
+            payload: {
+                spellCardId: equipmentSpellId,
+                manaCost: 6,
+                targetPlayerId: '0',
+            },
+        });
+
+        const equipment = Object.values(equipped.state.core.objects)
+            .find((object) => object.sourceSpellCardId === equipmentSpellId);
+
+        expect(equipped.success).toBe(true);
+        expect(equipped.events).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.SPELL_CAST_RESOLVED,
+                payload: expect.objectContaining({
+                    spellCardId: equipmentSpellId,
+                    manaCost: 6,
+                    targetPlayerId: '0',
+                }),
+            }),
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.ARENA_OBJECT_SUMMONED,
+                payload: expect.objectContaining({
+                    object: expect.objectContaining({
+                        kind: 'equipment',
+                        sourceSpellCardId: equipmentSpellId,
+                        name: '重生腰带',
+                        ownerId: '0',
+                        zoneId: PLAYER_ZERO_START_ZONE,
+                        anchoredToPlayerId: '0',
+                        attackOrTraitLine: '法师获得重生2特性',
+                    }),
+                }),
+            }),
+        ]));
+        expect(equipment).toMatchObject({
+            kind: 'equipment',
+            ownerId: '0',
+            name: '重生腰带',
+            zoneId: PLAYER_ZERO_START_ZONE,
+            life: 1,
+            armor: 0,
+            anchoredToPlayerId: '0',
+            attackOrTraitLine: '法师获得重生2特性',
+        });
+        expect(equipped.state.core.players['0']).toMatchObject({
+            mana: state.core.players['0'].mana - 6,
+            quickcastReady: false,
+            actionReady: true,
+        });
+        expect(equipped.state.core.players['0'].preparedSpellCardIds).toEqual([]);
+        expect(equipped.state.core.players['0'].discardSpellCardIds).toEqual([equipmentSpellId]);
+    });
+
     it('keeps mage-attached passive armor equipment with the mage and reduces incoming attack damage', () => {
         const equipmentSpellId = 3702;
         const planningState = setupState('planning');

@@ -1004,8 +1004,8 @@ export class DiceBoxThreeEngine {
         const towardCenterX = layout.x <= canvasWidth / 2 ? 1 : -1;
         const towardCenterY = layout.y <= canvasHeight / 2 ? 1 : -1;
         const alternatingX = order % 2 === 0 ? 1 : -1;
-        const primaryDistance = Math.max(30, Math.min(42, baseScale * 0.58));
-        const secondaryDistance = Math.max(10, Math.min(18, baseScale * 0.22));
+        const primaryDistance = Math.max(48, Math.min(66, baseScale * 0.86));
+        const secondaryDistance = Math.max(16, Math.min(28, baseScale * 0.34));
         const candidates = [
             { x: towardCenterX * primaryDistance, y: towardCenterY * secondaryDistance },
             { x: towardCenterX * primaryDistance, y: -towardCenterY * secondaryDistance },
@@ -1018,7 +1018,7 @@ export class DiceBoxThreeEngine {
         const otherLayouts = this.box.diceList
             .map((_, index) => (index === dieIndex ? null : this.getProjectedLayout(index, index)))
             .filter((candidate): candidate is DiceBoxProjectedLayout => Boolean(candidate));
-        const minVisibleDistance = 24;
+        const minVisibleDistance = 36;
         let best: { x: number; y: number; score: number; distance: number } | null = null;
 
         for (const candidate of candidates) {
@@ -1514,11 +1514,11 @@ export class DiceBoxThreeEngine {
         if (snapshots.length === 0) return;
 
         const baseScale = this.styleProfile.baseScale ?? DEFAULT_DICE_BOX_STYLE_PROFILE.baseScale ?? 64;
-        const lift = Math.max(2.2, Math.min(5, baseScale * 0.06));
-        const sideTravel = Math.max(3.2, Math.min(6.4, baseScale * 0.09));
-        const forwardTravel = Math.max(1.6, Math.min(4, baseScale * 0.05));
-        const screenSideTravel = Math.max(24, Math.min(44, baseScale * 0.62));
-        const screenForwardTravel = Math.max(8, Math.min(18, baseScale * 0.22));
+        const lift = Math.max(2.4, Math.min(4.8, baseScale * 0.06));
+        const sideTravel = Math.max(5.2, Math.min(9.2, baseScale * 0.13));
+        const forwardTravel = Math.max(2.8, Math.min(5.8, baseScale * 0.08));
+        const screenSideTravel = Math.max(42, Math.min(68, baseScale * 0.9));
+        const screenForwardTravel = Math.max(18, Math.min(30, baseScale * 0.38));
         const duration = Math.max(1100, durationMs);
         const minimumVisibleFrames = Math.max(24, Math.min(32, Math.ceil(duration / 46)));
         const canvas = this.box.renderer?.domElement;

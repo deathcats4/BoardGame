@@ -118,6 +118,21 @@ describe('mage-wars config package', () => {
         });
     });
 
+    test('loads Regrowth Belt as implemented mage-target equipment', () => {
+        expect(requireMageWarsSpellCardFromConfig(3707)).toMatchObject({
+            spellType: '装备',
+            typeLine: '装备 / 腰带',
+            schoolLine: '自然',
+            level: 1,
+            targetRule: '0-2` / 法师',
+            attackOrTraitLine: '法师获得重生2特性',
+            requiresCodeSupport: false,
+            spellActionSpeed: 'quick',
+            rawCost: '6',
+            manaCost: 6,
+        });
+    });
+
     test('keeps preset mage stats aligned with the existing setup source', () => {
         const materialized = materializeMageWarsConfigPackage();
 

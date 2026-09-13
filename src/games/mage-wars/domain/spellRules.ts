@@ -381,7 +381,7 @@ export function isMageWarsElementalStaffBindableSpell(spell: MageWarsConfigSpell
 }
 
 export function isMageWarsPassiveArmorEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
-    return [3702, 3703, 3708, 3709, 3711, 3721].includes(spell.spellCardId);
+    return [3702, 3703, 3707, 3708, 3709, 3711, 3721].includes(spell.spellCardId);
 }
 
 export function isMageWarsImplementedPassiveArmorEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {

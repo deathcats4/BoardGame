@@ -1,5 +1,6 @@
 import type { FlowHooks } from '../../../engine/systems/FlowSystem';
 import type { RandomFn } from '../../../engine/types';
+import { resolveMageWarsMageEquipmentRegeneration } from './damageRules';
 import { MAGE_WARS_EVENTS } from './events';
 import { MAGE_WARS_OBJECT_ABILITY_IDS, STATUS_TOKEN_IDS, type StatusTokenId } from './ids';
 import type { MageWarsCore, MageWarsEvent, MageWarsPhase } from './types';
@@ -126,7 +127,7 @@ function createUpkeepRegenerationEvents(
     sourceCommandType: string,
     timestamp: number,
 ): MageWarsEvent[] {
-    return Object.values(core.objects).flatMap((object) => {
+    const objectRegenerationEvents = Object.values(core.objects).flatMap((object) => {
         const regeneration = resolveMageWarsObjectRegeneration(core, object);
         if (regeneration.value <= 0 || object.damage <= 0) return [];
 
@@ -143,6 +144,28 @@ function createUpkeepRegenerationEvents(
             timestamp,
         }];
     });
+
+    const mageRegenerationEvents = Object.values(core.players).flatMap((player) => {
+        const regeneration = resolveMageWarsMageEquipmentRegeneration(core, player.id);
+        if (regeneration.value <= 0 || player.damage <= 0) return [];
+
+        return [{
+            type: MAGE_WARS_EVENTS.MAGE_REGENERATED,
+            payload: {
+                playerId: player.id,
+                regeneration: regeneration.value,
+                actualHealing: Math.min(player.damage, regeneration.value),
+                sourceObjectIds: regeneration.sourceObjectIds,
+            },
+            sourceCommandType,
+            timestamp,
+        }];
+    });
+
+    return [
+        ...objectRegenerationEvents,
+        ...mageRegenerationEvents,
+    ];
 }
 
 function createObjectManaChannelEvents(

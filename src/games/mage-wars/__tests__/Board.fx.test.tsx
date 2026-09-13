@@ -1858,7 +1858,7 @@ describe('MageWarsBoard spell cast choices', () => {
         };
     }
 
-    function createRegrowthBeltBlockedCore(): MageWarsCore {
+    function createRegrowthBeltChoiceCore(): MageWarsCore {
         const baseCore = MageWarsDomain.setup(['0', '1'], fixedRandom);
         const beastmaster = baseCore.players['0'];
 
@@ -1877,6 +1877,36 @@ describe('MageWarsBoard spell cast choices', () => {
                     quickcastReady: true,
                     preparedSpellSlots: 1,
                     preparedSpellCardIds: [3707],
+                },
+            },
+            arena: baseCore.arena.map((zone) => ({
+                ...zone,
+                occupantIds: zone.id === ARENA_ZONE_IDS.A3
+                    ? ['0']
+                    : zone.occupantIds.filter((id) => id !== '0'),
+            })),
+        };
+    }
+
+    function createBlockedSpellChoiceCore(): MageWarsCore {
+        const baseCore = MageWarsDomain.setup(['0', '1'], fixedRandom);
+        const beastmaster = baseCore.players['0'];
+
+        return {
+            ...baseCore,
+            currentPlayerId: '0',
+            phaseActorId: '0',
+            players: {
+                ...baseCore.players,
+                '0': {
+                    ...beastmaster,
+                    mageId: MAGE_IDS.BEASTMASTER_APPRENTICE,
+                    mageZoneId: ARENA_ZONE_IDS.A3,
+                    mana: 20,
+                    actionReady: true,
+                    quickcastReady: true,
+                    preparedSpellSlots: 1,
+                    preparedSpellCardIds: [1707],
                 },
             },
             arena: baseCore.arena.map((zone) => ({
@@ -2354,11 +2384,11 @@ describe('MageWarsBoard spell cast choices', () => {
         });
     });
 
-    it('does not expose blocked Regrowth Belt as a selectable prepared spell source', () => {
+    it('casts Regrowth Belt on own mage from the spell ChoiceRequest player target command', async () => {
         const dispatch = vi.fn();
         const { container } = renderBoardWithProviders(
             <MageWarsBoard
-                {...boardProps(createRegrowthBeltBlockedCore(), '0', { phase: 'initiativeQuickcast' })}
+                {...boardProps(createRegrowthBeltChoiceCore(), '0', { phase: 'initiativeQuickcast' })}
                 dispatch={dispatch}
             />,
         );
@@ -2368,28 +2398,68 @@ describe('MageWarsBoard spell cast choices', () => {
         );
         expect(regrowthBeltPreparedCard).not.toBeNull();
         expect(regrowthBeltPreparedCard?.getAttribute('data-primary-action')).toBe('true');
-        expect(regrowthBeltPreparedCard?.getAttribute('data-primary-action-state')).toBe('disabled');
+        expect(regrowthBeltPreparedCard?.getAttribute('data-primary-action-state')).toBe('enabled');
         expect(regrowthBeltPreparedCard?.getAttribute('data-secondary-inspect')).toBe('true');
-        expect(regrowthBeltPreparedCard).toBeDisabled();
+        expect(regrowthBeltPreparedCard).toBeEnabled();
 
         fireEvent.click(regrowthBeltPreparedCard!);
 
+        const ownMage = container.querySelector<HTMLElement>(
+            '[data-testid="mage-wars-zone-mage-entity"][data-player-id="0"]',
+        );
+        expect(ownMage).not.toBeNull();
+        await waitFor(() => {
+            expect(ownMage?.getAttribute('role')).toBe('button');
+            expect(ownMage?.className).toContain('rgba(16,185,129,0.48)');
+        });
+        expect(ownMage?.querySelector('[data-testid="mage-wars-mage-entity-target-frame"]')?.className).toContain('inset-0');
+        expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
+
+        fireEvent.click(ownMage!);
+
+        expect(dispatch).toHaveBeenCalledWith(MAGE_WARS_COMMANDS.CAST_SPELL, {
+            spellCardId: 3707,
+            manaCost: 6,
+            targetPlayerId: '0',
+        });
+    });
+
+    it('does not expose a blocked prepared spell as a selectable spell source', () => {
+        const dispatch = vi.fn();
+        const { container } = renderBoardWithProviders(
+            <MageWarsBoard
+                {...boardProps(createBlockedSpellChoiceCore(), '0', { phase: 'initiativeQuickcast' })}
+                dispatch={dispatch}
+            />,
+        );
+
+        const blockedPreparedCard = container.querySelector<HTMLButtonElement>(
+            '[data-testid="mage-wars-desktop-prepared-card"][data-source-card-id="1707"]',
+        );
+        expect(blockedPreparedCard).not.toBeNull();
+        expect(blockedPreparedCard?.getAttribute('data-primary-action')).toBe('true');
+        expect(blockedPreparedCard?.getAttribute('data-primary-action-state')).toBe('disabled');
+        expect(blockedPreparedCard?.getAttribute('data-secondary-inspect')).toBe('true');
+        expect(blockedPreparedCard).toBeDisabled();
+
+        fireEvent.click(blockedPreparedCard!);
+
         expect(dispatch).not.toHaveBeenCalled();
-        expect(regrowthBeltPreparedCard?.getAttribute('data-selected')).toBeNull();
+        expect(blockedPreparedCard?.getAttribute('data-selected')).toBeNull();
         expect(container.querySelector('[data-testid="mage-wars-selected-card-frame"]')).toBeNull();
         expect(container.querySelector('[data-testid="mage-wars-zone-mage-entity"][data-player-id="0"]')?.getAttribute('role'))
             .toBeNull();
         expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
 
-        const inspectButton = regrowthBeltPreparedCard?.parentElement?.querySelector<HTMLButtonElement>(
-            '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="3707"]',
+        const inspectButton = blockedPreparedCard?.parentElement?.querySelector<HTMLButtonElement>(
+            '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="1707"]',
         );
         expect(inspectButton).not.toBeNull();
 
         fireEvent.click(inspectButton!);
 
         expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('false');
-        expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('3707');
+        expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('1707');
     });
 
     it('casts Leather Gloves on own mage from the spell ChoiceRequest player target command', async () => {

@@ -52,6 +52,7 @@ export const MAGE_WARS_EVENTS = {
     SPELL_DIRECT_DAMAGE_ROLLED: 'MW_SPELL_DIRECT_DAMAGE_ROLLED',
     SPELL_HEALING_ROLLED: 'MW_SPELL_HEALING_ROLLED',
     ARENA_OBJECT_REGENERATED: 'MW_ARENA_OBJECT_REGENERATED',
+    MAGE_REGENERATED: 'MW_MAGE_REGENERATED',
     SPELL_PUSH_RESOLVED: 'MW_SPELL_PUSH_RESOLVED',
     SPELL_TELEPORT_RESOLVED: 'MW_SPELL_TELEPORT_RESOLVED',
     ENCHANTMENT_STOLEN: 'MW_ENCHANTMENT_STOLEN',
@@ -568,6 +569,15 @@ export interface MageWarsArenaObjectRegeneratedEvent extends GameEvent<typeof MA
     };
 }
 
+export interface MageWarsMageRegeneratedEvent extends GameEvent<typeof MAGE_WARS_EVENTS.MAGE_REGENERATED> {
+    payload: {
+        playerId: PlayerId;
+        regeneration: number;
+        actualHealing: number;
+        sourceObjectIds: string[];
+    };
+}
+
 export interface MageWarsSpellPushResolvedEvent extends GameEvent<typeof MAGE_WARS_EVENTS.SPELL_PUSH_RESOLVED> {
     payload: {
         playerId: PlayerId;
@@ -1020,6 +1030,7 @@ export type MageWarsEvent =
     | MageWarsSpellDirectDamageRolledEvent
     | MageWarsSpellHealingRolledEvent
     | MageWarsArenaObjectRegeneratedEvent
+    | MageWarsMageRegeneratedEvent
     | MageWarsSpellPushResolvedEvent
     | MageWarsSpellTeleportResolvedEvent
     | MageWarsEnchantmentStolenEvent

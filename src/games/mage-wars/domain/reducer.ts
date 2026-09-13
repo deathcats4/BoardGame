@@ -659,6 +659,12 @@ export function reduceEvent(core: MageWarsCore, event: MageWarsEvent): MageWarsC
                 damage: Math.max(0, object.damage - event.payload.actualHealing),
             }));
 
+        case MAGE_WARS_EVENTS.MAGE_REGENERATED:
+            return updatePlayer(core, event.payload.playerId, (player) => ({
+                ...player,
+                damage: Math.max(0, player.damage - event.payload.actualHealing),
+            }));
+
         case MAGE_WARS_EVENTS.STATUS_TOKEN_PLACED:
             if (event.payload.targetPlayerId) {
                 return updatePlayer(core, event.payload.targetPlayerId, (player) => (

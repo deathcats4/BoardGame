@@ -4,6 +4,11 @@ import type { PlayerId } from '../../../engine/types';
 import type { MageWarsConfigSpellCard } from '../data/configPackage';
 import type { MageWarsCore } from './types';
 
+export interface MageWarsMageEquipmentRegeneration {
+    value: number;
+    sourceObjectIds: string[];
+}
+
 function parseMageWarsArmorBonus(text: string | undefined): number {
     if (!text) return 0;
 
@@ -12,6 +17,16 @@ function parseMageWarsArmorBonus(text: string | undefined): number {
         armor += Number(match[1]);
     }
     return armor;
+}
+
+function parseMageWarsRegenerationBonus(text: string | undefined): number {
+    if (!text) return 0;
+
+    let regeneration = 0;
+    for (const match of text.matchAll(/重生\s*(\d+)/g)) {
+        regeneration = Math.max(regeneration, Number(match[1]));
+    }
+    return regeneration;
 }
 
 function resolveMageWarsEquipmentTraitText(object: { attackOrTraitLine?: string; rulesText?: string }): string | undefined {
@@ -45,6 +60,32 @@ export function createMageWarsObjectArmorDamageModifiers(
         source: 'mage-wars-object-armor',
         description: '护甲',
     }];
+}
+
+export function resolveMageWarsMageEquipmentRegeneration(
+    core: MageWarsCore,
+    playerId: PlayerId,
+): MageWarsMageEquipmentRegeneration {
+    const regenerationSources = Object.values(core.objects)
+        .filter((object) => object.kind === 'equipment' && object.anchoredToPlayerId === playerId)
+        .map((object) => ({
+            objectId: object.id,
+            value: Math.max(
+                parseMageWarsRegenerationBonus(object.attackOrTraitLine),
+                parseMageWarsRegenerationBonus(object.rulesText),
+            ),
+        }))
+        .filter((source) => source.value > 0);
+
+    if (regenerationSources.length === 0) {
+        return { value: 0, sourceObjectIds: [] };
+    }
+
+    const value = regenerationSources.reduce((best, source) => Math.max(best, source.value), 0);
+    return {
+        value,
+        sourceObjectIds: regenerationSources.map((source) => source.objectId),
+    };
 }
 
 export function resolveMageWarsMageEquipmentArmor(core: MageWarsCore, playerId: PlayerId): number {

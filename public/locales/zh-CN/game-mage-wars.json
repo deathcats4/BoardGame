@@ -496,6 +496,7 @@
     "spellPushTarget": "，目标 {{targetId}}，{{from}} → {{to}}",
     "spellTeleportResolved": "法术传送",
     "spellTeleportTarget": "，目标 {{targetId}}，{{from}} → {{to}}，距离 {{distance}}",
-    "arenaObjectRegenerated": "{{objectId}} 重生治疗 {{healing}} 点伤害"
+    "arenaObjectRegenerated": "{{objectId}} 重生治疗 {{healing}} 点伤害",
+    "mageRegenerated": "法师重生治疗 {{healing}} 点伤害"
   }
 }

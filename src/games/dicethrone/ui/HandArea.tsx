@@ -122,7 +122,6 @@ const LONG_PRESS_MOVE_CANCEL_PX = 14;
 const LONG_PRESS_CLICK_BLOCK_MS = 450;
 const DISCARD_PILE_MOUSE_HIT_PADDING_PX = 20;
 const DISCARD_PILE_TOUCH_HIT_PADDING_PX = 96;
-const TOUCH_SELL_BUTTON_MIN_SIZE = 'calc(44px / var(--mobile-board-shell-scale, 1))';
 
 const canSellCardsInPhase = (phase?: TurnPhase) => phase === 'main1' || phase === 'main2';
 
@@ -861,21 +860,6 @@ export const HandArea = ({
         shouldBlockLongPressClick,
     ]);
 
-    const handleTouchSellClick = React.useCallback((event: React.MouseEvent<HTMLButtonElement>, entry: HandCardEntry) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!canInteract) return;
-        if (!canSellCards) {
-            onError?.(t('error.notYourTurn'));
-            return;
-        }
-        if (!onSellCard) return;
-
-        const currentIndex = handEntries.findIndex(item => item.key === entry.key);
-        beginPendingCardAction(entry, { x: 0, y: 0 }, currentIndex);
-        onSellCard(entry.card.id);
-    }, [beginPendingCardAction, canInteract, canSellCards, handEntries, onError, onSellCard, t]);
-
     React.useEffect(() => {
         const handlePointerEnd = (_event: PointerEvent) => {
             if (!draggingCardRef.current || dragEndHandledRef.current) return;
@@ -960,15 +944,6 @@ export const HandArea = ({
                         const canDrag = canInteract && isFlipped && !isReturning && !isDiscardMode;
                         const canClickDiscard = isDiscardMode && isFlipped && !isReturning;
                         const canClickPlay = playCardOnClick && canPlayCards && isFlipped && !isReturning && !isDiscardMode;
-                        const canTouchSellCard = isCoarsePointer
-                            && canSellCardsInPhase(currentPhase)
-                            && canInteract
-                            && canSellCards
-                            && isFlipped
-                            && !isReturning
-                            && !isDiscardMode
-                            && !disableCardPointerEvents
-                            && Boolean(onSellCard);
                         const canPreviewCard = Boolean(onMagnifyCard) && isFlipped && !isReturning;
                         const canHoverCard = (canDrag || canClickDiscard || canPreviewCard || respondableCardIds?.has(card.id))
                             && !disableCardPointerEvents;
@@ -1108,32 +1083,6 @@ export const HandArea = ({
                                                     }}
                                                 />
                                                 <HandCardCostBadge cost={card.cpCost} affordable={canAffordCard} />
-                                                {canTouchSellCard && (
-                                                    <button
-                                                        type="button"
-                                                        data-testid="dt-hand-card-sell-button"
-                                                        aria-label={t('actions.sellCard')}
-                                                        className="absolute z-20 flex items-center justify-center border border-amber-100/80 bg-amber-500/95 px-1 font-black uppercase tracking-wide text-slate-950 shadow-lg shadow-black/40 active:scale-95"
-                                                        style={{
-                                                            left: buildBoardShellInlineUnitValue(0.45),
-                                                            bottom: buildBoardShellInlineUnitValue(0.45),
-                                                            minWidth: TOUCH_SELL_BUTTON_MIN_SIZE,
-                                                            minHeight: TOUCH_SELL_BUTTON_MIN_SIZE,
-                                                            height: buildBoardShellInlineUnitValue(2.45),
-                                                            paddingInline: buildBoardShellInlineUnitValue(0.52),
-                                                            borderRadius: buildBoardShellInlineUnitValue(0.48),
-                                                            fontSize: buildBoardShellInlineUnitValue(0.68),
-                                                            lineHeight: '1',
-                                                            touchAction: 'manipulation',
-                                                        }}
-                                                        onPointerDown={(event) => {
-                                                            event.stopPropagation();
-                                                        }}
-                                                        onClick={(event) => handleTouchSellClick(event, entry)}
-                                                    >
-                                                        {t('actions.sell')}
-                                                    </button>
-                                                )}
                                             </div>
                                             <div
                                                 data-card-face="back"

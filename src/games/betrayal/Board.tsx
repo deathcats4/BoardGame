@@ -90,6 +90,7 @@ import {
 } from "./possessionAtlas";
 import { type BetrayalScenarioCardId } from "./scenarioConfig";
 import {
+  SCENARIO_BOOK_TURN_DURATION_MS,
   resolveScenarioReaderOpenPlan,
   resolveScenarioReaderSpreadPages,
   type ScenarioBookTurnSnapshot,
@@ -441,6 +442,9 @@ export default function BetrayalBoard({
   );
   const pendingScenarioStartOpeningKeyRef = React.useRef<string | null>(null);
   const pendingScenarioTurnTutorialAdvanceRef = React.useRef(false);
+  const pendingScenarioTurnTutorialAdvanceTimerRef = React.useRef<number | null>(
+    null,
+  );
   const [
     scenarioStartOpeningCinematicKey,
     setScenarioStartOpeningCinematicKey,
@@ -873,6 +877,33 @@ export default function BetrayalBoard({
     }
   }, [allExplorers, observedExplorerPlayerId]);
 
+  const clearPendingScenarioTurnTutorialAdvance = React.useCallback(() => {
+    pendingScenarioTurnTutorialAdvanceRef.current = false;
+    if (pendingScenarioTurnTutorialAdvanceTimerRef.current !== null) {
+      window.clearTimeout(pendingScenarioTurnTutorialAdvanceTimerRef.current);
+      pendingScenarioTurnTutorialAdvanceTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleScenarioTurnTutorialAdvance = React.useCallback(() => {
+    if (pendingScenarioTurnTutorialAdvanceTimerRef.current !== null) {
+      window.clearTimeout(pendingScenarioTurnTutorialAdvanceTimerRef.current);
+    }
+    pendingScenarioTurnTutorialAdvanceRef.current = true;
+    pendingScenarioTurnTutorialAdvanceTimerRef.current = window.setTimeout(() => {
+      pendingScenarioTurnTutorialAdvanceTimerRef.current = null;
+      if (!pendingScenarioTurnTutorialAdvanceRef.current) {
+        return;
+      }
+      pendingScenarioTurnTutorialAdvanceRef.current = false;
+      nextStep("auto");
+    }, SCENARIO_BOOK_TURN_DURATION_MS + 160);
+  }, [nextStep]);
+
+  React.useEffect(() => clearPendingScenarioTurnTutorialAdvance, [
+    clearPendingScenarioTurnTutorialAdvance,
+  ]);
+
   const openScenarioReference = React.useCallback(() => {
     const tutorialScenarioStepId = tutorialStep?.id;
     const shouldAdvanceScenarioReferenceTutorial =
@@ -895,7 +926,7 @@ export default function BetrayalBoard({
     const hauntRevealKey = openPlan.isPublicHauntRevealReader
       ? buildLatestDiscoveryKey(core)
       : null;
-    pendingScenarioTurnTutorialAdvanceRef.current = false;
+    clearPendingScenarioTurnTutorialAdvance();
     if (hauntRevealKey) {
       setDismissedLatestDiscoveryKeys((previousKeys) => {
         if (previousKeys.has(hauntRevealKey)) {
@@ -928,6 +959,7 @@ export default function BetrayalBoard({
       nextStep("auto");
     }
   }, [
+    clearPendingScenarioTurnTutorialAdvance,
     core,
     isTutorialActive,
     nextStep,
@@ -952,11 +984,17 @@ export default function BetrayalBoard({
     setReferenceOpen(false);
     setScenarioReaderOpen(false);
     setReferenceScenarioOpeningStageActive(false);
-    pendingScenarioTurnTutorialAdvanceRef.current = false;
+    clearPendingScenarioTurnTutorialAdvance();
     if (shouldAdvanceScenarioReaderCloseTutorial) {
       nextStep("auto");
     }
-  }, [isTutorialActive, nextStep, scenarioReaderOpen, tutorialStep?.id]);
+  }, [
+    clearPendingScenarioTurnTutorialAdvance,
+    isTutorialActive,
+    nextStep,
+    scenarioReaderOpen,
+    tutorialStep?.id,
+  ]);
 
   const openReferenceCards = React.useCallback(() => {
     setReferenceSide("front");
@@ -3712,7 +3750,7 @@ export default function BetrayalBoard({
         playSound(BETRAYAL_SCENARIO_PAGE_TURN_KEY);
         setReferenceScenarioTurnDirection(direction);
         if (shouldAdvanceScenarioTurnTutorial) {
-          pendingScenarioTurnTutorialAdvanceRef.current = true;
+          scheduleScenarioTurnTutorialAdvance();
         }
       }
       return nextIndex;
@@ -3722,6 +3760,10 @@ export default function BetrayalBoard({
   const handleReferenceScenarioTurnComplete = React.useCallback(() => {
     setReferenceScenarioTurnDirection(null);
     setReferenceScenarioTurnSnapshot(null);
+    if (pendingScenarioTurnTutorialAdvanceTimerRef.current !== null) {
+      window.clearTimeout(pendingScenarioTurnTutorialAdvanceTimerRef.current);
+      pendingScenarioTurnTutorialAdvanceTimerRef.current = null;
+    }
     if (pendingScenarioTurnTutorialAdvanceRef.current) {
       pendingScenarioTurnTutorialAdvanceRef.current = false;
       nextStep("auto");

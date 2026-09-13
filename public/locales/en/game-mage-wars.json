@@ -496,6 +496,7 @@
     "spellPushTarget": ", target {{targetId}}, {{from}} → {{to}}",
     "spellTeleportResolved": "Spell teleport",
     "spellTeleportTarget": ", target {{targetId}}, {{from}} → {{to}}, distance {{distance}}",
-    "arenaObjectRegenerated": "{{objectId}} regenerated {{healing}} damage"
+    "arenaObjectRegenerated": "{{objectId}} regenerated {{healing}} damage",
+    "mageRegenerated": "Mage regenerated {{healing}} damage"
   }
 }

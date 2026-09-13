@@ -164,6 +164,9 @@ const MAGE_WARS_REFERENCE_INSPECT_BUTTON_SIZE = 'clamp(28px, 18.5cqw, 34px)';
 const MAGE_WARS_REFERENCE_INSPECT_ICON_SIZE = 'clamp(15px, 10cqw, 19px)';
 const MAGE_WARS_HUD_HINT_CARD_HEIGHT_CSS_VAR = 'var(--mage-wars-desktop-hud-hint-card-height, 15.75rem)';
 const MAGE_WARS_HUD_COMPACT_HINT_CARD_HEIGHT_REM = 4.5;
+const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MIN = 240;
+const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_RATIO = 0.24;
+const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MAX_RATIO = 0.32;
 const MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET = 316;
 const MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO = 0.28;
 const MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO = 0.45;
@@ -3543,17 +3546,23 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
     const isLandscapeMobileViewport = viewport.width <= 1023 && viewport.width > viewport.height;
     const desktopBottomGap = isLandscapeMobileViewport ? 0 : MAGE_WARS_DESKTOP_BOTTOM_GAP_PX;
     const cameraFitInsets = useMemo(() => {
-        if (!isLandscapeMobileViewport) {
-            return undefined;
-        }
+        const minBottomInset = isLandscapeMobileViewport
+            ? MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET
+            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MIN;
+        const bottomInsetRatio = isLandscapeMobileViewport
+            ? MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO
+            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_RATIO;
+        const maxBottomInsetRatio = isLandscapeMobileViewport
+            ? MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO
+            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MAX_RATIO;
 
         return {
             bottom: Math.min(
                 Math.max(
-                    MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET,
-                    Math.round(viewport.height * MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO),
+                    minBottomInset,
+                    Math.round(viewport.height * bottomInsetRatio),
                 ),
-                Math.round(viewport.height * MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO),
+                Math.round(viewport.height * maxBottomInsetRatio),
             ) + desktopBottomGap,
         };
     }, [desktopBottomGap, isLandscapeMobileViewport, viewport.height]);

@@ -6,8 +6,6 @@ import { DrawDeck } from '../DrawDeck';
 import { DiscardPile } from '../DiscardPile';
 import { HandArea, isHandCardOverDiscardPile } from '../HandArea';
 
-const mockUseCoarsePointer = vi.hoisted(() => vi.fn(() => false));
-
 vi.mock('react-i18next', () => ({
     useTranslation: () => ({
         t: (key: string) => key,
@@ -23,13 +21,11 @@ vi.mock('../../../../components/common/media/CardPreview', () => ({
 }));
 
 vi.mock('../../../../hooks/ui/useCoarsePointer', () => ({
-    useCoarsePointer: () => mockUseCoarsePointer(),
+    useCoarsePointer: () => false,
 }));
 
 afterEach(() => {
     vi.useRealTimers();
-    mockUseCoarsePointer.mockReset();
-    mockUseCoarsePointer.mockReturnValue(false);
 });
 
 describe('DiceThrone compatibility sizing', () => {
@@ -266,73 +262,6 @@ describe('DiceThrone compatibility sizing', () => {
 
         expect(onMagnifyCard).toHaveBeenCalledWith(topCard);
         expect(onPlayCard).not.toHaveBeenCalled();
-    });
-
-    it('桌面端主阶段手牌不显示额外售卖按钮，保留拖拽和点击预览语义', () => {
-        vi.useFakeTimers();
-
-        const topCard: AbilityCard = {
-            id: 'c1',
-            name: 'Card',
-            cpCost: 1,
-            previewRef: { type: 'image', src: 'x' },
-            effects: [],
-        };
-
-        render(
-            <HandArea
-                hand={[topCard]}
-                currentPhase="main1"
-                playerCp={2}
-                onSellCard={vi.fn()}
-                onMagnifyCard={vi.fn()}
-            />,
-        );
-
-        act(() => {
-            vi.runAllTimers();
-        });
-
-        expect(screen.queryByTestId('dt-hand-card-sell-button')).not.toBeInTheDocument();
-    });
-
-    it('触控端主阶段手牌提供售卖按钮，点击走卖牌回调且不打开预览', () => {
-        vi.useFakeTimers();
-        mockUseCoarsePointer.mockReturnValue(true);
-
-        const topCard: AbilityCard = {
-            id: 'c1',
-            name: 'Card',
-            cpCost: 1,
-            previewRef: { type: 'image', src: 'x' },
-            effects: [],
-        };
-        const onSellCard = vi.fn();
-        const onMagnifyCard = vi.fn();
-
-        render(
-            <HandArea
-                hand={[topCard]}
-                currentPhase="main1"
-                playerCp={2}
-                onSellCard={onSellCard}
-                onMagnifyCard={onMagnifyCard}
-            />,
-        );
-
-        act(() => {
-            vi.runAllTimers();
-        });
-
-        const sellButton = screen.getByTestId('dt-hand-card-sell-button');
-        expect(sellButton).toHaveAttribute('aria-label', 'actions.sellCard');
-        expect(sellButton.style.minWidth).toBe('calc(44px / var(--mobile-board-shell-scale, 1))');
-        expect(sellButton.style.minHeight).toBe('calc(44px / var(--mobile-board-shell-scale, 1))');
-
-        fireEvent.click(sellButton);
-
-        expect(onSellCard).toHaveBeenCalledWith('c1');
-        expect(onMagnifyCard).not.toHaveBeenCalled();
     });
 
     it('触控端弃牌堆投放热区放宽，桌面端仍沿用中心点命中', () => {
