@@ -1,4 +1,9 @@
-import type { TutorialAiAction, TutorialCollection, TutorialManifest } from '../../engine/types';
+import type {
+    TutorialAiAction,
+    TutorialCollection,
+    TutorialHiddenAutomationContract,
+    TutorialManifest,
+} from '../../engine/types';
 import { FLOW_COMMANDS } from '../../engine/systems/FlowSystem';
 import { MAGE_WARS_COMMANDS, MAGE_WARS_EVENTS } from './domain';
 
@@ -15,9 +20,18 @@ const advancePhase = (playerId: string): TutorialAiAction => ({
     payload: {},
 });
 
+const compressedRepeat = (
+    equivalentStepIds: string[],
+    reason: string,
+): TutorialHiddenAutomationContract => ({
+    kind: 'compressed-repeat',
+    equivalentStepIds,
+    reason,
+});
+
 export const MageWarsTutorial: TutorialManifest = {
     id: 'mage-wars-basic',
-    revision: 4,
+    revision: 5,
     numPlayers: 2,
     allowManualSkip: true,
     randomPolicy: {
@@ -153,6 +167,10 @@ export const MageWarsTutorial: TutorialManifest = {
                 playerId: '1',
                 payload: { spellCardIds: [ASYRAN_CLERIC_CARD_ID, PILLAR_OF_LIGHT_CARD_ID] },
             }],
+            hiddenAutomation: compressedRepeat(
+                ['plan-confirm'],
+                'Opponent repeats the same formal planning submit after the player has just confirmed a plan.',
+            ),
         },
         {
             id: 'prepared-and-hidden',
@@ -259,6 +277,10 @@ export const MageWarsTutorial: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: compressedRepeat(
+                ['deploy-select-wolf', 'deploy-target-zone', 'rouse-select-spell', 'rouse-target-wolf'],
+                'Opponent deployment repeats the prepared-spell selection and targeting flow; the next visible steps teach the public result.',
+            ),
         },
         {
             id: 'opponent-public-view',
@@ -289,6 +311,10 @@ export const MageWarsTutorial: TutorialManifest = {
             position: 'center',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['pass-your-deployment'],
+                'Opponent passes the same deployment phase window already taught to the player.',
+            ),
         },
         {
             id: 'skip-initiative-quickcast',
@@ -309,6 +335,10 @@ export const MageWarsTutorial: TutorialManifest = {
             position: 'center',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['skip-initiative-quickcast'],
+                'Opponent passes the same quickcast window after the player has seen the pass action.',
+            ),
         },
         {
             id: 'move-select-wolf',
@@ -347,6 +377,10 @@ export const MageWarsTutorial: TutorialManifest = {
             content: 'game-mage-wars:tutorial.steps.opponentPassCreatureAction',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['end-creature-action'],
+                'Opponent has no new creature action teaching point, so the repeated phase pass is compressed.',
+            ),
         },
         {
             id: 'skip-final-quickcast',
@@ -414,12 +448,20 @@ export const MageWarsTutorial: TutorialManifest = {
                 playerId: '1',
                 payload: { spellCardIds: [] },
             }],
+            hiddenAutomation: compressedRepeat(
+                ['plan-confirm'],
+                'Opponent repeats planning submission; this bridge only keeps the formal round synchronized.',
+            ),
         },
         {
             id: 'opponent-pass-second-deployment',
             content: 'game-mage-wars:tutorial.steps.opponentPassSecondDeployment',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['pass-your-deployment'],
+                'Opponent repeats an already compressed deployment pass in the second round.',
+            ),
         },
         {
             id: 'wall-prepared',
@@ -479,6 +521,10 @@ export const MageWarsTutorial: TutorialManifest = {
             content: 'game-mage-wars:tutorial.steps.opponentPassSecondInitiativeQuickcast',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['skip-initiative-quickcast'],
+                'Opponent repeats the quickcast pass window already covered earlier.',
+            ),
         },
         {
             id: 'skip-second-initiative-quickcast',
@@ -498,6 +544,10 @@ export const MageWarsTutorial: TutorialManifest = {
             content: 'game-mage-wars:tutorial.steps.opponentPassSecondCreatureAction',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['end-creature-action'],
+                'Opponent repeats the creature-action pass after the player has already learned that phase transition.',
+            ),
         },
         {
             id: 'guard-select-wolf',
@@ -546,6 +596,10 @@ export const MageWarsTutorial: TutorialManifest = {
             content: 'game-mage-wars:tutorial.steps.opponentPassSecondFinalQuickcast',
             allowedCommands: [FLOW_COMMANDS.ADVANCE_PHASE],
             aiActions: [advancePhase('1')],
+            hiddenAutomation: compressedRepeat(
+                ['skip-final-quickcast'],
+                'Opponent repeats the final quickcast pass after the player has used the same phase control.',
+            ),
         },
         {
             id: 'finish',

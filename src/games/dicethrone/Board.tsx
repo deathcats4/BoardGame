@@ -531,11 +531,21 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
 
     // 使用 useInteractionState Hook 管理交互状态（从 sys.interaction 读取）
     const sysInteraction = rawSysInteraction;
+    const activeInteractionOverlayId = sysInteraction?.id ?? null;
+    React.useEffect(() => {
+        if (!activeInteractionOverlayId) return;
+        closeMagnify();
+    }, [activeInteractionOverlayId, closeMagnify]);
     const activeResolutionFrameId = rawG.sys.resolution?.activeFrameId;
     const compareRollInteraction = asCompareRollChoice(sysInteraction);
-    const pendingInteraction: InteractionDescriptor | undefined = sysInteraction?.kind === 'dt:card-interaction'
-        ? sysInteraction.data as InteractionDescriptor
-        : undefined;
+    const pendingInteraction: InteractionDescriptor | undefined = React.useMemo(() => {
+        if (sysInteraction?.kind !== 'dt:card-interaction') return undefined;
+        return {
+            ...(sysInteraction.data as InteractionDescriptor),
+            id: sysInteraction.id,
+            playerId: sysInteraction.playerId,
+        };
+    }, [sysInteraction]);
     const { localState: localInteraction, handlers: interactionHandlers } = useInteractionState(pendingInteraction);
 
     // 骰子多步交互（multistep-choice，替代旧的 dt:card-interaction 骰子类型）
@@ -1594,20 +1604,21 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
             if (localInteraction.selectedStatus) {
                 engineMoves.removeStatus(
                     localInteraction.selectedStatus.playerId,
-                    localInteraction.selectedStatus.statusId
+                    localInteraction.selectedStatus.statusId,
+                    activeInteraction.id,
                 );
             } else if (activeInteraction.minSelectCount === 0) {
                 // 可选状态移除允许确认空选；这不是取消整张卡牌/整段交互。
-                engineMoves.resolveInteraction([], []);
+                engineMoves.resolveInteraction([], [], activeInteraction.id);
             }
         } else if (activeInteraction.type === 'selectPlayer') {
             // 根据交互意图决定操作
             if (localInteraction.selectedPlayers.length > 0) {
-                engineMoves.resolveInteraction(localInteraction.selectedPlayers);
+                engineMoves.resolveInteraction(localInteraction.selectedPlayers, undefined, activeInteraction.id);
             }
         } else if (activeInteraction.type === 'selectHandCard' || activeInteraction.type === 'selectDeckCard') {
             if (localInteraction.selectedCardIds.length > 0) {
-                engineMoves.resolveInteraction([], localInteraction.selectedCardIds);
+                engineMoves.resolveInteraction([], localInteraction.selectedCardIds, activeInteraction.id);
             }
         } else if (activeInteraction.type === 'selectTargetStatus') {
             // 转移状态
@@ -1617,7 +1628,8 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
                 engineMoves.transferStatus(
                     transferConfig.sourcePlayerId,
                     selectedPlayerId,
-                    transferConfig.statusId
+                    transferConfig.statusId,
+                    activeInteraction.id,
                 );
             } else {
                 return;

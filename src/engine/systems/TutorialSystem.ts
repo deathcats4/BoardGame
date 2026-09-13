@@ -14,6 +14,10 @@ import type {
     TutorialStepSnapshot,
 } from '../types';
 import { DEFAULT_TUTORIAL_STATE } from '../types';
+import {
+    getTutorialHiddenAutomationContractErrors,
+    isHiddenTutorialAutomationStep,
+} from '../tutorialStepAutomation';
 import type { EngineSystem, HookResult } from './types';
 import { SYSTEM_IDS } from './types';
 
@@ -219,9 +223,6 @@ const shouldAdvance = (events: GameEvent[], advanceOnEvents?: TutorialEventMatch
     return advanceOnEvents.some((matcher) => events.some((event) => isEventMatch(event, matcher)));
 };
 
-const isPureAutomaticStep = (step: TutorialStepSnapshot): boolean =>
-    Boolean(step.aiActions?.length) && !step.requireAction && !step.infoStep;
-
 const isAuthoredTutorialAiAction = (tutorial: TutorialState | undefined, command: Command): boolean => {
     if (!tutorial?.active || command.skipValidation !== true) return false;
     const aiActions = tutorial.step?.aiActions ?? tutorial.aiActions ?? [];
@@ -305,7 +306,12 @@ const advanceStep = <TCore>(
 };
 
 const isValidTutorialManifest = (manifest: TutorialManifest | undefined): manifest is TutorialManifest =>
-    Boolean(manifest && Array.isArray(manifest.steps) && manifest.steps.length > 0);
+    Boolean(
+        manifest
+        && Array.isArray(manifest.steps)
+        && manifest.steps.length > 0
+        && getTutorialHiddenAutomationContractErrors(manifest).length === 0,
+    );
 
 const retreatStep = <TCore>(
     state: MatchState<TCore>,
@@ -326,7 +332,7 @@ const retreatStep = <TCore>(
         const previousStep = manifest.steps[previousIndex];
         if (
             previousStep
-            && !isPureAutomaticStep(previousStep)
+            && !isHiddenTutorialAutomationStep(previousStep)
             && (!validator || validator(state, previousStep))
         ) {
             const previousTutorial = deriveStepState(manifest, previousIndex, tutorial.randomPolicy?.cursor);
@@ -393,6 +399,7 @@ const shouldAutoAdvanceAfterAiConsumed = (
     if (payload?.stepId && payload.stepId !== step.id) return false;
     if (step.autoAdvanceAfterAi === false) return false;
     if (!step.aiActions?.length && !tutorial.aiActions?.length) return false;
+    if (!isHiddenTutorialAutomationStep(step)) return false;
     return !step.advanceOnEvents || step.advanceOnEvents.length === 0;
 };
 

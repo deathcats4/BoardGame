@@ -73,6 +73,7 @@ import {
 } from '../../engine/ai';
 import { diceThroneAiRuntime } from './ai';
 import { resolveDiceThroneLocalPregameControlledPlayerId } from './localPregameControl';
+import { getDiceThroneCardPreviewRef, hasDiceThroneCharacterCard } from './ui/cardPreviewHelper';
 
 // ============================================================================
 // ActionLog 共享白名单 + 格式化
@@ -243,22 +244,53 @@ function formatDiceThroneActionEntry({
         return rawName;
     };
 
+    const getPlayerCharacterId = (playerId?: PlayerId): string | undefined => {
+        if (!playerId) return undefined;
+        const characterId = core.players[playerId]?.characterId;
+        return characterId && characterId !== 'unselected' ? characterId : undefined;
+    };
+
+    const resolveCardPreviewRef = (
+        cardId: string,
+        actorId?: PlayerId,
+        card?: AbilityCard,
+    ) => {
+        const characterId = getPlayerCharacterId(actorId);
+        if (characterId) {
+            const characterPreviewRef = getDiceThroneCardPreviewRef(cardId, characterId);
+            if (characterPreviewRef) return characterPreviewRef;
+            if (hasDiceThroneCharacterCard(cardId, characterId)) return undefined;
+        }
+
+        return card?.previewRef ?? getDiceThroneCardPreviewRef(cardId) ?? undefined;
+    };
+
+    const buildCardSegment = (
+        cardId: string,
+        actorId: PlayerId,
+        card?: AbilityCard,
+    ): ActionLogSegment => {
+        const resolvedCard = card ?? findDiceThroneCard(core, cardId, actorId) ?? findDiceThroneCard(core, cardId);
+        const previewText = resolvedCard?.name ?? cardId;
+        const isI18nKey = previewText.includes('.');
+        const previewRef = resolveCardPreviewRef(cardId, actorId, resolvedCard);
+        return {
+            type: 'card',
+            cardId,
+            previewText,
+            ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
+            ...(previewRef ? { previewRef } : {}),
+        };
+    };
+
     const buildCardSource = (sourceId: string, actorId: PlayerId): {
         actorId: PlayerId;
         cardSegment: ActionLogSegment;
     } => {
         const card = findDiceThroneCard(core, sourceId, actorId) ?? findDiceThroneCard(core, sourceId);
-        const previewText = card?.name ?? sourceId;
-        const isI18nKey = previewText.includes('.');
         return {
             actorId,
-            cardSegment: {
-                type: 'card',
-                cardId: sourceId,
-                previewText,
-                ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
-                ...(card?.previewRef ? { previewRef: card.previewRef } : {}),
-            },
+            cardSegment: buildCardSegment(sourceId, actorId, card),
         };
     };
 
@@ -364,21 +396,13 @@ function formatDiceThroneActionEntry({
     if (shouldRecordCommandEntry && (command.type === 'PLAY_CARD' || command.type === 'PLAY_UPGRADE_CARD')) {
         const cardId = (command.payload as { cardId: string }).cardId;
         const card = findDiceThroneCard(core, cardId, command.playerId);
-        if (!card || !card.previewRef) return null;
+        if (!card) return null;
 
         const actionKey = command.type === 'PLAY_UPGRADE_CARD'
             ? 'actionLog.playUpgradeCard'
             : 'actionLog.playCard';
 
-        // card segment：如果 card.name 是 i18n key（含 .），存原始 key + ns，渲染时翻译
-        const isI18nKey = card.name?.includes('.');
-        const cardSegment: ActionLogSegment = {
-            type: 'card',
-            cardId: card.id,
-            previewText: card.name ?? cardId,
-            previewRef: card.previewRef,
-            ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
-        };
+        const cardSegment = buildCardSegment(card.id, command.playerId, card);
 
         entries.push({
             id: `${command.type}-${command.playerId}-${timestamp}`,
@@ -423,20 +447,8 @@ function formatDiceThroneActionEntry({
 
         const segments: ActionLogSegment[] = [
             i18nSeg('actionLog.sellCard'),
+            buildCardSegment(cardId, command.playerId, card),
         ];
-        if (card?.previewRef) {
-            const isI18nKey = card.name?.includes('.');
-            segments.push({
-                type: 'card',
-                cardId: card.id,
-                previewText: card.name ?? cardId,
-                previewRef: card.previewRef,
-                ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
-            });
-        } else {
-            const displayName = card?.name ?? cardId;
-            segments.push({ type: 'text', text: displayName });
-        }
         segments.push(i18nSeg('actionLog.sellCardCp'));
 
         entries.push({
@@ -454,20 +466,8 @@ function formatDiceThroneActionEntry({
 
         const segments: ActionLogSegment[] = [
             i18nSeg('actionLog.discardCard'),
+            buildCardSegment(cardId, command.playerId, card),
         ];
-        if (card?.previewRef) {
-            const isI18nKey = card.name?.includes('.');
-            segments.push({
-                type: 'card',
-                cardId: card.id,
-                previewText: card.name ?? cardId,
-                previewRef: card.previewRef,
-                ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
-            });
-        } else {
-            const displayName = card?.name ?? cardId;
-            segments.push({ type: 'text', text: displayName });
-        }
 
         entries.push({
             id: `DISCARD_CARD-${command.playerId}-${timestamp}`,
@@ -486,18 +486,8 @@ function formatDiceThroneActionEntry({
         const segments: ActionLogSegment[] = [
             i18nSeg('actionLog.undoSellCard'),
         ];
-        if (card?.previewRef) {
-            const isI18nKey = card.name?.includes('.');
-            segments.push({
-                type: 'card',
-                cardId: card.id,
-                previewText: card.name ?? cardId,
-                previewRef: card.previewRef,
-                ...(isI18nKey ? { previewTextNs: DT_NS } : {}),
-            });
-        } else if (cardId) {
-            const displayName = card?.name ?? cardId;
-            segments.push({ type: 'text', text: displayName });
+        if (cardId) {
+            segments.push(buildCardSegment(cardId, command.playerId, card));
         }
 
         entries.push({
@@ -2034,8 +2024,9 @@ export { formatDiceThroneActionEntry };
 
 // 注册卡牌预览获取函数
 import { registerCardPreviewGetter } from '../../components/game/registry/cardPreviewRegistry';
-import { getDiceThroneCardPreviewRef } from './ui/cardPreviewHelper';
-registerCardPreviewGetter('dicethrone', getDiceThroneCardPreviewRef);
+registerCardPreviewGetter('dicethrone', (cardId, context) => (
+    getDiceThroneCardPreviewRef(cardId, context?.characterId)
+));
 
 // 注册关键图片解析器
 import { registerCriticalImageResolver } from '../../core';

@@ -1955,6 +1955,18 @@ test.describe('Mage Wars tutorial', () => {
             '[data-testid="mock-cone-blast"]',
         ].join(', '))).toHaveCount(0);
         await screenshotTutorialStep(page, 'finish', FINISH_SCREENSHOT_PATH);
+        await clickTutorialNext(page);
+        await expect.poll(() => {
+            const url = new URL(page.url());
+            return {
+                pathname: url.pathname,
+                game: url.searchParams.get('game'),
+            };
+        }, { timeout: 5_000 }).toEqual({
+            pathname: '/',
+            game: 'mage-wars',
+        });
+        await expect(page.locator('[data-tutorial-step]')).toHaveCount(0);
         await assertTutorialScreenshotEvidenceSet();
 
         await assertNoFatalFrontendErrors([{ label: 'mage-wars-tutorial-natural-flow', diagnostics }]);

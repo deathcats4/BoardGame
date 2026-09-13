@@ -1,6 +1,7 @@
 import type {
     MatchState,
     TutorialCollection,
+    TutorialHiddenAutomationContract,
     TutorialManifest,
     TutorialStepSnapshot,
 } from '../../engine/types';
@@ -19,6 +20,20 @@ import {
     createSafeOmenPendingResolutionTutorialCore,
     createStartedFirstScenarioTutorialCore,
 } from './testing/firstScenarioTestUtils';
+
+const setupPrecondition = (reason: string): TutorialHiddenAutomationContract => ({
+    kind: 'setup-precondition',
+    reason,
+});
+
+const compressedRepeat = (
+    equivalentStepIds: string[],
+    reason: string,
+): TutorialHiddenAutomationContract => ({
+    kind: 'compressed-repeat',
+    equivalentStepIds,
+    reason,
+});
 
 const isRabbitFootAlreadyUsed = (core: Partial<BetrayalCore> | undefined): boolean =>
     Boolean(
@@ -70,6 +85,7 @@ const BETRAYAL_BASIC_SETUP_AND_TURN: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal Betrayal first-turn tutorial board before the first visible player step.'),
         },
         {
             id: 'objective-and-turn',
@@ -296,6 +312,7 @@ const BETRAYAL_OMEN_CONFIRMATION_AND_HAUNT_RISK: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal omen confirmation example before the first visible player step.'),
         },
         {
             id: 'confirm-omen-card',
@@ -444,6 +461,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal natural haunt trigger board before the first visible player step.'),
         },
         {
             id: 'hand-off-to-teammate-one',
@@ -564,6 +582,10 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                 },
             ],
             aiDelayMs: 0,
+            hiddenAutomation: compressedRepeat(
+                ['watch-teammate-haunt-trigger'],
+                'The previous visible step explains teammate 1 owns the Mask confirmation; this applies that waiting handoff before showing the hero reader.',
+            ),
         },
         ...BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS,
     ],
@@ -679,6 +701,7 @@ const BETRAYAL_HAUNT_ACTIONS_AND_FINISH: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal haunt objective board before the first visible hero objective step.'),
         },
         {
             id: 'help-entry',
@@ -877,6 +900,10 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                 },
             ],
             aiDelayMs: 0,
+            hiddenAutomation: compressedRepeat(
+                ['watch-teammate-haunt-trigger'],
+                'The previous visible step explains teammate 1 owns the Mask confirmation; this applies that waiting handoff before showing the hero reader.',
+            ),
         },
         ...BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS,
     ],
@@ -901,6 +928,7 @@ const BETRAYAL_HERO_ATTACK_PATH: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal hero attack board before the first visible hero attack step.'),
         },
         {
             id: 'hero-attack-objective',
@@ -952,6 +980,7 @@ const BETRAYAL_JACK_SPIRIT_PATH: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal Jack spirit board before the first visible spirit action step.'),
         },
         {
             id: 'jack-spirit-objective',
@@ -1003,6 +1032,7 @@ const BETRAYAL_MUMMY_TRAITOR_VICTORY_CHAIN: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal traitor objective board before the first visible traitor step.'),
         },
         {
             id: 'traitor-objective',
@@ -1212,6 +1242,7 @@ const BETRAYAL_TRAITOR_VIEW_PATH: TutorialManifest = {
                     },
                 },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal traitor monster board before the first visible traitor action step.'),
         },
         BETRAYAL_MUMMY_TRAITOR_VICTORY_CHAIN.steps[1],
         ...BETRAYAL_MUMMY_MONSTER_ACTIONS.steps.slice(1),

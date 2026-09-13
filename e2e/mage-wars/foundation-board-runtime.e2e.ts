@@ -1915,7 +1915,7 @@ test.describe('Mage Wars foundation runtime board', () => {
         await lifeToggle.click();
         await expect(lifeToggle).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('[data-testid="mage-wars-field-card-life-readout"]').first()).toHaveAttribute('data-life-visible', 'true');
-        await expect(board).toContainText('己方已计划');
+        await expect(board).not.toContainText('己方已计划');
         await expect(board).toContainText('弃牌 3');
         const imageAudit = await auditMageWarsImages(page, [
             '火球术',

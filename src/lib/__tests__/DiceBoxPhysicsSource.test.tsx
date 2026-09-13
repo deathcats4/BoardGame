@@ -178,26 +178,28 @@ describe('DiceBoxPhysicsSource', () => {
             <DiceBoxPhysicsSource
                 dice={[{ id: 7, value: 2, isKept: false }]}
                 motion={settledMotion}
+                settledIdentity="roll-a"
                 onSettledChange={onSettledChange}
             />,
         );
 
         await waitFor(() => {
-            expect(onSettledChange).toHaveBeenCalledWith(true);
+            expect(onSettledChange).toHaveBeenCalledWith(true, 'roll-a');
         });
         onSettledChange.mockClear();
 
         view.rerender(
             <DiceBoxPhysicsSource
-                dice={[{ id: 7, value: 5, isKept: false }]}
+                dice={[{ id: 7, value: 2, isKept: false }]}
                 motion={settledMotion}
+                settledIdentity="roll-b"
                 onSettledChange={onSettledChange}
             />,
         );
 
         await waitFor(() => {
-            expect(engineMock.syncSettledValues).toHaveBeenCalledWith([5]);
-            expect(onSettledChange).toHaveBeenCalledWith(true);
+            expect(engineMock.syncSettledValues).toHaveBeenCalledWith([2]);
+            expect(onSettledChange).toHaveBeenCalledWith(true, 'roll-b');
         });
     });
 
@@ -433,6 +435,68 @@ describe('DiceBoxPhysicsSource', () => {
 
         await act(async () => {
             finishReroll?.();
+        });
+    });
+
+    it('补齐缺失骰子时必须等恢复完成后才通知当前结果已稳定', async () => {
+        let finishRestore: (() => void) | undefined;
+        const restore = new Promise<void>((resolve) => {
+            finishRestore = resolve;
+        });
+        const onSettledChange = vi.fn();
+        const engineMock = {
+            resize: vi.fn(),
+            destroy: vi.fn(),
+            setCanvasDiagnostics: vi.fn(),
+            setDieSkins: vi.fn(),
+            setDiceHighlights: vi.fn(),
+            getPhysicsState: vi.fn(),
+            hasDice: vi.fn().mockReturnValue(false),
+            rollToValues: vi.fn(),
+            rerollToValues: vi.fn(),
+            syncSettledValues: vi.fn(),
+            previewValues: vi.fn(),
+            clear: vi.fn(),
+            removeDice: vi.fn(),
+            restoreValues: vi.fn().mockImplementation(() => restore),
+        };
+        createEngineMock.mockResolvedValue(engineMock);
+
+        const view = render(
+            <DiceBoxPhysicsSource
+                dice={[]}
+                motion={settledMotion}
+                settledIdentity="empty-roll"
+                onSettledChange={onSettledChange}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(createEngineMock).toHaveBeenCalledTimes(1);
+        });
+        onSettledChange.mockClear();
+
+        view.rerender(
+            <DiceBoxPhysicsSource
+                dice={[{ id: 7, value: 6, isKept: false }]}
+                motion={settledMotion}
+                settledIdentity="restore-roll"
+                onSettledChange={onSettledChange}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(engineMock.restoreValues).toHaveBeenCalledWith([6]);
+        });
+        expect(onSettledChange).toHaveBeenCalledWith(false, 'restore-roll');
+        expect(onSettledChange).not.toHaveBeenCalledWith(true, 'restore-roll');
+
+        await act(async () => {
+            finishRestore?.();
+        });
+
+        await waitFor(() => {
+            expect(onSettledChange).toHaveBeenCalledWith(true, 'restore-roll');
         });
     });
 

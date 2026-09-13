@@ -171,6 +171,7 @@ export const COMMON_UNITS_MOGU: UnitCard[] = [
     attackType: 'melee',
     attackRange: 1,
     abilities: ['mogu_burst', 'mogu_fungal_mutation'],
+    unitTags: ['carrier'],
     deckSymbols: [DECK_SYMBOLS.MYCELIUM],
     spriteIndex: SPRITE_INDEX_MOGU.COMMON_SPORE_PLAGUE_BODY,
     spriteAtlas: 'cards',

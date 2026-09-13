@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type MockClientInstance = {
     config: any;
     latestState: unknown;
+    lastReceivedStateID: number | null;
     updateLatestState: ReturnType<typeof vi.fn>;
     connect: ReturnType<typeof vi.fn>;
     disconnect: ReturnType<typeof vi.fn>;
@@ -36,6 +37,7 @@ vi.mock('../client', () => {
     class MockGameTransportClient {
         config: any;
         latestState: unknown;
+        lastReceivedStateID: number | null = null;
         updateLatestState = vi.fn((state: unknown) => {
             this.latestState = state;
         });
@@ -206,6 +208,26 @@ function TransportBatchProbe(): JSX.Element {
             }}
         >
             transport batch
+        </button>
+    );
+}
+
+function PlayCardThenStatusInteractionProbe(): JSX.Element {
+    const { dispatch } = useGameClient();
+
+    return (
+        <button
+            data-testid="dispatch-play-card-then-status"
+            onClick={() => {
+                dispatch('PLAY_CARD', { cardId: 'card-get-away' });
+                dispatch('REMOVE_STATUS', {
+                    targetPlayerId: '0',
+                    statusId: 'hypnosis',
+                    interactionId: 'dt-interaction-card-get-away-1',
+                });
+            }}
+        >
+            play card then status
         </button>
     );
 }
@@ -1206,6 +1228,216 @@ describe('GameProvider transport baseline', () => {
         expect(client.sendCommand).toHaveBeenCalledTimes(2);
         expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
         expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 });
+    });
+
+    it('flushes queued optimistic commands before sending an interaction-id companion command', () => {
+        let hasPending = false;
+        const predictedCardInteractionState = {
+            core: { marker: 'predicted-card-status-interaction' },
+            sys: {
+                interaction: {
+                    current: {
+                        id: 'dt-interaction-card-get-away-1',
+                        kind: 'dt:card-interaction',
+                        playerId: '0',
+                    },
+                    queue: [],
+                    isBlocked: false,
+                },
+                eventStream: { entries: [], nextId: 1 },
+            },
+        };
+        const mockEngine = {
+            hasPendingCommands: vi.fn(() => hasPending),
+            getPendingCommandCount: vi.fn(() => (hasPending ? 1 : 0)),
+            reconcile: vi.fn((state: unknown) => {
+                hasPending = false;
+                return {
+                    stateToRender: state,
+                    didRollback: false,
+                    optimisticEventWatermark: null,
+                };
+            }),
+            setPlayerIds: vi.fn(),
+            syncRandom: vi.fn(),
+            reset: vi.fn(() => {
+                hasPending = false;
+            }),
+            processCommand: vi.fn((type: string) => {
+                if (type === 'PLAY_CARD') {
+                    hasPending = true;
+                    return {
+                        stateToRender: predictedCardInteractionState,
+                        shouldSend: true,
+                        animationMode: 'wait-confirm',
+                    };
+                }
+                return {
+                    stateToRender: null,
+                    shouldSend: true,
+                    animationMode: 'wait-confirm',
+                };
+            }),
+        };
+        optimisticEngineControls.engine = mockEngine;
+
+        render(
+            <GameProvider
+                server="http://127.0.0.1:3000"
+                matchId="match-react-optimistic-card-interaction-companion"
+                playerId="0"
+                engineConfig={{ domain: {} as any, systems: [] as any[] } as any}
+                latencyConfig={{
+                    optimistic: {
+                        enabled: true,
+                        pendingCompanionCommands: ['REMOVE_STATUS'],
+                    },
+                    batching: {
+                        enabled: true,
+                        windowMs: 50,
+                        maxBatchSize: 5,
+                    },
+                } as any}
+            >
+                <StateProbe />
+                <PlayCardThenStatusInteractionProbe />
+            </GameProvider>,
+        );
+
+        expect(mockClientInstances).toHaveLength(1);
+        const client = mockClientInstances[0]!;
+
+        act(() => {
+            client.emitStateUpdate({
+                core: { marker: 'authoritative-before-card' },
+                sys: {
+                    interaction: {
+                        current: undefined,
+                        queue: [],
+                        isBlocked: false,
+                    },
+                    eventStream: { entries: [], nextId: 1 },
+                },
+            }, [], { stateID: 1, randomCursor: 0 });
+        });
+        client.lastReceivedStateID = 1;
+
+        mockEngine.processCommand.mockClear();
+        client.sendCommand.mockClear();
+        client.sendBatch.mockClear();
+
+        act(() => {
+            screen.getByTestId('dispatch-play-card-then-status').click();
+        });
+
+        expect(screen.getByTestId('state').textContent).toContain('predicted-card-status-interaction');
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenCalledWith('PLAY_CARD', { cardId: 'card-get-away' }, '0');
+        expect(client.sendBatch).not.toHaveBeenCalled();
+        expect(client.sendCommand).toHaveBeenCalledTimes(2);
+        expect(client.sendCommand).toHaveBeenNthCalledWith(1, 'PLAY_CARD', { cardId: 'card-get-away' });
+        expect(client.sendCommand).toHaveBeenNthCalledWith(2, 'REMOVE_STATUS', {
+            targetPlayerId: '0',
+            statusId: 'hypnosis',
+            interactionId: 'dt-interaction-card-get-away-1',
+        }, { expectedStateID: 2 });
+    });
+
+    it('does not treat any interactionId payload as an optimistic companion command', () => {
+        let hasPending = false;
+        const predictedCardInteractionState = {
+            core: { marker: 'predicted-card-status-interaction' },
+            sys: {
+                interaction: {
+                    current: {
+                        id: 'dt-interaction-card-get-away-1',
+                        kind: 'dt:card-interaction',
+                        playerId: '0',
+                    },
+                    queue: [],
+                    isBlocked: false,
+                },
+                eventStream: { entries: [], nextId: 1 },
+            },
+        };
+        const mockEngine = {
+            hasPendingCommands: vi.fn(() => hasPending),
+            getPendingCommandCount: vi.fn(() => (hasPending ? 1 : 0)),
+            reconcile: vi.fn((state: unknown) => {
+                hasPending = false;
+                return {
+                    stateToRender: state,
+                    didRollback: false,
+                    optimisticEventWatermark: null,
+                };
+            }),
+            setPlayerIds: vi.fn(),
+            syncRandom: vi.fn(),
+            reset: vi.fn(() => {
+                hasPending = false;
+            }),
+            processCommand: vi.fn((type: string) => {
+                if (type === 'PLAY_CARD') {
+                    hasPending = true;
+                    return {
+                        stateToRender: predictedCardInteractionState,
+                        shouldSend: true,
+                        animationMode: 'wait-confirm',
+                    };
+                }
+                return {
+                    stateToRender: null,
+                    shouldSend: true,
+                    animationMode: 'wait-confirm',
+                };
+            }),
+        };
+        optimisticEngineControls.engine = mockEngine;
+
+        render(
+            <GameProvider
+                server="http://127.0.0.1:3000"
+                matchId="match-react-optimistic-card-interaction-unlisted-companion"
+                playerId="0"
+                engineConfig={{ domain: {} as any, systems: [] as any[] } as any}
+                latencyConfig={{ optimistic: { enabled: true } } as any}
+            >
+                <StateProbe />
+                <PlayCardThenStatusInteractionProbe />
+            </GameProvider>,
+        );
+
+        expect(mockClientInstances).toHaveLength(1);
+        const client = mockClientInstances[0]!;
+
+        act(() => {
+            client.emitStateUpdate({
+                core: { marker: 'authoritative-before-card' },
+                sys: {
+                    interaction: {
+                        current: undefined,
+                        queue: [],
+                        isBlocked: false,
+                    },
+                    eventStream: { entries: [], nextId: 1 },
+                },
+            }, [], { stateID: 1, randomCursor: 0 });
+        });
+
+        mockEngine.processCommand.mockClear();
+        client.sendCommand.mockClear();
+        client.sendBatch.mockClear();
+
+        act(() => {
+            screen.getByTestId('dispatch-play-card-then-status').click();
+        });
+
+        expect(screen.getByTestId('state').textContent).toContain('predicted-card-status-interaction');
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenCalledWith('PLAY_CARD', { cardId: 'card-get-away' }, '0');
+        expect(client.sendBatch).not.toHaveBeenCalled();
+        expect(client.sendCommand).toHaveBeenCalledTimes(1);
+        expect(client.sendCommand).toHaveBeenLastCalledWith('PLAY_CARD', { cardId: 'card-get-away' });
     });
 
     it('sends each rapid phase advance that remains valid in the predicted chain', () => {

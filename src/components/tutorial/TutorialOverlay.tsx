@@ -8,6 +8,7 @@ import { MOBILE_MAX_VIEWPORT_WIDTH } from "../../shared/mobileSupport";
 import { useRuntimeViewport } from "../../hooks/ui/useRuntimeViewport";
 import { OptimizedImage } from "../common/media/OptimizedImage";
 import type { TutorialStepSnapshot } from "../../engine/types";
+import { isHiddenTutorialAutomationStep } from "../../engine/tutorialStepAutomation";
 
 const TUTORIAL_NEXT_SOUND_KEY =
   "ui.general.khron_studio_rpg_interface_essentials_inventory_dialog_ucs_system_192khz.buttons.tab_switching_button.uiclick_tab_switching_button_01_krst_none";
@@ -129,17 +130,13 @@ const escapeTutorialTargetSelector = (value: string): string => {
   return value.replace(/["\\]/g, "\\$&");
 };
 
-const isPureAutomaticTutorialStep = (
-  step: TutorialStepSnapshot | null | undefined,
-) => Boolean(step?.aiActions?.length) && !step.requireAction && !step.infoStep;
-
 const hasPreviousVisibleTutorialStep = (
   steps: TutorialStepSnapshot[],
   currentIndex: number,
 ) => {
   for (let index = currentIndex - 1; index >= 0; index -= 1) {
     const step = steps[index];
-    if (step && !isPureAutomaticTutorialStep(step)) {
+    if (step && !isHiddenTutorialAutomationStep(step)) {
       return true;
     }
   }
@@ -779,11 +776,7 @@ export const TutorialOverlay: React.FC = () => {
     return null;
   }
 
-  const isPureAiStep =
-    currentStep.aiActions &&
-    currentStep.aiActions.length > 0 &&
-    !currentStep.requireAction &&
-    !currentStep.infoStep;
+  const isPureAiStep = isHiddenTutorialAutomationStep(currentStep);
 
   // 纯自动步骤不显示遮罩层；若当前玩家仍需操作/阅读，浮层必须继续出现。
   if (isPureAiStep) {

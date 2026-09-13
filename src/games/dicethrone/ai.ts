@@ -1551,9 +1551,12 @@ const buildSelectPlayerInteractionActions = (
         return buildSelectPlayerDecisionActions({
             descriptor: decision,
             emptyAction: (descriptor) => buildEmergencyInteractionCancelAction(descriptor.interactionId, 'empty-options'),
-            buildCommands: (selection) => [{
+            buildCommands: (selection, descriptor) => [{
                 type: 'RESOLVE_INTERACTION',
-                payload: { selectedPlayerIds: selection.map((candidate) => candidate.playerId) },
+                payload: {
+                    selectedPlayerIds: selection.map((candidate) => candidate.playerId),
+                    interactionId: descriptor.interactionId,
+                },
             }],
             buildActionKeyParts: (selection) => ['select-player', ...selection.map((candidate) => candidate.playerId)],
             buildLabel: (selection) => `选择玩家 ${selection.map((candidate) => candidate.playerId).join(', ')}`,
@@ -2040,7 +2043,7 @@ const buildInteractionActions = (
                         : `弃置手牌 ${selectedCardId}`,
                     commands: [{
                         type: 'RESOLVE_INTERACTION',
-                        payload: { selectedCardIds: [selectedCardId] },
+                        payload: { selectedCardIds: [selectedCardId], interactionId: current.id },
                     }],
                     metadata: {
                         interactionId: current.id,
@@ -2073,7 +2076,7 @@ const buildInteractionActions = (
                                 label: `转移 ${statusId} 到 ${targetPlayerId}`,
                                 commands: [{
                                     type: 'TRANSFER_STATUS',
-                                    payload: { fromPlayerId: sourcePlayerId, toPlayerId: targetPlayerId, statusId },
+                                    payload: { fromPlayerId: sourcePlayerId, toPlayerId: targetPlayerId, statusId, interactionId: current.id },
                                 }],
                                 aiHints: buildTransferStatusAiHints(
                                     state,
@@ -2104,7 +2107,7 @@ const buildInteractionActions = (
                     label: `移除 ${targetPlayerId} 的 ${statusId}`,
                     commands: [{
                         type: 'REMOVE_STATUS',
-                        payload: { targetPlayerId, statusId },
+                        payload: { targetPlayerId, statusId, interactionId: current.id },
                     }],
                     aiHints: buildRemoveStatusAiHints(state, playerId, targetPlayerId, statusId),
                     metadata: withVisibleStepDelayPolicy(withAiActionStrategyTags({
@@ -2143,7 +2146,7 @@ const buildInteractionActions = (
                 label: `转移 ${statusId} 到 ${targetPlayerId}`,
                 commands: [{
                     type: 'TRANSFER_STATUS',
-                    payload: { fromPlayerId: sourcePlayerId, toPlayerId: targetPlayerId, statusId },
+                    payload: { fromPlayerId: sourcePlayerId, toPlayerId: targetPlayerId, statusId, interactionId: current.id },
                 }],
                 aiHints: buildTransferStatusAiHints(state, playerId, sourcePlayerId, targetPlayerId, statusId),
                 metadata: withAiActionStrategyTags({

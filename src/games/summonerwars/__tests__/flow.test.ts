@@ -2174,6 +2174,7 @@ describe('召唤师战争本地 AI', () => {
                 attackType: 'melee',
                 attackRange: 1,
                 abilities: ['mogu_burst', 'mogu_fungal_mutation'],
+                unitTags: ['carrier'],
                 deckSymbols: [],
             },
             owner: '0',
@@ -2235,6 +2236,7 @@ describe('召唤师战争本地 AI', () => {
             attackType: 'melee',
             attackRange: 1,
             abilities: [],
+            unitTags: ['undead'],
             deckSymbols: [],
         }];
         const summoner = getSummoner(core, '0');
@@ -3006,6 +3008,7 @@ describe('召唤师战争本地 AI', () => {
                 attackType: 'melee',
                 attackRange: 1,
                 abilities: [],
+                unitTags: ['undead'],
                 deckSymbols: [],
             },
             {
@@ -3020,6 +3023,7 @@ describe('召唤师战争本地 AI', () => {
                 attackType: 'melee',
                 attackRange: 1,
                 abilities: [],
+                unitTags: ['undead'],
                 deckSymbols: [],
             },
         ];

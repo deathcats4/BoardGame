@@ -353,6 +353,21 @@ export interface TutorialAiAction {
     waitForBoardSyncAfter?: boolean;
 }
 
+export interface TutorialHiddenAutomationContract {
+    /**
+     * `setup-precondition` 只能用于首张玩家可见教程卡之前建立合法教程起点；
+     * 它不是玩家流程里的已教学步骤，中途分段预设必须显示为玩家可见分段或拆成独立教程。
+     *
+     * `compressed-repeat` 只能用于压缩已经通过可见步骤教学过的同类正式动作；
+     * 不同阶段、不同权限、不同结果或首次出现的机制不得标成重复。
+     */
+    kind: 'setup-precondition' | 'compressed-repeat';
+    /** 人能读懂的压缩依据，写明为什么这不是新的玩家教学动作。 */
+    reason: string;
+    /** `compressed-repeat` 对应的已教学步骤 ID，用于审计和测试。 */
+    equivalentStepIds?: string[];
+}
+
 export interface TutorialStepVisual {
     /** 逻辑资源路径；运行时由统一图片链解析，不手写 /assets 或 compressed。 */
     src: string;
@@ -390,6 +405,12 @@ export interface TutorialStepSnapshot {
     randomPolicy?: TutorialRandomPolicy;
     aiActions?: TutorialAiAction[];
     /**
+     * 允许此步骤在玩家教程流程中隐藏并由教程自动命令执行的显式合同。
+     * 没有该字段时，`aiActions` 只表示“这一步有教程代执行命令”，
+     * 不再自动意味着可隐藏、可从上一步回退中跳过，或可自动消费后推进。
+     */
+    hiddenAutomation?: TutorialHiddenAutomationContract;
+    /**
      * Delay before tutorial-authored automatic actions run.
      *
      * Used when the current visible step must stay readable before an AI/system
@@ -399,7 +420,8 @@ export interface TutorialStepSnapshot {
     /**
      * AI actions 执行完成后是否自动推进。
      *
-     * 默认保持旧行为：没有 advanceOnEvents 的 AI 步骤会自动推进。
+     * 只有声明 hiddenAutomation 的自动步骤才会在 AI actions 消费后自动推进；
+     * 没有 hiddenAutomation 时，AI actions 只表示教程代执行了命令，步骤仍是玩家可见步骤。
      * 某些教程步骤需要 AI 先补齐桌面状态，但仍停留在当前说明页等待玩家阅读。
      */
     autoAdvanceAfterAi?: boolean;

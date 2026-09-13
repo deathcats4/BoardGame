@@ -34,7 +34,8 @@ export interface DiceBoxPhysicsSourceProps {
     testId?: string;
     dataAttributes?: Record<string, string>;
     onPhysicsStatesChange?: (states: DicePhysicsState[]) => void;
-    onSettledChange?: (settled: boolean) => void;
+    settledIdentity?: string;
+    onSettledChange?: (settled: boolean, identity?: string) => void;
 }
 
 export function DiceBoxPhysicsSource({
@@ -51,6 +52,7 @@ export function DiceBoxPhysicsSource({
     testId = 'dice-box-physics-source',
     dataAttributes,
     onPhysicsStatesChange,
+    settledIdentity,
     onSettledChange,
 }: DiceBoxPhysicsSourceProps) {
     const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -172,7 +174,7 @@ export function DiceBoxPhysicsSource({
         () => (rerollIds.length > 0 ? `${rerollMotionId}|${rerollKey}|${rerollPreviousValuesKey}|${valuesKey}` : ''),
         [rerollIds.length, rerollKey, rerollMotionId, rerollPreviousValuesKey, valuesKey],
     );
-    const settledSignalKey = React.useMemo(
+    const motionSettledSignalKey = React.useMemo(
         () => [
             motionType,
             rollMotionId,
@@ -184,6 +186,7 @@ export function DiceBoxPhysicsSource({
         ].join('::'),
         [dice, lockedIndices, motionType, rerollKey, rerollMotionId, rerollPreviousValuesKey, rollMotionId],
     );
+    const settledSignalKey = settledIdentity ?? motionSettledSignalKey;
     const requiredDieSkinsReady = React.useMemo(
         () => !requireDieSkins
             || dice.length === 0
@@ -299,7 +302,7 @@ export function DiceBoxPhysicsSource({
             && previousNotificationKey !== notificationKey,
         );
         if (previousSettled !== nextSettled || settledIdentityChanged) {
-            onSettledChangeRef.current?.(nextSettled);
+            onSettledChangeRef.current?.(nextSettled, notificationKey);
         }
     }, []);
 
@@ -468,7 +471,7 @@ export function DiceBoxPhysicsSource({
                     setSettledState(true, settledSignalKey);
                     return;
                 }
-                setSettledState(false);
+                setSettledState(false, settledSignalKey);
                 if (activeMotionRef.current?.type !== 'roll' || activeMotionRef.current.key !== rollingKey) {
                     activeMotionRef.current = { type: 'roll', key: rollingKey };
                     try {
@@ -504,7 +507,7 @@ export function DiceBoxPhysicsSource({
                 try {
                     await restoreRerollStartValues(engine, startValues, targetValues);
                     previousDiceIdsRef.current = dice.map((die) => die.id);
-                    setSettledState(false);
+                    setSettledState(false, settledSignalKey);
                     await engine.rerollToValues(rerollIndices, targetValues, targetLockedIndices);
                 } finally {
                     finalizeVisibleSettledDice(engine);
@@ -517,7 +520,7 @@ export function DiceBoxPhysicsSource({
                     const pending = pendingRerollMotionRef.current;
                     if (pending) {
                         pendingRerollMotionRef.current = null;
-                        setSettledState(false);
+                        setSettledState(false, settledSignalKey);
                         await playRerollMotion(pending.key, pending.indices, pending.previousValues, pending.values, pending.lockedIndices);
                     }
                 }
@@ -534,7 +537,7 @@ export function DiceBoxPhysicsSource({
                         setSettledState(true, settledSignalKey);
                         return;
                     }
-                    setSettledState(false);
+                    setSettledState(false, settledSignalKey);
                     if (activeMotionRef.current?.type === 'reroll') {
                         if (activeMotionRef.current.key !== rerollMotionKey) {
                             pendingRerollMotionRef.current = {
@@ -561,7 +564,7 @@ export function DiceBoxPhysicsSource({
                     .filter((index) => index >= 0)
                     .sort((left, right) => right - left);
                 if (previousIds.length > dice.length && removedIndices.length === previousIds.length - dice.length) {
-                    setSettledState(false);
+                    setSettledState(false, settledSignalKey);
                     await engine.removeDice(removedIndices);
                     engine.syncValues(values);
                     previousDiceIdsRef.current = dice.map((die) => die.id);
@@ -569,7 +572,7 @@ export function DiceBoxPhysicsSource({
                     return;
                 }
 
-                setSettledState(true);
+                setSettledState(false, settledSignalKey);
                 await restoreVisibleSettledDice(engine, values);
                 previousDiceIdsRef.current = dice.map((die) => die.id);
                 setSettledState(true, settledSignalKey);

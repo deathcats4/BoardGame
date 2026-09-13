@@ -206,8 +206,8 @@ describe('DiceThrone 吸血鬼领主录入与资源合同', () => {
         expect(VAMPIRE_LORD_CARDS.filter(card => card.sourceAtlasIndex !== undefined).map(card => card.sourceAtlasIndex)).toEqual([
             17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
         ]);
-        expect(VAMPIRE_LORD_CARDS.filter(card => card.id !== 'card-unexpected').every(card => card.previewRef?.type === 'atlas')).toBe(true);
-        expect(VAMPIRE_LORD_CARDS.filter(card => card.id !== 'card-unexpected').every(card => (
+        expect(VAMPIRE_LORD_CARDS.every(card => card.previewRef?.type === 'atlas')).toBe(true);
+        expect(VAMPIRE_LORD_CARDS.every(card => (
             card.previewRef?.type !== 'atlas' || card.previewRef.atlasId === DICETHRONE_CARD_ATLAS_IDS.VAMPIRE_LORD
         ))).toBe(true);
         expect(VAMPIRE_LORD_CARDS.find(card => card.id === 'card-vampire-lord-bloodstone')?.previewRef).toMatchObject({
@@ -215,7 +215,11 @@ describe('DiceThrone 吸血鬼领主录入与资源合同', () => {
             atlasId: DICETHRONE_CARD_ATLAS_IDS.VAMPIRE_LORD,
             index: 32,
         });
-        expect(VAMPIRE_LORD_CARDS.find(card => card.id === 'card-unexpected')?.previewRef).toBeUndefined();
+        expect(VAMPIRE_LORD_CARDS.find(card => card.id === 'card-unexpected')?.previewRef).toMatchObject({
+            type: 'atlas',
+            atlasId: DICETHRONE_CARD_ATLAS_IDS.VAMPIRE_LORD,
+            index: 33,
+        });
 
         const upgradeTargets = Object.fromEntries(
             VAMPIRE_LORD_CARDS

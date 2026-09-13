@@ -33,12 +33,30 @@ export function applyEvents<TState, TEvent>(
 
 import type {
     AttackResolvedEvent,
+    BonusDiceContinuation,
     DiceThroneCore,
     PendingAttack,
     PendingAttackSettlementStage,
     PlayerId,
 } from './types';
 import { getPlayerAbilityBaseDamage } from './abilityLookup';
+
+export function assertValidBonusDiceContinuation(
+    continuation: BonusDiceContinuation | null | undefined,
+    sourceAbilityId: string | undefined,
+): void {
+    if (
+        continuation?.kind === 'attack'
+        && continuation.settlementStage === 'readyToResolve'
+        && continuation.markBonusDiceResolved !== true
+    ) {
+        throw new Error(
+            `[DiceThrone] invalid bonus dice continuation for ${sourceAbilityId ?? 'unknown'}: `
+            + 'readyToResolve means the main attack damage has already resolved, '
+            + 'so markBonusDiceResolved must be true.',
+        );
+    }
+}
 
 export function isDiceThroneAiSeat(state: DiceThroneCore, playerId: PlayerId): boolean {
     const controllerType = state.seatControllers?.[playerId]?.type;

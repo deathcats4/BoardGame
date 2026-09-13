@@ -507,7 +507,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.spellCardReading'))
             .toBe('先看计划法术会用到的基础字段：费用、行动、范围、目标、类型、派系和等级决定能不能计划与施放。');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.planningSkip'))
-            .toBe('计划阶段可以准备0至2张法术。空计划表示本回合不准备任何法术；正式牌桌同样用“确认计划 0/2”提交空计划。本教程会先准备两张法术，所以这里先读规则，不提交空计划。');
+            .toBe('计划阶段每回合最多准备2张法术；不准备时也用“确认计划”提交。本轮先准备两张。');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.endCreatureAction'))
             .toBe('移动已经消耗了灰狼的行动。点击“结束行动”，让双方完成生物行动并进入最终快速施法。');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.skipFinalQuickcast'))
@@ -519,7 +519,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.guardTokenResult'))
             .toContain('守卫标记');
         const zhStageText = String(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.stage'));
-        for (const phaseLabel of ['重置', '聚魔', '维持', '计划', '部署', '先手快速施法', '生物行动', '末尾快速施法']) {
+        for (const phaseLabel of ['起始', '重置', '聚魔', '维持', '计划', '部署', '优先快速施法', '生物行动', '最终快速施法']) {
             expect(zhStageText).toContain(phaseLabel);
         }
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.visuals.spellCardLegendAlt'))
@@ -527,7 +527,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.visuals.spellCardLegendCaption'))
             .toBe('这张图例先说明计划法术会用到的基础字段。');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.attackBarReading'))
-            .toBe('准备区里的丛林灰狼即将被打出。先读它的攻击条：左侧图标区分快速或标准行动、近战或远程；右侧读范围、伤害类型、攻击骰子、附加效果和特性。读完点下一步继续。');
+            .toBe('准备区里的丛林灰狼马上要打出。先看攻击条：它是快速近战，攻击骰子为4。');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.visuals.attackBarLegendAlt'))
             .toBe('攻击条图例：快速行动、标准行动、近战攻击、远程攻击、范围、伤害类型、攻击骰子、附加效果和特性');
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.visuals.attackBarLegendCaption'))
@@ -535,7 +535,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.spellCardReading'))
             .toBe('Use this spell-card legend first: cost, action, range, target, type, school, and level determine how you prepare and cast.');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.planningSkip'))
-            .toBe('Planning allows 0 to 2 prepared spells. An empty plan means preparing no spells this round; the normal table still submits it with “Confirm plan 0/2”. This tutorial prepares two spells first, so read this rule without submitting an empty plan here.');
+            .toBe('During Planning, prepare up to 2 spells each round; if you prepare none, submit with “Confirm plan”. This round, prepare two.');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.endCreatureAction'))
             .toBe('Moving has used the wolf\'s action. Click “End action” so both players finish Creature Action and enter Final Quickcast.');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.skipFinalQuickcast'))
@@ -545,7 +545,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.visuals.spellCardLegendCaption'))
             .toBe('This legend covers the basic fields needed for preparing spells.');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.attackBarReading'))
-            .toBe('Jungle Wolf is in your prepared spells and is about to be cast. Read its attack bar first: the left icons tell quick or full action and melee or ranged attack; the right side shows range, damage type, attack dice, extra effects, and traits. Click Next when done.');
+            .toBe('Jungle Wolf is in your prepared spells and is about to be cast. Its attack bar shows a quick melee attack with 4 attack dice.');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.visuals.attackBarLegendAlt'))
             .toBe('Attack-bar legend showing quick action, full action, melee attack, ranged attack, range, damage type, attack dice, additional effects, and traits');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.visuals.attackBarLegendCaption'))
@@ -560,7 +560,7 @@ describe('mage-wars tutorial', () => {
             ['planConfirm', '点击“确认计划 2/2”提交本回合计划。', 'Click “Confirm plan 2/2” to submit this round\'s plan.'],
             ['deploySelectWolf', '点击准备区的“丛林灰狼”。', 'Click Jungle Wolf in your prepared spells.'],
             ['deployTargetZone', '点击兽王所在区域。', 'Click the Beastmaster\'s zone.'],
-            ['wolfSummoned', '丛林灰狼已经被召唤到兽王所在区域；刚进场时行动未就绪，行动标记显示已用面表示它现在还不能行动。这一步先读状态，不点灰狼，点下一步继续。', 'Jungle Wolf has been summoned into the Beastmaster\'s zone. It enters without a ready action, so the spent action marker means it cannot act yet. This is a reading step: do not click the wolf yet, click Next to continue.'],
+            ['wolfSummoned', '丛林灰狼进场后行动标记是已用面，所以现在不能行动；下一步用兽性觉醒把它翻回就绪。', 'After Jungle Wolf enters play, its action marker is on the spent side, so it cannot act yet. Next, Rouse the Beast turns it ready.'],
             ['rouseSelectSpell', '点击准备区的“兽性觉醒”。', 'Click Rouse the Beast in your prepared spells.'],
             ['rouseTargetWolf', '点击场上的“丛林灰狼”卡牌本体，让兽性觉醒作用到它。', 'Click the Jungle Wolf card body in the arena so Rouse the Beast targets it.'],
             ['moveSelectWolf', '点击场上的“丛林灰狼”卡牌本体，选它作为这次移动的来源。', 'Click the Jungle Wolf card body in the arena to choose it as the moving creature.'],
@@ -586,7 +586,7 @@ describe('mage-wars tutorial', () => {
         expect(resolveLocaleKey(zhLocale, 'game-mage-wars:tutorial.steps.finish'))
             .toContain('守卫');
         expect(resolveLocaleKey(enLocale, 'game-mage-wars:tutorial.steps.finish'))
-            .toBe('You have now gone through Reset, Channel, Upkeep, Planning, Deployment, Initiative Quickcast, Creature Action, and Final Quickcast, while reading the board and cards, summoning Jungle Wolf, checking public discard, moving a creature, casting a wall, and guarding with a unit.');
+            .toBe('Tutorial complete. You have gone through a normal round flow and seen the wall and guard results.');
     });
 
     it('keeps the spell-card and attack-bar legends in the localized Mage Wars asset manifest', () => {

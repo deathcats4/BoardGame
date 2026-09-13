@@ -350,6 +350,79 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(settled.next.players['1'].statusEffects[STATUS_IDS.BLEED]).toBe(1);
     });
 
+    it('死无全尸 0 血滴只给魅惑之力 +0，不应跳过原本 4 点不可防御伤害', () => {
+        const cardId = 'card-vampire-lord-total-demise';
+        const state = createVampireLordState();
+        state.sys.phase = 'offensiveRoll';
+        state.core.activePlayerId = '0';
+        state.core.rollCount = 1;
+        state.core.rollDiceCount = 5;
+        state.core.rollConfirmed = true;
+        setVampireDice(state.core, [1, 5, 5, 5, 1]);
+        state.core.players['0'].resources[RESOURCE_IDS.CP] = 10;
+        state.core.players['0'].hand = [getCardById(cardId)];
+        state.core.players['0'].discard = [];
+
+        const selectEvents = execute(
+            state,
+            command('SELECT_ABILITY', '0', { abilityId: 'mesmerize-power' }),
+            fixedRandom,
+        );
+        const afterAbility = applyEvents(state.core, selectEvents);
+        expect(eventsOfType(selectEvents, 'ATTACK_INITIATED')[0]?.payload).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'mesmerize-power',
+            isDefendable: false,
+        });
+
+        const playEvents = execute(
+            { ...state, core: afterAbility },
+            command('PLAY_CARD', '0', { cardId }),
+            createQueuedRandom([5, 3, 2, 3, 5]),
+        );
+        const afterRoll = applyEvents(afterAbility, playEvents);
+        expect(eventsOfType(playEvents, 'BONUS_DIE_ROLLED').map(event => event.payload.face)).toEqual([
+            VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+        ]);
+
+        const settled = confirmPendingBonusDice(afterRoll, fixedRandom, 120);
+        expect(eventsOfType(settled.events, 'BONUS_DICE_SETTLED')[0]?.payload).toMatchObject({
+            sourceAbilityId: cardId,
+            totalDamage: 0,
+            displayOnly: true,
+        });
+        expect(eventsOfType(settled.events, 'BONUS_DAMAGE_ADDED')).toHaveLength(0);
+
+        const exitResult = diceThroneFlowHooks.onPhaseExit?.({
+            state: { core: settled.next, sys: state.sys },
+            from: 'offensiveRoll',
+            to: 'main2',
+            command: command('ADVANCE_PHASE', '0'),
+            random: fixedRandom,
+        } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
+        const exitEvents = (Array.isArray(exitResult) ? exitResult : exitResult?.events ?? []) as DiceThroneEvent[];
+        const next = applyEvents(settled.next, exitEvents);
+
+        expect(eventsOfType(exitEvents, 'DAMAGE_DEALT')[0]?.payload).toMatchObject({
+            targetId: '1',
+            amount: 4,
+            actualDamage: 4,
+            sourceAbilityId: 'mesmerize-power',
+        });
+        expect(eventsOfType(exitEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'mesmerize-power',
+            totalDamage: 4,
+        });
+        expect(next.players['1'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH - 4);
+    });
+
     it('沸血之力按基础 1 伤害加对手每层流血加伤，不直接扣对手 HP', () => {
         const cardId = 'card-vampire-lord-boiling-blood';
         const state = createAttackModifierCardState(cardId);

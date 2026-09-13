@@ -224,6 +224,16 @@ const validateInteractionOwnership = (
     return null;
 };
 
+const validateInteractionId = (
+    pendingInteraction: InteractionDescriptor,
+    interactionId?: string,
+): ValidationResult | null => {
+    if (typeof interactionId === 'string' && pendingInteraction.id !== interactionId) {
+        return fail('interaction_id_mismatch');
+    }
+    return null;
+};
+
 const validateTargetPlayerInInteraction = (
     state: DiceThroneCore,
     pendingInteraction: InteractionDescriptor,
@@ -1199,6 +1209,9 @@ const validateRemoveStatus = (
     if (ownershipError) return ownershipError;
 
     const interaction = pendingInteraction!;
+    const interactionIdError = validateInteractionId(interaction, cmd.payload.interactionId);
+    if (interactionIdError) return interactionIdError;
+
     const targetError = validateTargetPlayerInInteraction(state, interaction, cmd.payload.targetPlayerId);
     if (targetError) return targetError;
 
@@ -1229,6 +1242,9 @@ const validateTransferStatus = (
     if (ownershipError) return ownershipError;
 
     const interaction = pendingInteraction!;
+    const interactionIdError = validateInteractionId(interaction, cmd.payload.interactionId);
+    if (interactionIdError) return interactionIdError;
+
     const sourceTargetError = validateTargetPlayerInInteraction(state, interaction, cmd.payload.fromPlayerId);
     if (sourceTargetError) return sourceTargetError;
 
@@ -1269,6 +1285,9 @@ const validateResolveInteraction = (
     if (pendingInteraction.playerId !== playerId) {
         return fail('player_mismatch');
     }
+    const interactionIdError = validateInteractionId(pendingInteraction, cmd.payload.interactionId);
+    if (interactionIdError) return interactionIdError;
+
     if (pendingInteraction.type === 'selectPlayer') {
         const selectedPlayerIds = cmd.payload.selectedPlayerIds ?? [];
         const targetPlayerIds = pendingInteraction.targetPlayerIds ?? Object.keys(state.players);
@@ -1760,6 +1779,9 @@ const validateGrantTokens = (
     if (ownershipError) return ownershipError;
 
     const interaction = pendingInteraction!;
+    const interactionIdError = validateInteractionId(interaction, cmd.payload.interactionId);
+    if (interactionIdError) return interactionIdError;
+
     const targetError = validateTargetPlayerInInteraction(state, interaction, cmd.payload.targetPlayerId);
     if (targetError) return targetError;
 

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useGameClient } from '../engine/transport/react';
-import type { MatchState, TutorialManifest } from '../engine/types';
+import type { MatchState, TutorialManifest, TutorialState } from '../engine/types';
 import { TUTORIAL_COMMANDS } from '../engine/systems/TutorialSystem';
 import { useTutorial, type TutorialSessionScope } from '../contexts/TutorialContext';
 import { useGameMode } from '../contexts/GameModeContext';
@@ -16,6 +16,60 @@ export type MatchRoomSeatValidationSnapshot = {
 type OnlineSeatValidationBridgeProps = {
     onSnapshotChange: (snapshot: MatchRoomSeatValidationSnapshot) => void;
 };
+
+type TutorialProgressView = {
+    manifestId: string | null;
+    manifestRevision?: number;
+    stepIndex: number;
+    stepId: string | null;
+    totalSteps: number;
+};
+
+const getProjectedTutorialStepCount = (
+    tutorial: TutorialState | undefined,
+    manifest?: TutorialManifest | null,
+): number => {
+    if (!tutorial) return 0;
+    const transportTotal = (tutorial as TutorialState & { totalSteps?: number }).totalSteps;
+    if (typeof transportTotal === 'number' && transportTotal > 0) return transportTotal;
+    if (tutorial.steps?.length) return tutorial.steps.length;
+    if (manifest && tutorial.manifestId === manifest.id) return manifest.steps.length;
+    return 0;
+};
+
+const isSameTutorialRevision = (
+    manifest: TutorialManifest,
+    progress: { manifestRevision?: number | null },
+): boolean => (
+    !Number.isInteger(manifest.revision)
+    || progress.manifestRevision === manifest.revision
+);
+
+const snapshotTutorialProgress = (
+    tutorial: TutorialState | undefined,
+    manifest?: TutorialManifest | null,
+): TutorialProgressView | null => {
+    if (!tutorial?.active) return null;
+    const totalSteps = getProjectedTutorialStepCount(tutorial, manifest);
+    return {
+        manifestId: tutorial.manifestId ?? null,
+        manifestRevision: tutorial.manifestRevision,
+        stepIndex: tutorial.stepIndex,
+        stepId: tutorial.step?.id ?? null,
+        totalSteps,
+    };
+};
+
+const wasLastActiveTutorialStep = (
+    progress: TutorialProgressView | null,
+    manifest: TutorialManifest,
+): boolean => Boolean(
+    progress
+    && progress.manifestId === manifest.id
+    && isSameTutorialRevision(manifest, progress)
+    && progress.totalSteps > 0
+    && progress.stepIndex >= progress.totalSteps - 1
+);
 
 export type MatchRoomLiveDebugBridgeProps = {
     matchId?: string;
@@ -55,7 +109,11 @@ export const TutorialDispatchBridge = ({
         manifest: TutorialManifest | null;
         stateKey: string | null;
     }>({ manifest: null, stateKey: null });
+    const lastActiveTutorialProgressRef = useRef<TutorialProgressView | null>(null);
     const sessionScopeKey = sessionScope?.key ?? '';
+    const contextTutorialActive = contextTutorial.active;
+    const contextTutorialManifestId = contextTutorial.manifestId;
+    const contextTutorialManifestRevision = contextTutorial.manifestRevision;
 
     useLayoutEffect(() => {
         dispatchRef.current = dispatch;
@@ -87,16 +145,23 @@ export const TutorialDispatchBridge = ({
         }
 
         const tutorial = (state as MatchState | undefined)?.sys?.tutorial;
-        const contextMatchesManifest = contextTutorial.active
-            && contextTutorial.manifestId === tutorialManifest.id
-            && (
-                !Number.isInteger(tutorialManifest.revision)
-                || contextTutorial.manifestRevision === tutorialManifest.revision
-            );
+        const activeProgress = snapshotTutorialProgress(tutorial, tutorialManifest);
+        if (activeProgress?.manifestId === tutorialManifest.id) {
+            lastActiveTutorialProgressRef.current = activeProgress;
+        }
+        const contextMatchesManifest = contextTutorialActive
+            && contextTutorialManifestId === tutorialManifest.id
+            && isSameTutorialRevision(tutorialManifest, {
+                manifestRevision: contextTutorialManifestRevision,
+            });
         if (
             contextMatchesManifest
             && (!tutorial?.active || tutorial.manifestId !== tutorialManifest.id)
         ) {
+            if (wasLastActiveTutorialStep(lastActiveTutorialProgressRef.current, tutorialManifest)) {
+                boundManifestRef.current = { manifest: tutorialManifest, stateKey: 'completed-local-tutorial' };
+                return;
+            }
             boundManifestRef.current = { manifest: tutorialManifest, stateKey: 'restart-local-tutorial' };
             dispatchRef.current(TUTORIAL_COMMANDS.START, { manifest: tutorialManifest });
             return;
@@ -139,9 +204,9 @@ export const TutorialDispatchBridge = ({
         boundManifestRef.current = { manifest: tutorialManifest, stateKey };
         dispatchRef.current(TUTORIAL_COMMANDS.BIND_MANIFEST, { manifest: tutorialManifest });
     }, [
-        contextTutorial.active,
-        contextTutorial.manifestId,
-        contextTutorial.manifestRevision,
+        contextTutorialActive,
+        contextTutorialManifestId,
+        contextTutorialManifestRevision,
         isTutorialMode,
         sessionScopeKey,
         state,
@@ -154,16 +219,22 @@ export const TutorialDispatchBridge = ({
         if (!isTutorialMode || !state) return;
         const tutorial = (state as MatchState).sys.tutorial;
         if (!tutorial) return;
-        const contextMatchesManifest = contextTutorial.active
+        const contextMatchesManifest = contextTutorialActive
             && tutorialManifest
-            && contextTutorial.manifestId === tutorialManifest.id
-            && (
-                !Number.isInteger(tutorialManifest.revision)
-                || contextTutorial.manifestRevision === tutorialManifest.revision
-            );
+            && contextTutorialManifestId === tutorialManifest.id
+            && isSameTutorialRevision(tutorialManifest, {
+                manifestRevision: contextTutorialManifestRevision,
+            });
+        const localCloseCompletesCurrentTutorial = Boolean(
+            tutorialManifest
+            && contextMatchesManifest
+            && (!tutorial.active || tutorial.manifestId !== tutorialManifest.id)
+            && wasLastActiveTutorialStep(lastActiveTutorialProgressRef.current, tutorialManifest)
+        );
         if (
             contextMatchesManifest
             && (!tutorial.active || tutorial.manifestId !== tutorialManifest.id)
+            && !localCloseCompletesCurrentTutorial
         ) {
             return;
         }
@@ -184,9 +255,9 @@ export const TutorialDispatchBridge = ({
             contextRef.current.syncTutorialState(tutorial);
         }
     }, [
-        contextTutorial.active,
-        contextTutorial.manifestId,
-        contextTutorial.manifestRevision,
+        contextTutorialActive,
+        contextTutorialManifestId,
+        contextTutorialManifestRevision,
         isTutorialMode,
         sessionScope,
         sessionScopeKey,

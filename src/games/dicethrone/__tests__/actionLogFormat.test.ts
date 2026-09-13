@@ -23,9 +23,9 @@ import type {
     TokenUsedEvent,
     BonusDieRolledEvent,
 } from '../domain/types';
-import { STATUS_IDS, TOKEN_IDS } from '../domain/ids';
+import { DICETHRONE_CARD_ATLAS_IDS, STATUS_IDS, TOKEN_IDS } from '../domain/ids';
 import { RESOURCE_IDS } from '../domain/resources';
-import { createInitializedState, createSetupWithHand, fixedRandom, fistAttackAbilityId, getCardById, cmd, testSystems } from './test-utils';
+import { createHeroMatchup, createInitializedState, createSetupWithHand, fixedRandom, fistAttackAbilityId, getCardById, cmd, testSystems } from './test-utils';
 import { formatDiceThroneActionEntry } from '../game';
 import { DiceThroneDomain } from '../domain';
 import { createBonusRollContextFromSettlement } from '../domain/rollContext';
@@ -799,6 +799,41 @@ describe('formatDiceThroneActionEntry', () => {
             amount: 1,
         });
         expect(resultSeg?.paramI18nKeys).toContain('tokenLabel');
+    });
+
+    it('吸血鬼通用牌日志在旧快照缺少内联预览时，仍按吸血鬼实际牌库补卡图', () => {
+        const state = createHeroMatchup('vampire_lord', 'monk')(['0', '1'], fixedRandom);
+        const staleGetAway = getCardById('card-get-away');
+        delete staleGetAway.previewRef;
+        state.core.players['0'].hand = [staleGetAway];
+        state.core.players['0'].deck = state.core.players['0'].deck.filter(card => card.id !== 'card-get-away');
+
+        const entries = normalizeEntries(formatDiceThroneActionEntry({
+            command: {
+                type: 'PLAY_CARD',
+                playerId: '0',
+                payload: { cardId: 'card-get-away' },
+                timestamp: 42,
+            },
+            state,
+            events: [],
+        }));
+
+        const playEntry = entries.find(entry => entry.kind === 'PLAY_CARD');
+        expect(playEntry).toBeTruthy();
+        expect(playEntry?.segments).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: 'card',
+                cardId: 'card-get-away',
+                previewText: 'cards.card-get-away.name',
+                previewTextNs: 'game-dicethrone',
+                previewRef: {
+                    type: 'atlas',
+                    atlasId: DICETHRONE_CARD_ATLAS_IDS.VAMPIRE_LORD,
+                    index: 11,
+                },
+            }),
+        ]));
     });
 
     it('起开移除催眠应通过正式日志系统写入玩家日志', () => {

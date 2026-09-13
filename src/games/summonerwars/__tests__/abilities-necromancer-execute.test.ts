@@ -85,15 +85,17 @@ function makeUndeadWarrior(id: string): UnitCard {
     id, cardType: 'unit', name: '亡灵战士', unitClass: 'common',
     faction: 'necromancer', strength: 2, life: 4, cost: 2,
     attackType: 'melee', attackRange: 1,
+    unitTags: ['undead'],
     abilities: ['blood_rage', 'power_boost', 'blood_rage_decay'], deckSymbols: [],
   };
 }
 
 function makePlagueZombie(id: string): UnitCard {
   return {
-    id, cardType: 'unit', name: '疫病体', unitClass: 'common',
+    id, cardType: 'unit', name: '亡灵疫病体', unitClass: 'common',
     faction: 'necromancer', strength: 1, life: 1, cost: 0,
     attackType: 'melee', attackRange: 1,
+    unitTags: ['undead', 'carrier'],
     abilities: ['soulless', 'infection'], deckSymbols: [],
   };
 }
@@ -112,6 +114,7 @@ function makeMoguSporePlagueBody(id: string): UnitCard {
     id, cardType: 'unit', name: '菌袍疫病体', unitClass: 'common',
     faction: 'mogu', strength: 2, life: 2, cost: 0,
     attackType: 'melee', attackRange: 1,
+    unitTags: ['carrier'],
     abilities: ['mogu_burst', 'mogu_fungal_mutation'], deckSymbols: [],
   };
 }
@@ -139,6 +142,7 @@ function makeSoulArcher(id: string): UnitCard {
     id, cardType: 'unit', name: '亡灵弓箭手', unitClass: 'common',
     faction: 'necromancer', strength: 1, life: 3, cost: 1,
     attackType: 'ranged', attackRange: 3,
+    unitTags: ['undead'],
     abilities: ['soul_transfer'], deckSymbols: [],
   };
 }
@@ -280,6 +284,50 @@ describe('古尔-达斯 - 复活死灵 (revive_undead) execute 流程', () => {
       abilityId: 'revive_undead',
       sourceUnitId: summoner.instanceId,
       targetCardId: 'hellfire-cultist-discard',
+      targetPosition: { row: 4, col: 3 },
+    });
+
+    expect(events.some(e => e.type === SW_EVENTS.UNIT_DAMAGED)).toBe(false);
+    expect(events.some(e => e.type === SW_EVENTS.UNIT_SUMMONED)).toBe(false);
+    expect(newState.board[4][2].unit?.damage).toBe(0);
+    expect(newState.board[4][3].unit).toBeUndefined();
+  });
+
+  it('复活死灵不能选择只有疫病体标签但没有亡灵标签的单位', () => {
+    const state = createNecroState();
+    clearArea(state, [3, 4, 5], [1, 2, 3, 4]);
+
+    const summoner = placeUnit(state, { row: 4, col: 2 }, {
+      cardId: 'test-summoner',
+      card: makeSummoner('test-summoner'),
+      owner: '0',
+    });
+
+    state.players['0'].discard.push(makeMoguSporePlagueBody('mogu-spore-plague-body-discard'));
+    state.phase = 'summon';
+    state.currentPlayer = '0';
+
+    const validateResult = SummonerWarsDomain.validate(
+      { core: state, sys: {} as any },
+      {
+        type: SW_COMMANDS.ACTIVATE_ABILITY,
+        payload: {
+          abilityId: 'revive_undead',
+          sourceUnitId: summoner.instanceId,
+          targetCardId: 'mogu-spore-plague-body-discard',
+          targetPosition: { row: 4, col: 3 },
+        },
+        playerId: '0',
+        timestamp: fixedTimestamp,
+      },
+    );
+    expect(validateResult.valid).toBe(false);
+    expect(validateResult.error).toContain('亡灵单位');
+
+    const { events, newState } = executeAndReduce(state, SW_COMMANDS.ACTIVATE_ABILITY, {
+      abilityId: 'revive_undead',
+      sourceUnitId: summoner.instanceId,
+      targetCardId: 'mogu-spore-plague-body-discard',
       targetPosition: { row: 4, col: 3 },
     });
 
@@ -833,7 +881,7 @@ describe('感染 (infection) execute 流程', () => {
     expect(occupiedResult.newState.board[4][3].unit?.cardId).toBe('occupied-unit');
   });
 
-  it('感染不能把莫古的菌袍疫病体当成亡灵法师疫病体', () => {
+  it('感染按疫病体标签选择弃牌堆单位，不按亡灵法师阵营或卡名猜', () => {
     const state = createNecroState();
     clearArea(state, [3, 4, 5], [1, 2, 3, 4]);
 
@@ -860,8 +908,7 @@ describe('感染 (infection) execute 流程', () => {
         timestamp: fixedTimestamp,
       },
     );
-    expect(validateResult.valid).toBe(false);
-    expect(validateResult.error).toContain('疫病体');
+    expect(validateResult.valid).toBe(true);
 
     const { events, newState } = executeAndReduce(state, SW_COMMANDS.ACTIVATE_ABILITY, {
       abilityId: 'infection',
@@ -870,9 +917,9 @@ describe('感染 (infection) execute 流程', () => {
       targetPosition: { row: 4, col: 3 },
     });
 
-    expect(events.some(e => e.type === SW_EVENTS.UNIT_SUMMONED)).toBe(false);
-    expect(newState.board[4][3].unit).toBeUndefined();
-    expect(newState.players['0'].discard.map(card => card.id)).toContain('mogu-spore-plague-body-discard');
+    expect(events.some(e => e.type === SW_EVENTS.UNIT_SUMMONED)).toBe(true);
+    expect(newState.board[4][3].unit?.cardId).toBe('mogu-spore-plague-body-discard');
+    expect(newState.players['0'].discard.map(card => card.id)).not.toContain('mogu-spore-plague-body-discard');
   });
 
   it('弃牌堆无疫病体时验证拒绝', () => {

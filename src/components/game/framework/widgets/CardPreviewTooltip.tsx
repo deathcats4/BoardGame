@@ -107,6 +107,7 @@ export const CardPreviewTooltip: React.FC<CardPreviewTooltipProps> = ({
             <span
                 ref={anchorRef}
                 className="underline decoration-dotted decoration-white/40 hover:decoration-white/80 cursor-zoom-in transition-colors"
+                data-testid="card-preview-tooltip-anchor"
                 onMouseEnter={() => {
                     setIsHovered(true);
                     updateAnchorRect();
@@ -128,6 +129,7 @@ export const CardPreviewTooltip: React.FC<CardPreviewTooltipProps> = ({
             {isHovered && portalRoot && previewPosition && createPortal(
                 <div
                     className="fixed pointer-events-none"
+                    data-testid="card-preview-tooltip"
                     style={{
                         left: previewPosition.left,
                         top: previewPosition.top,

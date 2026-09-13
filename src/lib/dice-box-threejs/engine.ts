@@ -103,6 +103,26 @@ type DiceBoxInternalRuntime = InstanceType<typeof DiceBoxModule> & {
     steps?: number;
 };
 
+type DiceBoxRollCompleteResult = {
+    notation: string;
+    sets: Array<{
+        num: number;
+        type: string;
+        sides: number;
+        rolls: Array<{
+            type: string;
+            sides: number;
+            id: number;
+            value: number;
+            label: string;
+            reason: string;
+        }>;
+        total: number;
+    }>;
+    modifier: number;
+    total: number;
+};
+
 type DiceBoxRendererLike = InstanceType<typeof DiceBoxModule>['renderer'] & {
     clear?: () => void;
     getClearAlpha?: () => number;
@@ -572,6 +592,30 @@ async function loadDiceBoxModule(): Promise<typeof DiceBoxModule> {
 function createNotation(values: number[]): string {
     if (values.length === 0) return '0d6';
     return `${values.length}d6@${values.join(',')}`;
+}
+
+function createControlledRollCompleteResult(values: number[]): DiceBoxRollCompleteResult {
+    const rolls = values.map((value, index) => ({
+        type: 'd6',
+        sides: 6,
+        id: index,
+        value,
+        label: String(value),
+        reason: 'forced',
+    }));
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return {
+        notation: createNotation(values),
+        sets: [{
+            num: values.length,
+            type: 'd6',
+            sides: 6,
+            rolls,
+            total,
+        }],
+        modifier: 0,
+        total,
+    };
 }
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -1838,12 +1882,13 @@ export class DiceBoxThreeEngine {
             const targetValue = values[index];
             if (!die || typeof targetValue !== 'number') continue;
             const currentValue = readDieValue(die);
-            if (currentValue === targetValue) continue;
-            this.box.swapDiceFace(die, targetValue);
+            if (currentValue !== targetValue) {
+                this.box.swapDiceFace(die, targetValue);
+                didChange = true;
+            }
             if (commit) {
                 die.storeRolledValue('forced');
             }
-            didChange = true;
         }
 
         if (didChange) {
@@ -2247,7 +2292,7 @@ export class DiceBoxThreeEngine {
 
         runtime.rolling = false;
         runtime.running = false;
-        const result = runtime.getDiceResults?.();
+        const result = createControlledRollCompleteResult(values);
         runtime.onRollComplete?.(result);
         if (typeof document !== 'undefined') {
             document.dispatchEvent(new CustomEvent('rollComplete', { detail: result }));

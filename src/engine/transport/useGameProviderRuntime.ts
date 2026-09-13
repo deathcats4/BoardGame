@@ -36,8 +36,11 @@ import type { GameClientContextValue } from './reactContext';
 import { useOptionalToast } from '../../contexts/useOptionalToast';
 
 const SERIALIZED_COMMAND_TYPES = new Set(['ADVANCE_PHASE']);
-const PENDING_COMPANION_COMMAND_TYPES = new Set<string>([
+const BUILTIN_PENDING_COMPANION_COMMAND_TYPES = new Set<string>([
+    INTERACTION_COMMANDS.RESPOND,
+    INTERACTION_COMMANDS.STEP,
     INTERACTION_COMMANDS.CONFIRM,
+    INTERACTION_COMMANDS.CANCEL,
 ]);
 const COMMAND_PENDING_TOAST_DEDUPE_KEY = 'game-provider:command-pending';
 
@@ -45,12 +48,34 @@ function shouldSerializeCommand(type: string): boolean {
     return SERIALIZED_COMMAND_TYPES.has(type);
 }
 
-function canSendWhileOptimisticPending(type: string): boolean {
-    return PENDING_COMPANION_COMMAND_TYPES.has(type);
+function canSendWhileOptimisticPending(
+    type: string,
+    pendingCompanionCommandTypes: ReadonlySet<string>,
+): boolean {
+    return BUILTIN_PENDING_COMPANION_COMMAND_TYPES.has(type)
+        || pendingCompanionCommandTypes.has(type);
 }
 
 function canDeferCommandWaitingForPreviousStep(type: string): boolean {
     return shouldSerializeCommand(type);
+}
+
+function resolveExpectedStateIDForSingleCommand(args: {
+    serialized: boolean;
+    sendAfterOptimisticPending: boolean;
+    lastStateID: number | null;
+    pendingCount: number;
+}): number | undefined {
+    if (typeof args.lastStateID !== 'number') {
+        return undefined;
+    }
+    if (args.sendAfterOptimisticPending) {
+        return args.lastStateID + Math.max(0, args.pendingCount);
+    }
+    if (args.serialized) {
+        return args.lastStateID + Math.max(0, args.pendingCount - 1);
+    }
+    return undefined;
 }
 
 type DeferredCommand = {
@@ -107,6 +132,10 @@ export function useGameProviderRuntime(args: {
     const onStateReadyRef = useRef(onStateReady);
     const hasReportedStateReadyRef = useRef(false);
     const toast = useOptionalToast();
+    const pendingCompanionCommandTypes = useMemo(
+        () => new Set(latencyConfig?.optimistic?.pendingCompanionCommands ?? []),
+        [latencyConfig?.optimistic?.pendingCompanionCommands],
+    );
 
     const notifyCommandWaitingForPreviousStep = useCallback((queued = false) => {
         toast?.info(
@@ -455,7 +484,10 @@ export function useGameProviderRuntime(args: {
             }
             return sent;
         }
-        const sendWithoutPrediction = Boolean(engine?.hasPendingCommands() && canSendWhileOptimisticPending(type));
+        const sendWithoutPrediction = Boolean(
+            engine?.hasPendingCommands()
+            && canSendWhileOptimisticPending(type, pendingCompanionCommandTypes),
+        );
         const serialized = shouldSerializeCommand(type);
         if (engine?.hasPendingCommands() && !sendWithoutPrediction && !serialized) {
             deferCommandWaitingForPreviousStep(type, payload);
@@ -483,15 +515,23 @@ export function useGameProviderRuntime(args: {
         }
         const batcher = batcherRef.current;
         let sent = false;
-        if (batcher) {
+        if (batcher && sendWithoutPrediction && !batcher.flush()) {
+            if (engine) {
+                rollbackOptimisticRenderAndResync();
+            }
+            return false;
+        }
+        if (batcher && !sendWithoutPrediction) {
             sent = batcher.enqueue(type, payload);
         } else {
             const pendingCount = engine?.getPendingCommandCount?.() ?? 0;
             const lastStateID = client.lastReceivedStateID;
-            const expectedStateID = serialized
-                && typeof lastStateID === 'number'
-                ? lastStateID + Math.max(0, pendingCount - 1)
-                : undefined;
+            const expectedStateID = resolveExpectedStateIDForSingleCommand({
+                serialized,
+                sendAfterOptimisticPending: sendWithoutPrediction,
+                lastStateID,
+                pendingCount,
+            });
             sent = expectedStateID === undefined
                 ? client.sendCommand(type, payload)
                 : client.sendCommand(type, payload, { expectedStateID });
@@ -505,7 +545,7 @@ export function useGameProviderRuntime(args: {
             lastSerializedCommandRef.current = { type, payload };
         }
         return sent;
-    }, [deferCommandWaitingForPreviousStep, notifyCommandWaitingForPreviousStep, playerId, recoverFromRejectedCommand, rollbackOptimisticRenderAndResync]);
+    }, [deferCommandWaitingForPreviousStep, notifyCommandWaitingForPreviousStep, pendingCompanionCommandTypes, playerId, recoverFromRejectedCommand, rollbackOptimisticRenderAndResync]);
 
     useEffect(() => {
         dispatchRef.current = dispatch;

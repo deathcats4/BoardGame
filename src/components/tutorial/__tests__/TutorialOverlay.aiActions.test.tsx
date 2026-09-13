@@ -101,10 +101,28 @@ describe('TutorialOverlay aiActions visibility', () => {
             id: 'pure-ai-step',
             content: 'tutorial.pureAiStep',
             aiActions: [{ commandType: 'AI_MOVE' }],
+            hiddenAutomation: {
+                kind: 'compressed-repeat',
+                reason: 'AI repeats a formal action the visible tutorial already taught.',
+                equivalentStepIds: ['visible-ai-action'],
+            },
         });
 
         expect(document.querySelector('[data-tutorial-step="pure-ai-step"]')).toBeNull();
         expect(screen.queryByTestId('tutorial-overlay-card')).toBeNull();
+    });
+
+    it('不再仅凭 aiActions 隐藏教程步骤', () => {
+        renderWithStep({
+            id: 'unclassified-ai-step',
+            content: 'tutorial.unclassifiedAiStep',
+            aiActions: [{ commandType: 'AI_MOVE' }],
+        });
+
+        expect(
+            document.querySelector('[data-tutorial-step="unclassified-ai-step"]'),
+        ).not.toBeNull();
+        expect(screen.getByTestId('tutorial-overlay-card')).toBeTruthy();
     });
 
     it('显示教程步骤绑定的真实图片图例', () => {
@@ -165,6 +183,10 @@ describe('TutorialOverlay aiActions visibility', () => {
                     id: 'setup-ai',
                     content: 'tutorial.setupAi',
                     aiActions: [{ commandType: 'AI_SETUP' }],
+                    hiddenAutomation: {
+                        kind: 'setup-precondition',
+                        reason: 'Create the legal starting position before the first visible tutorial card.',
+                    },
                 },
                 visibleStep,
             ],

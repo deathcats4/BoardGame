@@ -149,7 +149,6 @@
     "hiddenInfo": "Hidden information",
     "spellbook": "Spellbook",
     "preparedSpells": "Prepared spells",
-    "preparedSpellsWithCount": "Your prepared {{count}} / {{total}}",
     "preparedSpell": "Prepared spell",
     "discardPile": "Discard pile",
     "discardPileWithCount": "Discard {{count}}",
@@ -386,14 +385,14 @@
       "intro": "Mage Wars lasts several rounds, until one mage has taken enough damage to be destroyed. The last mage standing wins the game.",
       "selfHud": "Your mage panel shows life, damage, mana, channeling, action marker, and quickcast marker. Apprentice mages start with Life 24, Mana 10, and Channeling 10; your goal is to deal enough damage to defeat the opposing mage.",
       "opponentHud": "The opponent panel shows the same readouts. Opponent prepared spells use card backs and a count, so card names stay hidden until revealed.",
-      "stage": "Each round moves through Reset, Channel, Upkeep, Planning, Deployment, Initiative Quickcast, Creature Action, and Final Quickcast. Reset, Channel, and Upkeep with no pending choice resolve automatically; during Planning, prepare 0 to 2 spells, and click “Confirm plan 0/2” to submit an empty plan. Deployment and both quickcast windows then resolve in order, with creature movement or attacks during Creature Action.",
+      "stage": "The rules split a round into the Ready Stage and Action Stage. Ready includes Initiative, Reset, Channel, Upkeep, Planning, and Deployment; Action includes Initiative Quickcast, Creature Action, and Final Quickcast. The tutorial stops only when you need to decide.",
       "prepareChannelResult": "The ready stage is resolving.",
       "channelResult": "The Beastmaster currently has Channeling 10; after channeling, the mana supply gains 10 mana.",
       "prepareUpkeep": "Upkeep is resolving.",
       "preparePlanning": "Upkeep is resolving before planning begins.",
       "spellCardReading": "Use this spell-card legend first: cost, action, range, target, type, school, and level determine how you prepare and cast.",
-      "planningSkip": "Planning allows 0 to 2 prepared spells. An empty plan means preparing no spells this round; the normal table still submits it with “Confirm plan 0/2”. This tutorial prepares two spells first, so read this rule without submitting an empty plan here.",
-      "attackBarReading": "Jungle Wolf is in your prepared spells and is about to be cast. Read its attack bar first: the left icons tell quick or full action and melee or ranged attack; the right side shows range, damage type, attack dice, extra effects, and traits. Click Next when done.",
+      "planningSkip": "During Planning, prepare up to 2 spells each round; if you prepare none, submit with “Confirm plan”. This round, prepare two.",
+      "attackBarReading": "Jungle Wolf is in your prepared spells and is about to be cast. Its attack bar shows a quick melee attack with 4 attack dice.",
       "planOpenCreatureCategory": "Click the Creature category.",
       "planCreatureNextPage": "Click the next page to find Jungle Wolf.",
       "planSelectWolf": "Jungle Wolf is a Creature spell: it summons a creature into the arena to keep fighting. Click the Jungle Wolf card body to put it into the first prepared slot.",
@@ -405,7 +404,7 @@
       "preparedAndHidden": "Both players choose their own spells at the same time. Your chosen spells are kept hidden from the opponent so they cannot know your plan.",
       "deploySelectWolf": "Click Jungle Wolf in your prepared spells.",
       "deployTargetZone": "Click the Beastmaster's zone.",
-      "wolfSummoned": "Jungle Wolf has been summoned into the Beastmaster's zone. It enters without a ready action, so the spent action marker means it cannot act yet. This is a reading step: do not click the wolf yet, click Next to continue.",
+      "wolfSummoned": "After Jungle Wolf enters play, its action marker is on the spent side, so it cannot act yet. Next, Rouse the Beast turns it ready.",
       "rouseSelectSpell": "Click Rouse the Beast in your prepared spells.",
       "rouseTargetWolf": "Click the Jungle Wolf card body in the arena so Rouse the Beast targets it.",
       "passYourDeployment": "Jungle Wolf's action marker is ready, but this is still the deployment phase. Click “End deployment” first; after the action phase begins, click the Jungle Wolf card body to move it.",
@@ -442,7 +441,7 @@
       "guardTokenResult": "Jungle Wolf gains the guard marker and spends its action for the round. The marker stays on the unit to show it protects friendly objects in the same zone.",
       "endSecondCreatureAction": "Guarding has spent Jungle Wolf's action. Click “End action” to enter Final Quickcast.",
       "opponentPassSecondFinalQuickcast": "The opponent passes Final Quickcast, so it is your turn to close the round.",
-      "finish": "You have now gone through Reset, Channel, Upkeep, Planning, Deployment, Initiative Quickcast, Creature Action, and Final Quickcast, while reading the board and cards, summoning Jungle Wolf, checking public discard, moving a creature, casting a wall, and guarding with a unit."
+      "finish": "Tutorial complete. You have gone through a normal round flow and seen the wall and guard results."
     }
   },
   "actionLog": {

@@ -70,6 +70,7 @@
       "deckSymbols": "牌组符号",
       "cardType": "卡牌类型",
       "unitClass": "单位级别",
+      "unitTags": "单位标签",
       "quantity": "数量",
       "setupPositions": "起始位置",
       "attack": "攻击",
@@ -98,6 +99,7 @@
       "deckSymbols": "牌组符号",
       "cardType": "卡牌类型",
       "unitClass": "单位级别",
+      "unitTags": "单位标签",
       "quantity": "数量",
       "setupPositions": "起始位置",
       "attack": "攻击",
@@ -168,6 +170,11 @@
         "summoner": "召唤师",
         "champion": "英雄",
         "common": "士兵"
+      },
+      "unitTags": {
+        "undead": "亡灵",
+        "carrier": "疫病体",
+        "citadel": "城塞"
       },
       "attackType": {
         "melee": "近战",

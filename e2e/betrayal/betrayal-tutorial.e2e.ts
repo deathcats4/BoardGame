@@ -1957,6 +1957,76 @@ const expectRabbitFootResultConfirmationReady = async (
     "betrayal-discovery-continue",
   );
   await expect(eventRollConfirm, `${label}必须显示结果确认按钮`).toBeVisible();
+  const confirmationDiagnostics = await page.evaluate(() => {
+    const state = (
+      window as unknown as {
+        __BG_TEST_HARNESS__?: {
+          state?: {
+            get?: () => {
+              core?: {
+                recentRoll?: {
+                  id?: string;
+                  kind?: string;
+                  playerId?: string;
+                  trait?: string;
+                  dice?: number[];
+                  passiveBonus?: number;
+                  consumedRabbitFootCardIds?: string[];
+                  lastRabbitFootRerollDieIndex?: number;
+                  lastRabbitFootRerollPreviousDice?: number[];
+                };
+                pendingEventRollResolution?: {
+                  rollId?: string;
+                  playerId?: string;
+                  requiredPlayerIds?: string[];
+                  acknowledgedPlayerIds?: string[];
+                  requiresAcknowledgement?: boolean;
+                };
+              };
+            };
+          };
+        };
+      }
+    ).__BG_TEST_HARNESS__?.state?.get?.();
+    const discovery = document.querySelector<HTMLElement>(
+      '[data-testid="betrayal-discovery-panel"]',
+    );
+    const button = document.querySelector<HTMLButtonElement>(
+      '[data-testid="betrayal-discovery-continue"]',
+    );
+    const diceSource = document.querySelector<HTMLElement>(
+      '[data-testid="betrayal-house-dice-physics-source"]',
+    );
+    const diceGroup = document.querySelector<HTMLElement>(
+      '[data-testid="betrayal-house-dice-3d-group"]',
+    );
+    const activeStep = document.querySelector<HTMLElement>(
+      "[data-tutorial-step]",
+    );
+    return {
+      label,
+      tutorialStep: activeStep?.getAttribute("data-tutorial-step") ?? null,
+      discoveryAllows: discovery?.dataset.allowsInventoryRollModifiers ?? null,
+      buttonDisabled: button?.disabled ?? null,
+      buttonReadable: button?.dataset.eventRollReadable ?? null,
+      buttonText: button?.textContent ?? null,
+      diceSettled: diceSource?.dataset.diceSettled ?? null,
+      diceVisualSettled: diceSource?.dataset.diceVisualSettled ?? null,
+      diceEngineReady: diceSource?.dataset.diceEngineReady ?? null,
+      diceSkinsReady: diceSource?.dataset.diceSkinsReady ?? null,
+      diceRuleValues: diceGroup?.dataset.diceRuleValues ?? null,
+      diceVisibleRuleValues: diceGroup?.dataset.diceVisibleRuleValues ?? null,
+      dicePhysicsReady: diceGroup?.dataset.dicePhysicsReady ?? null,
+      dicePhysicsStateCount: diceGroup?.dataset.dicePhysicsStateCount ?? null,
+      recentRoll: state?.core?.recentRoll ?? null,
+      pendingEventRollResolution:
+        state?.core?.pendingEventRollResolution ?? null,
+    };
+  });
+  console.log(
+    "[BETRAYAL_RABBIT_FOOT_CONFIRM_DIAGNOSTICS]",
+    JSON.stringify(confirmationDiagnostics),
+  );
   await expect(eventRollConfirm, `${label}确认按钮必须可点击`).toBeEnabled();
   await expect(eventRollConfirm, `${label}确认进度必须仍是 0/1`).toHaveText(
     "确认 0/1",
@@ -4039,6 +4109,89 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).not.toContainText("其他玩家确认");
     await expect(tutorialOverlayCard).not.toContainText("承受 1 点物理伤害");
     await expect(discoveryReveal).toBeVisible();
+    const useRabbitFootDiagnostics = await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __BG_TEST_HARNESS__?: {
+            state?: {
+              get?: () => {
+                core?: {
+                  recentRoll?: {
+                    id?: string;
+                    kind?: string;
+                    playerId?: string;
+                    trait?: string;
+                    dice?: number[];
+                    passiveBonus?: number;
+                    consumedRabbitFootCardIds?: string[];
+                  };
+                  pendingEventRollResolution?: {
+                    rollId?: string;
+                    playerId?: string;
+                    requiredPlayerIds?: string[];
+                    acknowledgedPlayerIds?: string[];
+                    requiresAcknowledgement?: boolean;
+                  };
+                  turnStartInventoryCardIds?: string[];
+                  usedCardIdsThisTurn?: string[];
+                  currentExplorer?: { inventory?: Array<{ id?: string }> };
+                };
+              };
+            };
+          };
+        }
+      ).__BG_TEST_HARNESS__?.state?.get?.();
+      const discovery = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-discovery-panel"]',
+      );
+      const continueButton = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-discovery-continue"]',
+      );
+      const diceSource = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-house-dice-physics-source"]',
+      );
+      const diceGroup = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-house-dice-3d-group"]',
+      );
+      const rabbitFoot = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-inventory-rope"]',
+      );
+      const rabbitFootHighlight = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-inventory-rope-roll-modifier"]',
+      );
+      const activeStep = document.querySelector<HTMLElement>(
+        "[data-tutorial-step]",
+      );
+      return {
+        tutorialStep: activeStep?.getAttribute("data-tutorial-step") ?? null,
+        discoveryAllows: discovery?.dataset.allowsInventoryRollModifiers ?? null,
+        continueReadable: continueButton?.dataset.eventRollReadable ?? null,
+        continueText: continueButton?.textContent ?? null,
+        diceSettled: diceSource?.dataset.diceSettled ?? null,
+        diceVisualSettled: diceSource?.dataset.diceVisualSettled ?? null,
+        diceEngineReady: diceSource?.dataset.diceEngineReady ?? null,
+        diceSkinsReady: diceSource?.dataset.diceSkinsReady ?? null,
+        diceHighlightCount: diceSource?.dataset.diceHighlightCount ?? null,
+        diceRuleValues: diceGroup?.dataset.diceRuleValues ?? null,
+        diceVisibleRuleValues: diceGroup?.dataset.diceVisibleRuleValues ?? null,
+        dicePhysicsReady: diceGroup?.dataset.dicePhysicsReady ?? null,
+        dicePhysicsStateCount: diceGroup?.dataset.dicePhysicsStateCount ?? null,
+        rabbitFootAvailable: rabbitFoot?.dataset.rollModifierAvailable ?? null,
+        rabbitFootHighlightPresent: Boolean(rabbitFootHighlight),
+        recentRoll: state?.core?.recentRoll ?? null,
+        pendingEventRollResolution:
+          state?.core?.pendingEventRollResolution ?? null,
+        turnStartInventoryCardIds:
+          state?.core?.turnStartInventoryCardIds ?? [],
+        usedCardIdsThisTurn: state?.core?.usedCardIdsThisTurn ?? [],
+        inventory:
+          state?.core?.currentExplorer?.inventory?.map((card) => card.id) ?? [],
+      };
+    });
+    console.log(
+      "[BETRAYAL_USE_RABBIT_FOOT_DIAGNOSTICS]",
+      JSON.stringify(useRabbitFootDiagnostics),
+    );
     await expect(discoveryReveal).toHaveAttribute(
       "data-allows-inventory-roll-modifiers",
       "true",

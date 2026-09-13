@@ -301,6 +301,7 @@ export function BetrayalHouseDice3DGroup({
         dieSkins={dieSkins}
         requireDieSkins
         highlightedDice={highlightedRerollDice}
+        settledIdentity={rollMotionId}
         testId="betrayal-house-dice-physics-source"
         canvasTestId={canvasTestId}
         rendererMode="debug-visible"
@@ -316,8 +317,8 @@ export function BetrayalHouseDice3DGroup({
           );
           setPhysicsStates(states);
         }}
-        onSettledChange={(settled) => {
-          onDiceSettledChange?.(buildRecentRollDisplayKey(roll) ?? roll.id, settled);
+        onSettledChange={(settled, identity) => {
+          onDiceSettledChange?.(identity ?? rollMotionId, settled);
         }}
       />
       {hasPhysicsState ? (

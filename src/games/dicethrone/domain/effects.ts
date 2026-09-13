@@ -40,6 +40,7 @@ import {
 } from './tokenResponse';
 import type { AbilityDef } from './combat';
 import { reduce as reduceDiceThroneCore } from './reducer';
+import { assertValidBonusDiceContinuation } from './utils';
 
 // ============================================================================
 // 效果上下文
@@ -222,6 +223,7 @@ export function createDisplayOnlySettlement(
         continuation: NonNullable<PendingBonusDiceSettlement['continuation']>;
     },
 ): BonusDiceRerollRequestedEvent {
+    assertValidBonusDiceContinuation(options.continuation, sourceAbilityId);
     return {
         type: 'BONUS_DICE_REROLL_REQUESTED',
         payload: {
@@ -364,6 +366,7 @@ export function createBonusDiceWithReroll(
         : config.opensAfterRollConfirmedResponseWindow;
     // 续跑语义必须由创建者声明；不能根据当前攻击、展示方式或结算模式猜测。
     const continuation = config.continuation;
+    assertValidBonusDiceContinuation(continuation, sourceAbilityId);
 
     if (hasToken) {
         // 有足够 token，创建可重掷的 settlement

@@ -151,6 +151,7 @@ export const COMMON_UNITS_PALADIN: UnitCard[] = [
     attackType: 'melee',
     attackRange: 1,
     abilities: ['judgment'],
+    unitTags: ['citadel'],
     deckSymbols: [DECK_SYMBOLS.DIAMOND], // 💎 (图片确认：单符号)
     spriteIndex: SPRITE_INDEX_PALADIN.COMMON_FORTRESS_WARRIOR,
     spriteAtlas: 'cards',
@@ -168,6 +169,7 @@ export const COMMON_UNITS_PALADIN: UnitCard[] = [
     attackType: 'melee',
     attackRange: 1,
     abilities: ['entangle', 'guardian'],
+    unitTags: ['citadel'],
     deckSymbols: [DECK_SYMBOLS.SHIELD], // 🛡️ (图片确认)
     spriteIndex: SPRITE_INDEX_PALADIN.COMMON_FORTRESS_KNIGHT,
     spriteAtlas: 'cards',
@@ -185,6 +187,7 @@ export const COMMON_UNITS_PALADIN: UnitCard[] = [
     attackType: 'ranged',
     attackRange: 3,
     abilities: ['holy_arrow'],
+    unitTags: ['citadel'],
     deckSymbols: [DECK_SYMBOLS.DIAMOND], // 💎 (图片确认：单符号)
     spriteIndex: SPRITE_INDEX_PALADIN.COMMON_FORTRESS_ARCHER,
     spriteAtlas: 'cards',

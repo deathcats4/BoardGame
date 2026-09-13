@@ -198,7 +198,7 @@ describe('useMatchRoomTutorialLifecycle', () => {
         );
     });
 
-    it('当前教程最后一步不是 finish 时，结束后仍会按完成态返回上一页', async () => {
+    it('当前教程最后一步不是 finish 时，结束后仍会按完成态返回游戏大厅', async () => {
         const setPlayerID = vi.fn();
         const navigate = vi.fn();
         const openModal = vi.fn(() => 'modal-1');
@@ -231,7 +231,7 @@ describe('useMatchRoomTutorialLifecycle', () => {
             await vi.advanceTimersByTimeAsync(600);
         });
 
-        expect(navigate).toHaveBeenCalledWith(-1);
+        expect(navigate).toHaveBeenCalledWith('/?game=qidahen', { replace: true });
     });
 
     it('同一条教程已经走到最后一步且当前未激活时，不会重复自动启动', () => {
@@ -877,7 +877,7 @@ describe('useMatchRoomTutorialLifecycle', () => {
         });
 
         expect(readCompletedTutorialIds('qidahen').has('attack-and-battle')).toBe(true);
-        expect(navigate).toHaveBeenCalledWith(-1);
+        expect(navigate).toHaveBeenCalledWith('/?game=qidahen', { replace: true });
     });
 
     it('完成普通可见章节时，会直接记录该章节', async () => {

@@ -290,7 +290,7 @@ function handleTotalDemiseRoll({
             customResolutionId: VAMPIRE_LORD_TOTAL_DEMISE_SETTLEMENT_ID,
             continuation: {
                 kind: 'attack',
-                settlementStage: 'readyToResolve',
+                settlementStage: 'preDamage',
                 markBonusDiceResolved: false,
             },
         },

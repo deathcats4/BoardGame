@@ -41,6 +41,11 @@ const resolveCharacterCardPreviewRef = (cardId: string, characterId: string): Ca
     return CHARACTER_CARD_PREVIEW_MAP.has(key)
         ? CHARACTER_CARD_PREVIEW_MAP.get(key) ?? null
         : null;
+};
+
+export function hasDiceThroneCharacterCard(cardId: string, characterId: string): boolean {
+    initializeCardsMap();
+    return CHARACTER_CARD_PREVIEW_MAP.has(buildCharacterCardKey(characterId, cardId));
 }
 
 /**

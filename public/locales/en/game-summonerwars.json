@@ -70,6 +70,7 @@
       "deckSymbols": "Deck Symbols",
       "cardType": "Card Type",
       "unitClass": "Unit Class",
+      "unitTags": "Unit Tags",
       "quantity": "Qty",
       "setupPositions": "Setup Position",
       "attack": "Attack",
@@ -98,6 +99,7 @@
       "deckSymbols": "deck symbols",
       "cardType": "card type",
       "unitClass": "unit class",
+      "unitTags": "unit tags",
       "quantity": "quantity",
       "setupPositions": "setup position",
       "attack": "attack",
@@ -168,6 +170,11 @@
         "summoner": "Summoner",
         "champion": "Champion",
         "common": "Common Unit"
+      },
+      "unitTags": {
+        "undead": "Undead",
+        "carrier": "Carrier",
+        "citadel": "Citadel"
       },
       "attackType": {
         "melee": "Melee",
@@ -629,7 +636,7 @@
   },
   "cardSelector": {
     "reviveUndead": "Revive Undead: Select an undead unit from the discard pile",
-    "infection": "Infection: Select a plague zombie from the discard pile",
+    "infection": "Infection: Select a Carrier unit from the discard pile",
     "fortressPower": "Fortress Power: Select a fortress unit from the discard pile",
     "shadowMarlGrimoire": "Marl Grimoire: Select a card from the discard pile",
     "default": "Select a card",
@@ -703,7 +710,7 @@
       "fireSacrificeSummon": "Fire Sacrifice: Select a friendly unit to destroy",
       "lifeDrain": "Life Drain: Select a friendly unit within 2 spaces to destroy",
       "infection": {
-        "selectCard": "Infection: Select a plague zombie from the discard pile",
+        "selectCard": "Infection: Select a Carrier unit from the discard pile",
         "selectPosition": "Infection: Confirm placement"
       },
       "holyArrow": {
@@ -875,7 +882,7 @@
       "sneakDirection": "Sneak: choose a movement direction",
       "glacialShiftBuilding": "Glacial Shift: choose a friendly building",
       "glacialShiftDestination": "Glacial Shift: choose a destination",
-      "infection": "Infection: choose a plague zombie to revive",
+      "infection": "Infection: choose a Carrier unit to replace the destroyed unit",
       "grabFollow": "Grab: choose a follow-up position",
       "grabFollowWithSource": "Grab: {{unit}} ({{position}}) choose a follow-up position",
       "soulTransfer": "Soul Transfer: confirm movement",
@@ -1026,7 +1033,7 @@
     },
     "infection": {
       "name": "Infection",
-      "description": "After this unit destroys a unit, you may replace the destroyed unit with a Plague Zombie from your discard pile."
+      "description": "After this unit destroys a unit, you may replace the destroyed unit with a Carrier unit from your discard pile."
     },
     "soul_transfer": {
       "name": "Soul Transfer",

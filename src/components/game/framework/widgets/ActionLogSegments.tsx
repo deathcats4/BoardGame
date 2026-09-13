@@ -5,12 +5,15 @@ import { CardPreviewTooltip } from './CardPreviewTooltip';
 import { BreakdownTooltip } from '../../../common/overlays/BreakdownTooltip';
 import type { CardPreviewRef } from '../../../../core';
 import { buildSpriteBackgroundImage } from '../../../../core/SpriteAssetResolver';
+import type { CardPreviewLookupContext } from '../../registry/cardPreviewRegistry';
 
 interface ActionLogSegmentsProps {
     segments: ActionLogSegment[];
     locale?: string;
+    playerId?: string | number;
+    characterId?: string;
     /** 获取卡牌的 previewRef（由游戏层提供） */
-    getCardPreviewRef?: (cardId: string) => CardPreviewRef | null;
+    getCardPreviewRef?: (cardId: string, context?: CardPreviewLookupContext) => CardPreviewRef | null;
     /** 卡牌预览最大尺寸（像素） */
     cardPreviewMaxDim?: number;
     /** breakdown tooltip 层级，父级浮层需要抬高时传入 */
@@ -46,15 +49,17 @@ const I18nSegment: React.FC<{
 const CardSegmentRenderer: React.FC<{
     segment: Extract<ActionLogSegment, { type: 'card' }>;
     locale?: string;
-    getCardPreviewRef?: (cardId: string) => CardPreviewRef | null;
+    playerId?: string | number;
+    characterId?: string;
+    getCardPreviewRef?: (cardId: string, context?: CardPreviewLookupContext) => CardPreviewRef | null;
     maxDim?: number;
-}> = ({ segment, locale, getCardPreviewRef, maxDim }) => {
+}> = ({ segment, locale, playerId, characterId, getCardPreviewRef, maxDim }) => {
     const ns = segment.previewTextNs || '';
     const { t } = useTranslation(ns || undefined);
     const rawText = segment.previewText || segment.cardId;
     const displayText = segment.previewTextNs ? t(rawText, { defaultValue: rawText }) : rawText;
     // 优先使用 segment 内联的 previewRef，其次走 registry 查找
-    const previewRef = segment.previewRef ?? getCardPreviewRef?.(segment.cardId) ?? null;
+    const previewRef = segment.previewRef ?? getCardPreviewRef?.(segment.cardId, { playerId, characterId }) ?? null;
 
     if (!previewRef) {
         return <span>{displayText}</span>;
@@ -117,6 +122,8 @@ const DiceResultSegment: React.FC<{
 export const ActionLogSegments: React.FC<ActionLogSegmentsProps> = ({
     segments,
     locale,
+    playerId,
+    characterId,
     getCardPreviewRef,
     cardPreviewMaxDim,
     breakdownZIndex,
@@ -150,6 +157,8 @@ export const ActionLogSegments: React.FC<ActionLogSegmentsProps> = ({
                             key={index}
                             segment={segment}
                             locale={locale}
+                            playerId={playerId}
+                            characterId={characterId}
                             getCardPreviewRef={getCardPreviewRef}
                             maxDim={cardPreviewMaxDim}
                         />

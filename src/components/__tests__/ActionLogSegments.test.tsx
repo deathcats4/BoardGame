@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { setAssetsBaseUrl } from '../../core';
 import { OverlayLayerProvider } from '../common/overlays/OverlayLayerContext';
@@ -81,5 +81,37 @@ describe('ActionLogSegments', () => {
         expect(dieIcon).toHaveStyle({
             backgroundImage: 'url("/assets/i18n/zh-CN/summonerwars/common/compressed/dice.webp")',
         });
+    });
+
+    it('card 片段缺少内联预览时，向 registry 传递玩家和角色上下文并打开卡图 tooltip', async () => {
+        const getCardPreviewRef = vi.fn(() => ({
+            type: 'image' as const,
+            src: 'dicethrone/images/xixuegui/ability-cards',
+        }));
+
+        render(
+            <ActionLogSegments
+                locale="zh-CN"
+                playerId="0"
+                characterId="vampire_lord"
+                getCardPreviewRef={getCardPreviewRef}
+                segments={[
+                    {
+                        type: 'card',
+                        cardId: 'card-get-away',
+                        previewText: '起开！',
+                    },
+                ]}
+            />
+        );
+
+        expect(getCardPreviewRef).toHaveBeenCalledWith('card-get-away', {
+            playerId: '0',
+            characterId: 'vampire_lord',
+        });
+
+        fireEvent.mouseEnter(screen.getByTestId('card-preview-tooltip-anchor'));
+
+        expect(await screen.findByTestId('card-preview-tooltip')).toBeInTheDocument();
     });
 });

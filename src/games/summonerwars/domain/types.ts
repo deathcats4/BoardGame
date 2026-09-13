@@ -32,6 +32,9 @@ export type AttackRange = 1 | 2 | 3 | 4;
 /** 单位职业 */
 export type UnitClass = 'summoner' | 'champion' | 'common';
 
+/** 卡面 / 规则原文可筛选的单位身份标签 */
+export type UnitTag = 'undead' | 'carrier' | 'citadel';
+
 /** 卡牌类型 */
 export type CardType = 'unit' | 'event' | 'structure';
 
@@ -77,6 +80,7 @@ export interface UnitCard {
   attackType: AttackType;
   attackRange: AttackRange; // 射程（近战1，远程通常3）
   abilities?: string[];  // 能力 ID 列表
+  unitTags?: UnitTag[];  // 卡面 / 规则原文可筛选的单位身份标签，如亡灵、疫病体 / Carrier、城塞 / Citadel
   deckSymbols: string[]; // 牌组符号
   spriteIndex?: number;  // 精灵图索引
   spriteAtlas?: 'hero' | 'cards' | 'portal'; // 精灵图集类型

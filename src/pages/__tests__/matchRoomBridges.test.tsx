@@ -320,6 +320,76 @@ describe('TutorialDispatchBridge', () => {
         );
     });
 
+    it('棋盘在最后一步关闭教程时，会同步关闭态而不是重新启动同一教程', async () => {
+        const manifest: TutorialManifest = {
+            id: 'mage-wars-basic',
+            revision: 5,
+            steps: [
+                { id: 'intro', content: 'intro' },
+                { id: 'finish', content: 'finish' },
+            ],
+        };
+        contextTutorialState = {
+            active: true,
+            manifestId: manifest.id,
+            manifestRevision: manifest.revision,
+            stepIndex: 1,
+            steps: [],
+            step: manifest.steps[1],
+        } as TutorialState & { totalSteps: number };
+        gameClientState = buildState({
+            active: true,
+            manifestId: manifest.id,
+            manifestRevision: manifest.revision,
+            stepIndex: 1,
+            steps: [],
+            step: manifest.steps[1],
+            totalSteps: manifest.steps.length,
+        } as TutorialState & { totalSteps: number });
+
+        const view = render(
+            <TutorialDispatchBridge tutorialManifest={manifest}>
+                <div />
+            </TutorialDispatchBridge>,
+        );
+
+        await waitFor(() => expect(syncTutorialState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                active: true,
+                manifestId: manifest.id,
+                stepIndex: 1,
+                totalSteps: manifest.steps.length,
+            }),
+        ));
+
+        dispatch.mockClear();
+        syncTutorialState.mockClear();
+        gameClientState = buildState({
+            active: false,
+            manifestId: null,
+            stepIndex: 0,
+            steps: [],
+            step: null,
+        });
+
+        view.rerender(
+            <TutorialDispatchBridge tutorialManifest={manifest}>
+                <div />
+            </TutorialDispatchBridge>,
+        );
+
+        await waitFor(() => expect(syncTutorialState).toHaveBeenCalledWith(
+            expect.objectContaining({
+                active: false,
+                manifestId: null,
+            }),
+        ));
+        expect(dispatch).not.toHaveBeenCalledWith(
+            TUTORIAL_COMMANDS.START,
+            { manifest },
+        );
+    });
+
     it('刚 START 到第 0 步且清单没有校验器时，不重复绑定清单覆盖教程状态', () => {
         const manifest: TutorialManifest = {
             id: 'mage-wars-basic',

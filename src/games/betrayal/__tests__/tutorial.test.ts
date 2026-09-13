@@ -181,6 +181,7 @@ describe('Betrayal 教程配置', () => {
         const setupStep = manifest?.steps.find((step) => step.id === 'setup-runtime');
         expect(setupStep?.aiActions).toHaveLength(1);
         expect(setupStep?.aiActions?.[0]?.commandType).toBe('SYS_CHEAT_MERGE_STATE');
+        expect(setupStep?.hiddenAutomation?.kind).toBe('setup-precondition');
         expect(manifest?.steps.find((step) => step.id === 'objective-and-turn')?.highlightTarget).toBe('betrayal-action-move');
         expect(manifest?.steps.find((step) => step.id === 'traits-and-speed')?.highlightTarget).toBe('betrayal-current-traits');
         expect(manifest?.steps.find((step) => step.id === 'trait-track-reading')?.highlightTarget).toBe('betrayal-current-traits');
@@ -381,6 +382,10 @@ describe('Betrayal 教程配置', () => {
                 expect(hiddenStep).toMatchObject({
                     aiDelayMs: 0,
                     viewAs: '0',
+                    hiddenAutomation: {
+                        kind: 'compressed-repeat',
+                        equivalentStepIds: ['watch-teammate-haunt-trigger'],
+                    },
                 });
                 expect(hiddenStep.highlightTarget).toBeUndefined();
                 expect(hiddenStep.autoAdvanceAfterAi).toBeUndefined();
@@ -509,6 +514,7 @@ describe('Betrayal 教程配置', () => {
         const defaultManifest = tutorialCatalog.tutorials['basic-setup-and-turn']?.manifest;
         const manifest = tutorialCatalog.tutorials['move-explore-use']?.manifest;
         const setupStep = manifest?.steps.find((step) => step.id === 'setup-runtime');
+        expect(setupStep?.hiddenAutomation?.kind).toBe('setup-precondition');
         const setupFields = setupStep?.aiActions?.[0]?.payload?.fields as { eventOrder?: Array<{ name?: string }> } | undefined;
         const setupInventory = setupFields && 'currentExplorer' in setupFields
             ? (setupFields as { currentExplorer?: { inventory?: Array<{ id?: string; name?: string }> } }).currentExplorer?.inventory
@@ -636,6 +642,7 @@ describe('Betrayal 教程配置', () => {
         const setupStep = manifest?.steps.find((step) => step.id === 'setup-omen-confirmation');
         expect(setupStep?.aiActions).toHaveLength(1);
         expect(setupStep?.aiActions?.[0]?.commandType).toBe('SYS_CHEAT_MERGE_STATE');
+        expect(setupStep?.hiddenAutomation?.kind).toBe('setup-precondition');
         const omenCore = createSafeOmenPendingResolutionTutorialCore();
         expect(omenCore.pendingCardResolutionQueue[0]).toMatchObject({
             playerId: '0',
@@ -691,6 +698,7 @@ describe('Betrayal 教程配置', () => {
         const setupStep = manifest?.steps.find((step) => step.id === 'setup-natural-haunt-flow');
         expect(setupStep?.aiActions).toHaveLength(1);
         expect(setupStep?.aiActions?.[0]?.commandType).toBe('SYS_CHEAT_MERGE_STATE');
+        expect(setupStep?.hiddenAutomation?.kind).toBe('setup-precondition');
         expect(setupStep?.autoAdvanceAfterAi).toBeUndefined();
         expect(setupStep?.infoStep).toBeUndefined();
         expect(setupStep?.showMask).toBeUndefined();
@@ -778,6 +786,10 @@ describe('Betrayal 教程配置', () => {
         ]);
         expect(teammateConfirmStep).toMatchObject({
             aiDelayMs: 0,
+            hiddenAutomation: {
+                kind: 'compressed-repeat',
+                equivalentStepIds: ['watch-teammate-haunt-trigger'],
+            },
         });
         expect(teammateConfirmStep?.viewAs).toBe('0');
         expect(teammateConfirmStep?.infoStep).toBeUndefined();

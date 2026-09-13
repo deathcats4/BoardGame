@@ -237,8 +237,131 @@ describe('DiceBoxThreeEngine', () => {
         expect(Math.abs(vector.angle.y)).toBeLessThanOrEqual(5);
         expect(box.animateThrow).not.toHaveBeenCalled();
         expect(box.swapDiceFace).toHaveBeenCalledWith(die, 6);
-        expect(box.onRollComplete).toHaveBeenCalledWith({ total: 6 });
+        expect(box.getDiceResults).not.toHaveBeenCalled();
+        expect(box.onRollComplete).toHaveBeenCalledWith(expect.objectContaining({
+            notation: '1d6@6',
+            total: 6,
+        }));
         expect(engine.finalizeSettledFrame).toHaveBeenCalledTimes(1);
+    });
+
+    it('指定值首次投骰即使骰面未变化，也会提交完成事件可读结果', async () => {
+        const makeVector = (x = 0, y = 0, z = 0) => ({
+            x,
+            y,
+            z,
+            set: vi.fn(function set(this: { x: number; y: number; z: number }, nextX: number, nextY: number, nextZ: number) {
+                this.x = nextX;
+                this.y = nextY;
+                this.z = nextZ;
+            }),
+        });
+        const makeQuaternion = () => ({
+            x: 0,
+            y: 0,
+            z: 0,
+            w: 1,
+            set: vi.fn(function set(this: { x: number; y: number; z: number; w: number }, x: number, y: number, z: number, w: number) {
+                this.x = x;
+                this.y = y;
+                this.z = z;
+                this.w = w;
+            }),
+        });
+        const vector = {
+            index: 0,
+            type: 'd6',
+            pos: makeVector(0, 0, 10),
+            velocity: makeVector(0, 0, -2),
+            angle: makeVector(1, 1, 1),
+        };
+        const die = {
+            shape: 'd6',
+            result: [] as Array<{ value: number; reason: string }>,
+            position: makeVector(),
+            quaternion: makeQuaternion(),
+            rotation: makeVector(),
+            body: {
+                position: makeVector(),
+                quaternion: makeQuaternion(),
+                velocity: makeVector(),
+                angularVelocity: makeVector(),
+                aabbNeedsUpdate: false,
+            },
+            getLastValue: vi.fn(() => ({ value: 6 })),
+            storeRolledValue: vi.fn(function storeRolledValue(this: { result: Array<{ value: number; reason: string }> }, reason: string) {
+                this.result.push({ value: 6, reason });
+            }),
+            material: [],
+            updateMatrixWorld: vi.fn(),
+        };
+        const box = {
+            diceList: [] as Array<typeof die>,
+            strength: 0.92,
+            notationVectors: { notation: '1d6@6', constant: null, set: [{ num: 1, type: 'd6' }] },
+            startClickThrow: vi.fn(() => {
+                box.notationVectors = { notation: '1d6@6', constant: null, set: [{ num: 1, type: 'd6' }] };
+                return { ...box.notationVectors, vectors: [vector], result: [6] };
+            }),
+            spawnDice: vi.fn((_vector: typeof vector, targetDie?: typeof die) => {
+                if (!targetDie) {
+                    box.diceList.push(die);
+                }
+            }),
+            simulateThrow: vi.fn(),
+            animateThrow: vi.fn(),
+            clearDice: vi.fn(() => {
+                box.diceList = [];
+            }),
+            roll: vi.fn().mockResolvedValue(undefined),
+            swapDiceFace: vi.fn(),
+            getDiceResults: vi.fn(() => ({
+                notation: box.notationVectors.notation,
+                sets: [{
+                    num: 1,
+                    type: 'd6',
+                    sides: 6,
+                    rolls: [{ type: 'd6', sides: 6, id: 0, ...box.diceList[0].result.at(-1)! }],
+                    total: box.diceList[0].result.at(-1)!.value,
+                }],
+                modifier: 0,
+                total: box.diceList[0].result.at(-1)!.value,
+            })),
+            onRollComplete: vi.fn(),
+            renderer: { render: vi.fn(), clear: vi.fn(), domElement: null },
+            scene: { updateMatrixWorld: vi.fn() },
+            camera: { updateProjectionMatrix: vi.fn(), updateMatrixWorld: vi.fn() },
+        };
+        const engine = Object.create(DiceBoxThreeEngine.prototype) as DiceBoxThreeEngine & {
+            box: typeof box;
+            container: HTMLElement;
+            worldBounds: { width: number; height: number };
+            dieSkins: [];
+            diceHighlights: [];
+            diceHighlightShells: Map<number, unknown>;
+            styleProfile: DiceBoxStyleProfile;
+            finalizeSettledFrame: ReturnType<typeof vi.fn>;
+            renderFrame: ReturnType<typeof vi.fn>;
+        };
+        engine.box = box;
+        engine.container = { clientWidth: 360, clientHeight: 220 } as HTMLElement;
+        engine.worldBounds = { width: 360, height: 220 };
+        engine.dieSkins = [];
+        engine.diceHighlights = [];
+        engine.diceHighlightShells = new Map();
+        engine.styleProfile = { baseScale: 64, strength: 0.16 };
+        engine.finalizeSettledFrame = vi.fn();
+        engine.renderFrame = vi.fn();
+
+        await engine.rollToValues([6]);
+
+        expect(box.swapDiceFace).not.toHaveBeenCalled();
+        expect(die.storeRolledValue).toHaveBeenCalledWith('forced');
+        expect(box.getDiceResults).not.toHaveBeenCalled();
+        expect(box.onRollComplete).toHaveBeenCalledWith(expect.objectContaining({
+            notation: '1d6@6',
+            total: 6,
+        }));
     });
 
     it('指定值重骰使用受控框内动画，并在动画结束后才应用目标结果', async () => {

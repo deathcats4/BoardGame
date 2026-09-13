@@ -553,6 +553,7 @@ describe('PLAY_EVENT 验证', () => {
     core.players['0'].discard.push(makeUnitCard('mogu-spore-plague-body', {
       name: '菌袍疫病体',
       faction: 'mogu',
+      unitTags: ['carrier'],
     }));
 
     const request = validate(core, SW_COMMANDS.REQUEST_EVENT_INTERACTION, { cardId: CARD_IDS.MOGU_RELEASE_SPORES });

@@ -1858,6 +1858,36 @@ describe('MageWarsBoard spell cast choices', () => {
         };
     }
 
+    function createRegrowthBeltBlockedCore(): MageWarsCore {
+        const baseCore = MageWarsDomain.setup(['0', '1'], fixedRandom);
+        const beastmaster = baseCore.players['0'];
+
+        return {
+            ...baseCore,
+            currentPlayerId: '0',
+            phaseActorId: '0',
+            players: {
+                ...baseCore.players,
+                '0': {
+                    ...beastmaster,
+                    mageId: MAGE_IDS.BEASTMASTER_APPRENTICE,
+                    mageZoneId: ARENA_ZONE_IDS.A3,
+                    mana: 20,
+                    actionReady: true,
+                    quickcastReady: true,
+                    preparedSpellSlots: 1,
+                    preparedSpellCardIds: [3707],
+                },
+            },
+            arena: baseCore.arena.map((zone) => ({
+                ...zone,
+                occupantIds: zone.id === ARENA_ZONE_IDS.A3
+                    ? ['0']
+                    : zone.occupantIds.filter((id) => id !== '0'),
+            })),
+        };
+    }
+
     function createDemonCuirassChoiceCore(): MageWarsCore {
         const baseCore = MageWarsDomain.setup(['0', '1'], fixedRandom);
         const warlock = baseCore.players['0'];
@@ -2322,6 +2352,44 @@ describe('MageWarsBoard spell cast choices', () => {
             manaCost: 12,
             targetPlayerId: '1',
         });
+    });
+
+    it('does not expose blocked Regrowth Belt as a selectable prepared spell source', () => {
+        const dispatch = vi.fn();
+        const { container } = renderBoardWithProviders(
+            <MageWarsBoard
+                {...boardProps(createRegrowthBeltBlockedCore(), '0', { phase: 'initiativeQuickcast' })}
+                dispatch={dispatch}
+            />,
+        );
+
+        const regrowthBeltPreparedCard = container.querySelector<HTMLButtonElement>(
+            '[data-testid="mage-wars-desktop-prepared-card"][data-source-card-id="3707"]',
+        );
+        expect(regrowthBeltPreparedCard).not.toBeNull();
+        expect(regrowthBeltPreparedCard?.getAttribute('data-primary-action')).toBe('true');
+        expect(regrowthBeltPreparedCard?.getAttribute('data-primary-action-state')).toBe('disabled');
+        expect(regrowthBeltPreparedCard?.getAttribute('data-secondary-inspect')).toBe('true');
+        expect(regrowthBeltPreparedCard).toBeDisabled();
+
+        fireEvent.click(regrowthBeltPreparedCard!);
+
+        expect(dispatch).not.toHaveBeenCalled();
+        expect(regrowthBeltPreparedCard?.getAttribute('data-selected')).toBeNull();
+        expect(container.querySelector('[data-testid="mage-wars-selected-card-frame"]')).toBeNull();
+        expect(container.querySelector('[data-testid="mage-wars-zone-mage-entity"][data-player-id="0"]')?.getAttribute('role'))
+            .toBeNull();
+        expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
+
+        const inspectButton = regrowthBeltPreparedCard?.parentElement?.querySelector<HTMLButtonElement>(
+            '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="3707"]',
+        );
+        expect(inspectButton).not.toBeNull();
+
+        fireEvent.click(inspectButton!);
+
+        expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('false');
+        expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('3707');
     });
 
     it('casts Leather Gloves on own mage from the spell ChoiceRequest player target command', async () => {
@@ -3579,7 +3647,7 @@ describe('MageWarsBoard token placement', () => {
         expect(mageLifeReadout).not.toBeNull();
         expect(mageLifeReadout?.getAttribute('data-life-remaining')).toBe('18');
         expect(mageLifeReadout?.getAttribute('data-life-visible')).toBe('false');
-        expect(mageLifeReadout?.getAttribute('data-life-readout-position')).toBe('entity-right-midline');
+        expect(mageLifeReadout?.getAttribute('data-life-readout-position')).toBe('entity-center');
         expect(mageLifeReadout?.querySelector('[data-testid="mage-wars-mage-entity-life-readout-text"]')?.textContent).toBe('18/24');
         const mageTokenRail = mageEntity?.querySelector<HTMLElement>('[data-testid="mage-wars-entity-status-token-rail"]');
         expect(mageTokenRail?.getAttribute('data-token-rail-layout')).toBe('stack');

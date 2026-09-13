@@ -748,13 +748,22 @@ export interface PendingBonusDiceSettlement {
  * 任何仍属于攻击结算的临时骰都必须写出攻击恢复阶段，不能由 reducer 根据
  * displayOnly、骰子来源或当前 UI 状态猜测。
  */
-export type BonusDiceContinuation =
+export type AttackBonusDiceContinuation =
     | {
         kind: 'attack';
-        settlementStage: PendingAttackSettlementStage;
         /** 该临时骰是否已经消费了原攻击效果，阻止流程重放同一效果。 */
-        markBonusDiceResolved: boolean;
+        markBonusDiceResolved: true;
+        settlementStage: PendingAttackSettlementStage;
     }
+    | {
+        kind: 'attack';
+        /** 未消费主攻击伤害时，不能声明只剩 ATTACK_RESOLVED 收口。 */
+        markBonusDiceResolved: false;
+        settlementStage: Exclude<PendingAttackSettlementStage, 'readyToResolve'>;
+    };
+
+export type BonusDiceContinuation =
+    | AttackBonusDiceContinuation
     | {
         kind: 'complete';
     };

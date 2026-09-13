@@ -27,9 +27,10 @@ import {
 
 const cardText = (id: string, field: 'name' | 'description') => `cards.${id}.${field}`;
 const VAMPIRE_LORD_CARD_ATLAS_ID = DICETHRONE_CARD_ATLAS_IDS.VAMPIRE_LORD;
-const VAMPIRE_LORD_COMMON_ATLAS_INDEX: CommonCardAtlasIndexMap = Object.fromEntries(
-    Object.entries(TREANT_NINJA_COMMON_ATLAS_INDEX).filter(([cardId]) => cardId !== 'card-unexpected'),
-);
+const VAMPIRE_LORD_COMMON_ATLAS_INDEX: CommonCardAtlasIndexMap = {
+    ...TREANT_NINJA_COMMON_ATLAS_INDEX,
+    'card-unexpected': 33,
+};
 
 const atlasPreview = (index: number): CardPreviewRef => ({ type: 'atlas', atlasId: VAMPIRE_LORD_CARD_ATLAS_ID, index });
 

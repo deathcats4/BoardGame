@@ -37,6 +37,14 @@ describe('DiceThrone compatibility source guards', () => {
         expect(board).not.toContain('handleCardSpotlightClose(item.id)');
     });
 
+    it('进入交互弹窗时应清理已有放大预览，避免背景关闭按钮被遮罩截获', () => {
+        const board = readUiSource('../Board.tsx');
+
+        expect(board).toContain('const activeInteractionOverlayId = sysInteraction?.id ?? null');
+        expect(board).toContain('if (!activeInteractionOverlayId) return;');
+        expect(board).toContain('closeMagnify();');
+    });
+
     it('CenterBoard tip 图应提供显式宽度，避免旧 WebView 丢失 aspect 类后横条化', () => {
         const centerBoard = readUiSource('CenterBoard.tsx');
 

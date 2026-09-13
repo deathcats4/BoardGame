@@ -834,8 +834,8 @@ describe('AI legal actions', () => {
         expect(actions).toHaveLength(2);
         expect(actions.every((action) => action.kind === 'interaction-select-player')).toBe(true);
         expect(actions.map((action) => action.commands[0])).toEqual([
-            { type: 'RESOLVE_INTERACTION', payload: { selectedPlayerIds: ['1'] } },
-            { type: 'RESOLVE_INTERACTION', payload: { selectedPlayerIds: ['3'] } },
+            { type: 'RESOLVE_INTERACTION', payload: { selectedPlayerIds: ['1'], interactionId: 'dt-interaction-ai-select-player' } },
+            { type: 'RESOLVE_INTERACTION', payload: { selectedPlayerIds: ['3'], interactionId: 'dt-interaction-ai-select-player' } },
         ]);
     });
 
@@ -1393,7 +1393,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-select-player');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'RESOLVE_INTERACTION',
-            payload: { selectedPlayerIds: ['3'] },
+            payload: { selectedPlayerIds: ['3'], interactionId: 'dt-interaction-ai-select-player-low-hp' },
         });
     });
 
@@ -1432,7 +1432,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-select-player');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'RESOLVE_INTERACTION',
-            payload: { selectedPlayerIds: ['2'] },
+            payload: { selectedPlayerIds: ['2'], interactionId: 'dt-interaction-ai-select-friendly-buff-target' },
         });
     });
 
@@ -1467,7 +1467,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-select-player');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'RESOLVE_INTERACTION',
-            payload: { selectedPlayerIds: ['3'] },
+            payload: { selectedPlayerIds: ['3'], interactionId: 'dt-interaction-ai-select-best-cleanse-target' },
         });
     });
 
@@ -1519,7 +1519,7 @@ describe('AI legal actions', () => {
             kind: 'interaction-remove-status',
             commands: [{
                 type: 'REMOVE_STATUS',
-                payload: { targetPlayerId: '1', statusId: 'poison' },
+                payload: { targetPlayerId: '1', statusId: 'poison', interactionId: 'dt-interaction-ai-select-status' },
             }],
             metadata: expect.objectContaining({
                 strategyTags: ['purify-control'],
@@ -1597,7 +1597,7 @@ describe('AI legal actions', () => {
             kind: 'interaction-transfer-status',
             commands: [{
                 type: 'TRANSFER_STATUS',
-                payload: { fromPlayerId: '1', toPlayerId: '0', statusId: 'poison' },
+                payload: { fromPlayerId: '1', toPlayerId: '0', statusId: 'poison', interactionId: 'dt-interaction-ai-transfer-status' },
             }],
             metadata: expect.objectContaining({
                 strategyTags: ['purify-control'],
@@ -1607,7 +1607,7 @@ describe('AI legal actions', () => {
             kind: 'interaction-transfer-status',
             commands: [{
                 type: 'TRANSFER_STATUS',
-                payload: { fromPlayerId: '1', toPlayerId: '2', statusId: 'poison' },
+                payload: { fromPlayerId: '1', toPlayerId: '2', statusId: 'poison', interactionId: 'dt-interaction-ai-transfer-status' },
             }],
             metadata: expect.objectContaining({
                 strategyTags: ['purify-control'],
@@ -1647,7 +1647,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-remove-status');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'REMOVE_STATUS',
-            payload: { targetPlayerId: '0', statusId: STATUS_IDS.BURN },
+            payload: { targetPlayerId: '0', statusId: STATUS_IDS.BURN, interactionId: 'dt-interaction-ai-remove-own-debuff-first' },
         });
     });
 
@@ -1773,7 +1773,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-transfer-status');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'TRANSFER_STATUS',
-            payload: { fromPlayerId: '0', toPlayerId: '1', statusId: STATUS_IDS.POISON },
+            payload: { fromPlayerId: '0', toPlayerId: '1', statusId: STATUS_IDS.POISON, interactionId: 'dt-interaction-ai-transfer-own-debuff-to-enemy' },
         });
     });
 
@@ -1856,7 +1856,7 @@ describe('AI legal actions', () => {
         expect(resolution?.action.kind).toBe('interaction-transfer-status');
         expect(resolution?.action.commands[0]).toEqual({
             type: 'TRANSFER_STATUS',
-            payload: { fromPlayerId: '0', toPlayerId: '1', statusId: STATUS_IDS.POISON },
+            payload: { fromPlayerId: '0', toPlayerId: '1', statusId: STATUS_IDS.POISON, interactionId: 'dt-interaction-ai-transfer-selected-status-target' },
         });
     });
 

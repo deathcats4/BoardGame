@@ -206,6 +206,11 @@ describe('TutorialSystem', () => {
                     id: 'ai-bridge',
                     content: 'ai bridge',
                     aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                    hiddenAutomation: {
+                        kind: 'compressed-repeat',
+                        reason: 'AI repeats the previously taught formal move.',
+                        equivalentStepIds: ['intro'],
+                    },
                 },
                 { id: 'locked-action', content: 'locked action', requireAction: true },
             ],
@@ -254,6 +259,158 @@ describe('TutorialSystem', () => {
                 payload: expect.objectContaining({ from: 2, to: 0, stepId: 'intro' }),
             }),
         );
+    });
+
+    it('PREVIOUS: 没有 hiddenAutomation 的 aiActions 步骤仍是玩家可见步骤', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'previous-visible-ai',
+            steps: [
+                { id: 'intro', content: 'intro' },
+                {
+                    id: 'watch-ai',
+                    content: 'watch ai',
+                    aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                },
+                { id: 'locked-action', content: 'locked action', requireAction: true },
+            ],
+        };
+        const state = createTestState();
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+        const atLockedAction: MatchState<TestCore> = {
+            ...started!.state!,
+            sys: {
+                ...started!.state!.sys,
+                tutorial: {
+                    ...started!.state!.sys.tutorial,
+                    stepIndex: 2,
+                    step: manifest.steps[2],
+                    allowManualSkip: false,
+                },
+            },
+        };
+
+        const previous = sys.beforeCommand?.({
+            state: atLockedAction,
+            command: { type: TUTORIAL_COMMANDS.PREVIOUS, playerId: '0', payload: {} },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(previous?.halt).toBe(true);
+        expect(previous?.error).toBeUndefined();
+        expect(previous?.state?.sys.tutorial.stepIndex).toBe(1);
+        expect(previous?.state?.sys.tutorial.step?.id).toBe('watch-ai');
+    });
+
+    it('AI_CONSUMED: 没有 hiddenAutomation 的 aiActions 步骤不会自动跳过', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const manifest: TutorialManifest = {
+            id: 'visible-ai-consume',
+            steps: [
+                {
+                    id: 'watch-ai',
+                    content: 'watch ai',
+                    aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                },
+                { id: 'after-ai', content: 'after ai' },
+            ],
+        };
+        const state = createTestState();
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        const consumed = sys.beforeCommand?.({
+            state: started!.state!,
+            command: { type: TUTORIAL_COMMANDS.AI_CONSUMED, playerId: '0', payload: { stepId: 'watch-ai' } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(consumed?.halt).toBe(true);
+        expect(consumed?.state?.sys.tutorial.stepIndex).toBe(0);
+        expect(consumed?.state?.sys.tutorial.step?.id).toBe('watch-ai');
+        expect(consumed?.state?.sys.tutorial.aiActions).toBeUndefined();
+        expect(consumed?.state?.sys.tutorial.step?.aiActions).toBeUndefined();
+    });
+
+    it('START: compressed-repeat 必须引用此前玩家可见步骤', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const state = createTestState();
+        const manifest: TutorialManifest = {
+            id: 'bad-hidden-repeat',
+            steps: [
+                {
+                    id: 'ai-bridge',
+                    content: 'ai bridge',
+                    aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                    hiddenAutomation: {
+                        kind: 'compressed-repeat',
+                        reason: 'This tries to hide a step without a visible taught action.',
+                        equivalentStepIds: ['missing-visible-step'],
+                    },
+                },
+                { id: 'after-ai', content: 'after ai' },
+            ],
+        };
+
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(started?.halt).toBe(true);
+        expect(started?.error).toBe(TUTORIAL_ERRORS.INVALID_MANIFEST);
+        expect(started?.state).toBeUndefined();
+    });
+
+    it('START: setup-precondition 只能用于首张可见步骤之前', () => {
+        const sys = createTutorialSystem<TestCore>();
+        const state = createTestState();
+        const manifest: TutorialManifest = {
+            id: 'bad-mid-setup',
+            steps: [
+                { id: 'intro', content: 'intro', infoStep: true },
+                {
+                    id: 'mid-setup',
+                    content: 'mid setup',
+                    aiActions: [{ commandType: 'AI_MOVE', playerId: '1' }],
+                    hiddenAutomation: {
+                        kind: 'setup-precondition',
+                        reason: 'This hides a new mid-tutorial exercise instead of showing a segment start.',
+                    },
+                },
+                { id: 'after', content: 'after', infoStep: true },
+            ],
+        };
+
+        const started = sys.beforeCommand?.({
+            state,
+            command: { type: TUTORIAL_COMMANDS.START, playerId: '0', payload: { manifest } },
+            events: [],
+            random: mockRandom,
+            playerIds: ['0', '1'],
+        });
+
+        expect(started?.halt).toBe(true);
+        expect(started?.error).toBe(TUTORIAL_ERRORS.INVALID_MANIFEST);
+        expect(started?.state).toBeUndefined();
     });
 
     it('PREVIOUS: 第一张教程卡没有上一步时保持当前步骤且不报错', () => {

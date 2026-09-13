@@ -203,12 +203,16 @@ export const DiceThroneDomain: DomainCore<DiceThroneCore, DiceThroneCommand, Dic
             }
         }
 
-        // dt:card-interaction：data 直接是 PendingInteraction（状态选择类）
+        // dt:card-interaction：data 保留原始 PendingInteraction；校验使用当前 live interaction ID。
         // multistep-choice：骰子类交互，从 meta 构造兼容的 InteractionDescriptor
         let pendingInteraction: InteractionDescriptor | undefined;
         let pendingDefenderChoice: PendingDefenderChoice | undefined;
         if (interaction?.kind === 'dt:card-interaction') {
-            pendingInteraction = interaction.data as InteractionDescriptor;
+            pendingInteraction = {
+                ...(interaction.data as InteractionDescriptor),
+                id: interaction.id,
+                playerId: interaction.playerId,
+            };
         } else if (interaction?.kind === 'dt:defender-choice') {
             pendingDefenderChoice = interaction.data as PendingDefenderChoice;
         } else if (interaction?.kind === 'multistep-choice') {

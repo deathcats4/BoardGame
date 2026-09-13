@@ -2193,7 +2193,7 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
           const player = newState.core.players[payload.playerId];
           if (!player) continue;
           const discardCards = player.discard.filter((card) => {
-            if (payload.cardType === 'plagueZombie') {
+            if (payload.cardType === 'carrier' || payload.cardType === 'plagueZombie') {
               return card.cardType === 'unit' && isPlagueZombieCard(card);
             }
             return false;

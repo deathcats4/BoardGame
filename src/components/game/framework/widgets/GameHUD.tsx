@@ -245,6 +245,14 @@ export const GameHUD = ({
         return t('hud.status.player', { id: normalizedId });
     }, [getStateActionLogPlayerLabel, myPlayerId, myDisplayName, playerNameMap, t]);
 
+    const getActionLogCharacterId = useCallback((playerId: string | number): string | undefined => {
+        const state = undoState?.G as { core?: { players?: Record<string, { characterId?: unknown }> } } | null | undefined;
+        const rawCharacterId = state?.core?.players?.[String(playerId)]?.characterId;
+        return typeof rawCharacterId === 'string' && rawCharacterId !== 'unselected'
+            ? rawCharacterId
+            : undefined;
+    }, [undoState?.G]);
+
     const actionLogRows = useMemo(() => {
         const entries = undoState?.G?.sys?.actionLog?.entries ?? [];
         return buildActionLogRows(entries, { getPlayerLabel: getActionLogPlayerLabel });
@@ -550,6 +558,8 @@ export const GameHUD = ({
                                     <ActionLogSegments
                                         segments={row.segments}
                                         locale={locale}
+                                        playerId={row.actorId}
+                                        characterId={getActionLogCharacterId(row.actorId)}
                                         getCardPreviewRef={getCardPreviewRef}
                                         cardPreviewMaxDim={cardPreviewMaxDim}
                                     />

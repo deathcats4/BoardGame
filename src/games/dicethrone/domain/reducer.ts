@@ -26,6 +26,7 @@ import { FLOW_EVENTS } from '../../../engine/systems/FlowSystem';
 import { buildHeroAbilitiesForFace, initHeroState, createCharacterDice } from './characters';
 import { hasCurrentChoiceAnchor, registerChoiceEffectHandler, resolveChoiceEffect } from './choiceEffects';
 import {
+    assertValidBonusDiceContinuation,
     isDiceThroneAiSeat,
     markPendingAttackPostDamageFollowUpResolved,
     removeCard,
@@ -366,6 +367,7 @@ const handleBonusDiceSettled: EventHandler<Extract<DiceThroneEvent, { type: 'BON
 ) => {
     const settlement = state.pendingBonusDiceSettlement;
     const continuation = settlement?.continuation;
+    assertValidBonusDiceContinuation(continuation, settlement?.sourceAbilityId);
     const pendingAttack = continuation?.kind === 'attack' && state.pendingAttack
         ? updatePendingAttackSettlementStage(
             continuation.markBonusDiceResolved

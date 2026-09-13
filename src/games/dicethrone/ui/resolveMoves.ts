@@ -23,10 +23,10 @@ export type DiceThroneMoveMap = {
     // 卡牌交互相关
     modifyDie: (dieId: number, newValue: number) => void;
     rerollDie: (dieId: number) => void;
-    removeStatus: (targetPlayerId: string, statusId?: string) => void;
-    transferStatus: (fromPlayerId: string, toPlayerId: string, statusId: string) => void;
+    removeStatus: (targetPlayerId: string, statusId?: string, interactionId?: string) => void;
+    transferStatus: (fromPlayerId: string, toPlayerId: string, statusId: string, interactionId?: string) => void;
     grantTokens: (targetPlayerId: string, tokens: Array<{ tokenId: string; amount: number }>) => void;
-    resolveInteraction: (selectedPlayerIds: string[], selectedCardIds?: string[]) => void;
+    resolveInteraction: (selectedPlayerIds: string[], selectedCardIds?: string[], interactionId?: string) => void;
     selectDefenderTarget: (defenderId: string) => void;
     // confirmInteraction: (interactionId: string, selectedDiceIds?: number[], selectedPlayerId?: string) => void; // @deprecated - 使用 InteractionSystem
     // cancelInteraction: () => void; // @deprecated - 使用 InteractionSystem
@@ -74,10 +74,10 @@ export const resolveMoves = (
     // 卡牌交互
     modifyDie: (dieId, newValue) => dispatch('MODIFY_DIE', { dieId, newValue }),
     rerollDie: (dieId) => dispatch('REROLL_DIE', { dieId }),
-    removeStatus: (targetPlayerId, statusId) => dispatch('REMOVE_STATUS', { targetPlayerId, statusId }),
-    transferStatus: (fromPlayerId, toPlayerId, statusId) => dispatch('TRANSFER_STATUS', { fromPlayerId, toPlayerId, statusId }),
+    removeStatus: (targetPlayerId, statusId, interactionId) => dispatch('REMOVE_STATUS', { targetPlayerId, statusId, ...(interactionId ? { interactionId } : {}) }),
+    transferStatus: (fromPlayerId, toPlayerId, statusId, interactionId) => dispatch('TRANSFER_STATUS', { fromPlayerId, toPlayerId, statusId, ...(interactionId ? { interactionId } : {}) }),
     grantTokens: (targetPlayerId, tokens) => dispatch('GRANT_TOKENS', { targetPlayerId, tokens }),
-    resolveInteraction: (selectedPlayerIds, selectedCardIds) => dispatch('RESOLVE_INTERACTION', { selectedPlayerIds, selectedCardIds }),
+    resolveInteraction: (selectedPlayerIds, selectedCardIds, interactionId) => dispatch('RESOLVE_INTERACTION', { selectedPlayerIds, selectedCardIds, ...(interactionId ? { interactionId } : {}) }),
     selectDefenderTarget: (defenderId) => dispatch(DICETHRONE_COMMANDS.SELECT_DEFENDER_TARGET, { defenderId }),
     // confirmInteraction: (interactionId, selectedDiceIds, selectedPlayerId) => dispatch('CONFIRM_INTERACTION', { interactionId, selectedDiceIds, selectedPlayerId }),
     // cancelInteraction: () => dispatch('CANCEL_INTERACTION', {}),

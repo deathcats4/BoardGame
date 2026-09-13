@@ -499,7 +499,7 @@ function MageWarsLifeDamageReadout({
         <div
             aria-hidden="true"
             className={cx(
-                'pointer-events-none absolute inset-0 z-20 flex items-center justify-end pr-[8%] transition-opacity',
+                'pointer-events-none absolute inset-0 z-20 flex items-center justify-center transition-opacity',
                 showLifeTotals ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
             )}
             data-testid={testId}
@@ -507,7 +507,7 @@ function MageWarsLifeDamageReadout({
             data-life={life}
             data-life-remaining={remaining}
             data-life-visible={showLifeTotals ? 'true' : 'false'}
-            data-life-readout-position="entity-right-midline"
+            data-life-readout-position="entity-center"
             data-damage-ratio={damageRatio.toFixed(3)}
             style={MAGE_WARS_LIFE_BADGE_CONTAINER_STYLE}
         >
@@ -2060,6 +2060,7 @@ function PreparedSpellsDock({
     canCast,
     selectedCardId,
     planningDraftCardIds = [],
+    isSpellCastable,
     onSelect,
     onInspectCard,
     onPlanningDraftRemove,
@@ -2070,6 +2071,7 @@ function PreparedSpellsDock({
     canCast: boolean;
     selectedCardId: number | null;
     planningDraftCardIds?: number[];
+    isSpellCastable?: (cardId: number) => boolean;
     onSelect: (cardId: number) => void;
     onInspectCard?: (cardId: number, label?: string) => void;
     onPlanningDraftRemove?: (slotIndex: number) => void;
@@ -2081,9 +2083,7 @@ function PreparedSpellsDock({
         : [];
     const showingPlanningDraft = planningDraftIds.length > 0;
     const visibleIds = showingPlanningDraft ? planningDraftIds : preparedIds;
-    const visibleSlotTotal = showingPlanningDraft ? MAGE_WARS_MAX_PREPARED_SPELLS : player.preparedSpellSlots;
     const canSelectSpell = canAct && canCast && CAST_PHASES.has(phase);
-    const shouldShowPreparedSummary = phase !== 'planning';
 
     return (
         <section
@@ -2093,14 +2093,6 @@ function PreparedSpellsDock({
             data-tutorial-id="mw-prepared"
             data-layout-position="below-turn-action"
         >
-            {shouldShowPreparedSummary ? (
-                <div className="text-center text-[0.66rem] font-semibold text-amber-100">
-                    {t('privateZones.preparedSpellsWithCount', {
-                        count: visibleIds.length,
-                        total: visibleSlotTotal,
-                    })}
-                </div>
-            ) : null}
             <div
                 className="flex flex-row-reverse justify-end"
                 style={{
@@ -2113,6 +2105,9 @@ function PreparedSpellsDock({
                     const visibleCardId = visibleIds[slot];
                     const isPlanningDraftCard = showingPlanningDraft && visibleCardId != null;
                     const canRemovePlanningDraft = isPlanningDraftCard && Boolean(onPlanningDraftRemove);
+                    const canSelectVisibleSpell = visibleCardId != null
+                        && canSelectSpell
+                        && isSpellCastable?.(visibleCardId) !== false;
                     return (
                         <PreparedSpellCard
                             key={`${player.id}-${showingPlanningDraft ? 'planning-draft' : 'prepared'}-desktop-${slot}-${visibleCardId ?? 'empty'}`}
@@ -2127,13 +2122,13 @@ function PreparedSpellsDock({
                             selected={visibleCardId === selectedCardId || isPlanningDraftCard}
                             planningDraft={isPlanningDraftCard}
                             planSlotIndex={slot + 1}
-                            disabled={visibleCardId == null || (!canSelectSpell && !canRemovePlanningDraft)}
+                            disabled={visibleCardId == null || (!canSelectVisibleSpell && !canRemovePlanningDraft)}
                             primaryActionIntent={visibleCardId != null && (canSelectSpell || canRemovePlanningDraft)}
                             onClick={visibleCardId == null
                                 ? undefined
                                 : canRemovePlanningDraft
                                     ? () => onPlanningDraftRemove?.(slot)
-                                    : canSelectSpell
+                                    : canSelectVisibleSpell
                                         ? () => onSelect(visibleCardId)
                                         : undefined}
                             onInspect={visibleCardId == null
@@ -3802,6 +3797,18 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                 .map((player) => player.id)
             : [],
     );
+    const canPreparedSpellCast = (cardId: number): boolean => {
+        if (!canAct || !activePlayer || !isCommandAllowed(MAGE_WARS_COMMANDS.CAST_SPELL) || !CAST_PHASES.has(phase)) {
+            return false;
+        }
+        const opportunity = buildMageWarsSpellCastOpportunity({
+            state: G,
+            playerId: activePlayer.id,
+            spellCardId: cardId,
+        });
+        const request = opportunity ? buildChoiceRequestFromOpportunity(opportunity) : null;
+        return hasEnabledChoiceCandidate(request?.candidates);
+    };
     const selectedSpell = selectedSpellCardId == null
         ? undefined
         : getMageWarsSpellCardFromConfig(selectedSpellCardId);
@@ -4506,13 +4513,19 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
     const handlePreparedSpellSelect = (cardId: number) => {
         if (!isCommandAllowed(MAGE_WARS_COMMANDS.CAST_SPELL)) return;
         const willSelectPreparedSpell = selectedSpellCardId !== cardId;
+        let request: ReturnType<typeof buildChoiceRequestFromOpportunity> | null = null;
         if (canAct && activePlayer) {
             const opportunity = buildMageWarsSpellCastOpportunity({
                 state: G,
                 playerId: activePlayer.id,
                 spellCardId: cardId,
             });
-            const request = opportunity ? buildChoiceRequestFromOpportunity(opportunity) : null;
+            request = opportunity ? buildChoiceRequestFromOpportunity(opportunity) : null;
+            if (!hasEnabledChoiceCandidate(request?.candidates)) {
+                setSelectedSpellCardId(null);
+                setPendingSpellCastSelection(null);
+                return;
+            }
             if (request?.kind === 'confirm') {
                 const surface = projectChoiceRequestToDirectSelectionTargets<MageWarsSpellCastChoiceValue>(
                     request,
@@ -4910,6 +4923,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                             canCast={isCommandAllowed(MAGE_WARS_COMMANDS.CAST_SPELL)}
                             selectedCardId={selectedSpellCardId}
                             planningDraftCardIds={selectedPlanningSpellCardIds}
+                            isSpellCastable={canPreparedSpellCast}
                             onSelect={handlePreparedSpellSelect}
                             onInspectCard={handleInspectSpellCard}
                             onPlanningDraftRemove={removePlanningDraftAtSlot}

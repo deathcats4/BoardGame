@@ -4,6 +4,7 @@ import type { MatchState } from '../../../engine/types';
 import { DiceThroneDomain } from '../domain';
 import { createDiceThroneEventSystem } from '../domain/systems';
 import { reduce } from '../domain/reducer';
+import { createDisplayOnlySettlement } from '../domain/effects';
 import type { DiceThroneCore, DiceThroneEvent, PendingBonusDiceSettlement } from '../domain/types';
 import { createHeroMatchup, createQueuedRandom, testSystems } from './test-utils';
 import { COMMON_CARDS } from '../domain/commonCards';
@@ -126,6 +127,48 @@ describe('DiceThrone 奖励骰普通确认合同', () => {
         ];
 
         expect(getRegisteredBonusDiceSettlementIds()).toEqual(new Set(expectedSettlementIds));
+    });
+
+    it('未消费主攻击伤害的奖励骰不能声明 readyToResolve', () => {
+        const illegalContinuation = {
+            kind: 'attack',
+            settlementStage: 'readyToResolve',
+            markBonusDiceResolved: false,
+        } as any;
+        const dice = [{ index: 0, value: 4, face: 'sabre', effectParams: { value: 4 } }];
+
+        expect(() => createDisplayOnlySettlement(
+            'test-attack-modifier',
+            '0',
+            '1',
+            dice,
+            100,
+            { continuation: illegalContinuation },
+        )).toThrow(/invalid bonus dice continuation.*test-attack-modifier/);
+
+        const state = createHeroMatchup('monk', 'treant')(['0', '1'], createQueuedRandom([1])).core;
+        state.pendingBonusDiceSettlement = {
+            ...bonusSettlement(),
+            sourceAbilityId: 'test-attack-modifier',
+            continuation: illegalContinuation,
+        } as any;
+
+        expect(() => reduce(state, {
+            type: 'BONUS_DICE_SETTLED',
+            payload: {
+                settlementId: 'ordinary-confirm-required',
+                finalDice: dice,
+                totalDamage: 0,
+                thresholdTriggered: false,
+                attackerId: '0',
+                targetId: '1',
+                sourceAbilityId: 'test-attack-modifier',
+                displayOnly: true,
+                allowDiceModification: true,
+            },
+            sourceCommandType: 'TEST_CONFIRM_BONUS_DICE',
+            timestamp: 101,
+        } as DiceThroneEvent)).toThrow(/invalid bonus dice continuation.*test-attack-modifier/);
     });
 
     it('即使对手有改骰牌，奖励骰也不再打开响应窗口，而是直接停在右侧骰盘等待普通确认', () => {

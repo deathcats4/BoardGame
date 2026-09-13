@@ -39,6 +39,11 @@ const getTutorialCompletionStorageKey = (gameId: string) => `${TUTORIAL_COMPLETI
 
 const encodeTutorialProgressPart = (value: string) => encodeURIComponent(value.trim());
 
+export const buildTutorialCompletionLobbyPath = (gameId: string | undefined): string => {
+    if (!gameId) return '/';
+    return `/?game=${encodeURIComponent(gameId)}`;
+};
+
 export const resolveTutorialProgressId = (
     tutorialId: string | undefined,
     manifestId: string | null | undefined,
@@ -590,7 +595,7 @@ export function useMatchRoomTutorialLifecycle(args: UseMatchRoomTutorialLifecycl
         if (!tutorialStartedRef.current) return;
 
         // 教程模式下，部分游戏会在初始化/重置时短暂触发 tutorial.active=false。
-        // 这里避免把"瞬间失活"误判为"教程已结束"，导致刚进入就 navigate(-1) 退回首页。
+        // 这里避免把"瞬间失活"误判为"教程已结束"，导致刚进入就返回游戏大厅。
         if (!isActive) {
             const timer = window.setTimeout(() => {
                 if (!tutorialStartedRef.current) return;
@@ -615,7 +620,7 @@ export function useMatchRoomTutorialLifecycle(args: UseMatchRoomTutorialLifecycl
                         navigate(`/play/${gameId}/tutorial/${nextTutorialId}`);
                         return;
                     }
-                    navigate(-1);
+                    navigate(buildTutorialCompletionLobbyPath(gameId), { replace: true });
                 }
             }, 600);
             return () => window.clearTimeout(timer);

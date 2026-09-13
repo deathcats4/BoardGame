@@ -21,6 +21,16 @@ const getDeckPreviewRef = (characterId: string, cardId: string): CardPreviewRef 
 };
 
 describe('DiceThrone 卡牌备用预览入口', () => {
+    it('所有实际牌库里的手牌都必须解析到卡图', () => {
+        const violations = Object.entries(CHARACTER_DATA_MAP).flatMap(([characterId, character]) => (
+            character.getStartingDeck(deterministicRandom as never)
+                .filter((card) => !card.previewRef)
+                .map((card) => `${characterId}:${card.id}`)
+        ));
+
+        expect(violations).toEqual([]);
+    });
+
     it('按当前角色实际牌库解析通用牌图集，不把新规格角色套旧顺序', () => {
         const cases = [
             { characterId: 'vampire_lord', cardId: 'card-get-away', expectedIndex: 11 },
@@ -43,8 +53,13 @@ describe('DiceThrone 卡牌备用预览入口', () => {
         }
     });
 
-    it('尊重角色牌库里的无图卡，不用默认顺序错指其它吸血鬼牌', () => {
-        expect(getDeckPreviewRef('vampire_lord', 'card-unexpected')).toBeNull();
-        expect(getDiceThroneCardPreviewRef('card-unexpected', 'vampire_lord')).toBeNull();
+    it('吸血鬼意不意外必须使用本英雄 slot-33，不得错指血石或其它英雄图集', () => {
+        const expected = getDeckPreviewRef('vampire_lord', 'card-unexpected');
+        expect(expected).toMatchObject({
+            type: 'atlas',
+            atlasId: 'dicethrone:vampire_lord-cards',
+            index: 33,
+        });
+        expect(getDiceThroneCardPreviewRef('card-unexpected', 'vampire_lord')).toEqual(expected);
     });
 });

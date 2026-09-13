@@ -344,7 +344,7 @@ vi.mock('../../../lib/dice-physics/DiceBoxPhysicsSource', async () => {
             let active = true;
             const markSettled = () => {
                 if (active) {
-                    props.onSettledChange?.(true);
+                    props.onSettledChange?.(true, props.settledIdentity);
                 }
             };
             markSettled();
@@ -359,14 +359,15 @@ vi.mock('../../../lib/dice-physics/DiceBoxPhysicsSource', async () => {
                 window.clearInterval(retryTimer);
                 window.clearTimeout(stopRetryTimer);
             };
-        }, [diceKey, motionKey, props.onSettledChange]);
+        }, [diceKey, motionKey, props.onSettledChange, props.settledIdentity]);
 
         return ReactActual.createElement(actual.DiceBoxPhysicsSource, {
             ...props,
-            onSettledChange: (settled: boolean) => {
-                props.onSettledChange?.(settled);
+            onSettledChange: (settled: boolean, identity?: string) => {
+                const settledIdentity = identity ?? props.settledIdentity;
+                props.onSettledChange?.(settled, settledIdentity);
                 if (!settled) {
-                    window.setTimeout(() => props.onSettledChange?.(true), 0);
+                    window.setTimeout(() => props.onSettledChange?.(true, settledIdentity), 0);
                 }
             },
         });

@@ -47,6 +47,7 @@ import {
 import {
   getBaseCardId,
   isUndeadCard,
+  isCarrierCard,
   isPlagueZombieCard,
   isFortressUnit,
   isMoguSporePlagueBodyCard,
@@ -206,6 +207,9 @@ registerConditionHandler(swConditionRegistry, 'isUnitType', (params, ctx) => {
     if (unitType === 'undead') {
       return isUndeadCard(u.card);
     }
+    if (unitType === 'carrier') {
+      return isCarrierCard(u.card);
+    }
     return u.card.unitClass === unitType;
   });
 });
@@ -246,7 +250,7 @@ registerConditionHandler(swConditionRegistry, 'hasCardInDiscard', (params, ctx) 
     if (cardType === 'undead') {
       return isUndeadCard(card);
     }
-    if (cardType === 'plagueZombie') {
+    if (cardType === 'carrier' || cardType === 'plagueZombie') {
       return isPlagueZombieCard(card);
     }
     if (cardType === 'mogu_spore_plague_body') {

@@ -1,6 +1,20 @@
-import type { TutorialManifest, TutorialEventMatcher } from '../../engine/types';
+import type { TutorialHiddenAutomationContract, TutorialManifest, TutorialEventMatcher } from '../../engine/types';
 import { TOKEN_IDS, STATUS_IDS } from './domain/ids';
 import { MONK_CARDS } from './heroes/monk/cards';
+
+const setupPrecondition = (reason: string): TutorialHiddenAutomationContract => ({
+    kind: 'setup-precondition',
+    reason,
+});
+
+const compressedRepeat = (
+    equivalentStepIds: string[],
+    reason: string,
+): TutorialHiddenAutomationContract => ({
+    kind: 'compressed-repeat',
+    equivalentStepIds,
+    reason,
+});
 
 // ============================================================================
 // 牌组配置
@@ -96,6 +110,7 @@ export const DiceThroneTutorial: TutorialManifest = {
                 { commandType: 'PLAYER_READY', playerId: '1', payload: {} },
                 { commandType: 'HOST_START_GAME', playerId: '0', payload: {} },
             ],
+            hiddenAutomation: setupPrecondition('Create the legal Dice Throne tutorial match before the first visible step.'),
             advanceOnEvents: [
                 { type: 'HOST_STARTED' },
                 { type: 'SYS_PHASE_CHANGED', match: { to: 'upkeep' } },
@@ -281,6 +296,10 @@ export const DiceThroneTutorial: TutorialManifest = {
                 { commandType: 'CONFIRM_ROLL', playerId: '1', payload: {} },
                 { commandType: 'ADVANCE_PHASE', playerId: '1', payload: {} },
             ],
+            hiddenAutomation: compressedRepeat(
+                ['dice-roll', 'dice-confirm', 'resolve-attack'],
+                'Opponent defense repeats the roll, confirm, and phase-advance family already taught in the player attack.',
+            ),
             advanceOnEvents: [MATCH_PHASE_MAIN2],
         },
 
@@ -374,6 +393,10 @@ export const DiceThroneTutorial: TutorialManifest = {
                 { commandType: 'ADVANCE_PHASE', playerId: '1', payload: {} },
                 { commandType: 'ADVANCE_PHASE', playerId: '1', payload: {} },
             ],
+            hiddenAutomation: compressedRepeat(
+                ['advance', 'dice-roll', 'dice-confirm', 'abilities', 'resolve-attack', 'inner-peace-response'],
+                'The AI turn compresses phase advances, rolls, confirmations, ability selection, and response passing already taught as formal actions.',
+            ),
             advanceOnEvents: [
                 { type: 'SYS_TUTORIAL_AI_CONSUMED', match: { stepId: 'ai-turn' } },
             ],

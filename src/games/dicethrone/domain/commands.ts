@@ -180,6 +180,8 @@ export interface RemoveStatusCommand extends Command<'REMOVE_STATUS'> {
         targetPlayerId: PlayerId;
         /** 状态 ID（可选，不提供则移除所有） */
         statusId?: string;
+        /** 当前 dt:card-interaction ID；玩家 UI 交互应携带，旧入口可省略。 */
+        interactionId?: string;
     };
 }
 
@@ -192,6 +194,8 @@ export interface TransferStatusCommand extends Command<'TRANSFER_STATUS'> {
         toPlayerId: PlayerId;
         /** 状态 ID */
         statusId: string;
+        /** 当前 dt:card-interaction ID；玩家 UI 交互应携带，旧入口可省略。 */
+        interactionId?: string;
     };
 }
 
@@ -209,6 +213,8 @@ export interface ResolveInteractionCommand extends Command<'RESOLVE_INTERACTION'
     payload: {
         selectedPlayerIds?: PlayerId[];
         selectedCardIds?: string[];
+        /** 当前 dt:card-interaction ID；玩家 UI 交互应携带，旧入口可省略。 */
+        interactionId?: string;
     };
 }
 
@@ -288,6 +294,8 @@ export interface GrantTokensCommand extends Command<'GRANT_TOKENS'> {
         targetPlayerId: PlayerId;
         /** 要授予的 Token 列表 */
         tokens: Array<{ tokenId: string; amount: number }>;
+        /** 当前 dt:card-interaction ID；玩家 UI 交互应携带，旧入口可省略。 */
+        interactionId?: string;
     };
 }
 
