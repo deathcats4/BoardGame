@@ -1953,7 +1953,7 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
     test('血潮汹涌、血从天降、饮血如酒应通过手牌真实入口进入奖励骰或花费选择', async ({ page, game }, testInfo) => {
         await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
 
-        await test.step('血潮汹涌应先出现奖励骰，确认后利爪才获得 3 个鲜血之力', async () => {
+        await test.step('血潮汹涌应先出现奖励骰，确认后血滴才获得 3 个鲜血之力', async () => {
             const cardId = 'card-vampire-lord-blood-surge';
             await game.setupScene({
                 gameId: 'dicethrone',
@@ -1979,7 +1979,7 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 },
             });
             await closeDebugPanelIfVisible(page);
-            await setDiceThroneBonusDiceValues(page, [1]);
+            await setDiceThroneBonusDiceValues(page, [6]);
             await expectVampireLordCardPreview(page, cardId, 17);
 
             await dragVampireLordHandCardToPlay(page, cardId);
@@ -2004,8 +2004,8 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 cp: 2,
                 bloodPower: 0,
                 sourceAbilityId: cardId,
-                diceValues: [1],
-                diceFaces: [VAMPIRE_LORD_DICE_FACE_IDS.CLAW],
+                diceValues: [6],
+                diceFaces: [VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP],
                 events: expect.arrayContaining(['CARD_PLAYED', 'BONUS_DIE_ROLLED']),
             });
             await expectRightTrayBonusDiceConfirmation(page, () => game.getState(), {
@@ -2034,7 +2034,7 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 events: expect.arrayContaining(['BONUS_DICE_SETTLED', 'TOKEN_GRANTED']),
             });
             await waitForDiceThroneVisualIdle(page);
-            await game.screenshot('吸血鬼领主-血潮汹涌-利爪结算后获得3血力', testInfo);
+            await game.screenshot('吸血鬼领主-血潮汹涌-血滴结算后获得3血力', testInfo);
         });
 
         await test.step('血从天降应先出现奖励骰，确认后按骰值一半向上取整获得鲜血之力', async () => {

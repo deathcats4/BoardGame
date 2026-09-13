@@ -717,6 +717,59 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         });
     });
 
+    it('已造成伤害但只剩攻击收口时仍先暂停一次，让鲜血之力 4 档可被玩家使用', () => {
+        const state = createBloodPowerPassiveState(4);
+        state.sys.phase = 'defensiveRoll';
+        state.core.activePlayerId = '0';
+        state.core.pendingAttack = {
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'blood-thirst',
+            settlementStage: 'postDamagePending',
+            isDefendable: true,
+            bonusDamage: 0,
+            attackModifierBonusDamage: 0,
+            damageResolved: true,
+            resolvedDamage: 6,
+        };
+
+        const firstExitResult = diceThroneFlowHooks.onPhaseExit?.({
+            state,
+            from: 'defensiveRoll',
+            to: 'main2',
+            command: command('ADVANCE_PHASE', '0'),
+            random: fixedRandom,
+        } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
+        const firstExitEvents = (Array.isArray(firstExitResult) ? firstExitResult : firstExitResult?.events ?? []) as DiceThroneEvent[];
+        const paused = applyEvents(state.core, firstExitEvents);
+
+        expect(Array.isArray(firstExitResult) ? undefined : firstExitResult?.halt).toBe(true);
+        expect(eventsOfType(firstExitEvents, 'ATTACK_RESOLVED')).toHaveLength(0);
+        expect(eventsOfType(firstExitEvents, 'PENDING_ATTACK_UPDATED')[0]?.payload.patch).toMatchObject({
+            postDamagePassiveActionOpportunityOffered: true,
+        });
+        expect(paused.pendingAttack?.settlementStage).toBe('postDamagePending');
+        expect(paused.pendingAttack?.resolvedDamage).toBe(6);
+        expect(validateCommand(paused, useBloodPower(3), 'defensiveRoll').valid).toBe(true);
+
+        const secondExitResult = diceThroneFlowHooks.onPhaseExit?.({
+            state: { core: paused, sys: state.sys },
+            from: 'defensiveRoll',
+            to: 'main2',
+            command: command('ADVANCE_PHASE', '0'),
+            random: fixedRandom,
+        } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
+        const secondExitEvents = (Array.isArray(secondExitResult) ? secondExitResult : secondExitResult?.events ?? []) as DiceThroneEvent[];
+
+        expect(Array.isArray(secondExitResult) ? undefined : secondExitResult?.overrideNextPhase).toBe('main2');
+        expect(eventsOfType(secondExitEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'blood-thirst',
+            totalDamage: 6,
+        });
+    });
+
     it('攻击成功伤害到 2 层流血对手后，回合结束获得 1 个鲜血之力', () => {
         const state = createBloodPowerPassiveState(0);
         state.sys.phase = 'discard';
@@ -1607,35 +1660,35 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(next.players['0'].discard.map(card => card.id)).toEqual([cardId]);
     });
 
-    it('血潮汹涌投 1 骰：利爪给 3 鲜血之力，非利爪抽 1 张牌', () => {
+    it('血潮汹涌投 1 骰：血滴给 3 鲜血之力，非血滴抽 1 张牌', () => {
         const cardId = 'card-vampire-lord-blood-surge';
-        const claw = playVampireLordCard(cardId, { cp: 0 }, createQueuedRandom([1]));
+        const bloodDrop = playVampireLordCard(cardId, { cp: 0 }, createQueuedRandom([6]));
 
-        expect(eventsOfType(claw.events, 'CARD_PLAYED')[0]?.payload).toMatchObject({
+        expect(eventsOfType(bloodDrop.events, 'CARD_PLAYED')[0]?.payload).toMatchObject({
             playerId: '0',
             cardId,
             cpCost: 0,
         });
-        expect(eventsOfType(claw.events, 'BONUS_DIE_ROLLED')[0]?.payload).toMatchObject({
-            value: 1,
-            face: VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+        expect(eventsOfType(bloodDrop.events, 'BONUS_DIE_ROLLED')[0]?.payload).toMatchObject({
+            value: 6,
+            face: VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
             playerId: '0',
             targetPlayerId: '0',
         });
-        expect(claw.next.pendingBonusDiceSettlement?.rollDieResolution?.resolutionMode).toBe('none');
-        expect(claw.next.players['0'].tokens[TOKEN_IDS.BLOOD_POWER] ?? 0).toBe(0);
+        expect(bloodDrop.next.pendingBonusDiceSettlement?.rollDieResolution?.resolutionMode).toBe('none');
+        expect(bloodDrop.next.players['0'].tokens[TOKEN_IDS.BLOOD_POWER] ?? 0).toBe(0);
 
-        const clawSettled = confirmPendingBonusDice(claw.next);
-        expect(eventsOfType(clawSettled.events, 'TOKEN_GRANTED')[0]?.payload).toMatchObject({
+        const bloodDropSettled = confirmPendingBonusDice(bloodDrop.next);
+        expect(eventsOfType(bloodDropSettled.events, 'TOKEN_GRANTED')[0]?.payload).toMatchObject({
             targetId: '0',
             tokenId: TOKEN_IDS.BLOOD_POWER,
             amount: 3,
             newTotal: 3,
             sourceAbilityId: cardId,
         });
-        expect(eventsOfType(clawSettled.events, 'CARD_DRAWN')).toHaveLength(0);
-        expect(clawSettled.next.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(3);
-        expect(clawSettled.next.players['0'].resources[RESOURCE_IDS.CP]).toBe(0);
+        expect(eventsOfType(bloodDropSettled.events, 'CARD_DRAWN')).toHaveLength(0);
+        expect(bloodDropSettled.next.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(3);
+        expect(bloodDropSettled.next.players['0'].resources[RESOURCE_IDS.CP]).toBe(0);
 
         const other = playVampireLordCard(
             cardId,

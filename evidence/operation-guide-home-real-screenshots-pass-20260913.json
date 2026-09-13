@@ -1,7 +1,7 @@
 {
   "verdict": "PASS",
   "scope": "current-user-request",
-  "generatedAt": "2026-09-13T19:02:38+08:00",
+  "generatedAt": "2026-09-13T22:38:38+08:00",
   "display": {
     "purpose": "final-user-visible-delivery",
     "trigger": "user-requested-open",
@@ -58,10 +58,10 @@
       ]
     },
     {
-      "requirement": "悬浮球说明不能画圈，标注不能遮挡悬浮球；指出位置时离悬浮球远一点。",
+      "requirement": "悬浮球说明使用醒目的大箭头；不能画圈，标注不能遮挡悬浮球；指出位置时离悬浮球远一点。",
       "status": "PASS",
       "evidence": [
-        "D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-dicethrone-source-real-screenshots-20260913/operation-guide-annotation-audit.json records only label rectangles and line endpoints; no circle annotation is generated.",
+        "D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-dicethrone-source-real-screenshots-20260913/operation-guide-annotation-audit.json records annotationStyle large-arrow for the home web, home App and in-game FAB images; no circle annotation is generated.",
         "The annotation audit checked label rectangles against each target FAB rectangle with padding and found no collisions.",
         "D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-home-real-screenshots-20260913/05-web-home-guide-home-fab-zoom.png and D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-home-real-screenshots-20260913/06-web-home-guide-game-fab-zoom.png show the expanded annotated screenshots in the viewer.",
         "D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-home-real-screenshots-20260913/09-app-home-guide-app-fab-zoom.png and D:/gongzuo/webgame/BoardGame/test-results/evidence-screenshots/_shared/operation-guide-home-real-screenshots-20260913/10-app-home-guide-game-fab-zoom.png show the App and in-game FAB annotations in the viewer."
@@ -125,6 +125,12 @@
       "completedAt": "2026-09-13T18:58:00+08:00"
     },
     {
+      "command": "node scripts/verify/build-operation-guide-fab-annotations.mjs",
+      "status": "PASS",
+      "completedAt": "2026-09-13T22:32:00+08:00",
+      "outputs": 3
+    },
+    {
       "command": "node scripts/infra/vitest-cli-safe.mjs run src/components/system/__tests__/OperationGuidePanel.test.tsx src/components/__tests__/GameHUDChatPreview.test.ts --configLoader native --pool forks --no-file-parallelism --maxWorkers 1",
       "status": "PASS",
       "completedAt": "2026-09-13T18:58:18+08:00",
@@ -132,9 +138,9 @@
       "tests": 25
     },
     {
-      "command": "node scripts/infra/run-e2e-single.mjs default e2e/_shared/operation-guide-hud.e2e.ts",
+      "command": "PW_E2E_FRONTEND_PORT=6674 node scripts/infra/run-e2e-single.mjs default e2e/_shared/operation-guide-hud.e2e.ts",
       "status": "PASS",
-      "completedAt": "2026-09-13T18:59:45+08:00",
+      "completedAt": "2026-09-13T22:38:02+08:00",
       "tests": 3
     }
   ]

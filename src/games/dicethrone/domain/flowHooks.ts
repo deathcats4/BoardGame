@@ -167,14 +167,18 @@ const shouldPauseForPostDamagePassiveAction = (
     if (attackResolvedIndex < 0) return null;
 
     const eventsBeforeAttackResolved = events.slice(0, attackResolvedIndex) as DiceThroneEvent[];
-    if (!eventsBeforeAttackResolved.some(event => event.type === 'DAMAGE_DEALT')) return null;
-
     const attackResolved = events[attackResolvedIndex] as Extract<DiceThroneEvent, { type: 'ATTACK_RESOLVED' }>;
     const attackerId = attackResolved.payload.attackerId;
     const coreBeforeAttackResolved = applyEvents(core, eventsBeforeAttackResolved, reduce);
-    if (!coreBeforeAttackResolved.pendingAttack || coreBeforeAttackResolved.pendingAttack.attackerId !== attackerId) {
+    const pendingAttack = coreBeforeAttackResolved.pendingAttack;
+    if (!pendingAttack || pendingAttack.attackerId !== attackerId) {
         return null;
     }
+    if (pendingAttack.postDamagePassiveActionOpportunityOffered === true) return null;
+
+    const damageDealtThisBatch = eventsBeforeAttackResolved.some(event => event.type === 'DAMAGE_DEALT');
+    const hasResolvedAttackDamage = (pendingAttack.resolvedDamage ?? 0) > 0;
+    if (!damageDealtThisBatch && !hasResolvedAttackDamage) return null;
 
     const hasUsablePostDamagePassive = getPlayerPassiveAbilities(coreBeforeAttackResolved, attackerId)
         .some(passive => passive.actions.some((action, actionIndex) => (
@@ -183,8 +187,24 @@ const shouldPauseForPostDamagePassiveAction = (
         )));
     if (!hasUsablePostDamagePassive) return null;
 
+    const opportunityOfferedEvent: DiceThroneEvent = {
+        type: 'PENDING_ATTACK_UPDATED',
+        payload: {
+            attackerId,
+            patch: {
+                postDamagePassiveActionOpportunityOffered: true,
+            },
+        },
+        sourceCommandType: attackResolved.sourceCommandType,
+        timestamp: attackResolved.timestamp,
+    };
+
     return {
-        events: events.filter((_, index) => index !== attackResolvedIndex),
+        events: [
+            ...events.slice(0, attackResolvedIndex),
+            opportunityOfferedEvent,
+            ...events.slice(attackResolvedIndex + 1),
+        ],
         halt: true,
     };
 };

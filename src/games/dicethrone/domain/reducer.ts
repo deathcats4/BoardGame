@@ -1098,8 +1098,8 @@ const resolveBonusDieEffectKeyForValue = (
         return value <= 2 ? 'bonusDie.effect.blinded.miss' : 'bonusDie.effect.blinded.hit';
     }
     if (effectKey.startsWith('bonusDie.effect.vampireLordBloodSurge')) {
-        return face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW
-            ? 'bonusDie.effect.vampireLordBloodSurgeClaw'
+        return face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP
+            ? 'bonusDie.effect.vampireLordBloodSurgeBloodDrop'
             : 'bonusDie.effect.vampireLordBloodSurgeOther';
     }
     if (effectKey.startsWith('bonusDie.effect.vampireLordTotalDemise')) {

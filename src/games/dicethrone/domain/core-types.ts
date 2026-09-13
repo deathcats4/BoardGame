@@ -409,6 +409,11 @@ export interface PendingAttack {
      * 后续只需要生成 ATTACK_RESOLVED 收口，不应再次重放整段攻击或二次造成伤害。
      */
     postDamageFollowUpResolved?: boolean;
+    /**
+     * 本次攻击造成伤害后，已经给过玩家一次伤害后主动能力窗口。
+     * 用于避免“给吸血机会”和“再次点击结束以跳过机会”互相循环。
+     */
+    postDamagePassiveActionOpportunityOffered?: boolean;
 }
 
 // ============================================================================

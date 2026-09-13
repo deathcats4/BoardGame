@@ -90,9 +90,9 @@ const rollBloodSurge = (description: string): AbilityEffect => ({
         target: 'self',
         diceCount: 1,
         conditionalEffects: [{
-            face: VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            face: VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
             grantToken: { tokenId: TOKEN_IDS.BLOOD_POWER, value: 3, target: 'self' },
-            effectKey: 'bonusDie.effect.vampireLordBloodSurgeClaw',
+            effectKey: 'bonusDie.effect.vampireLordBloodSurgeBloodDrop',
         }],
         defaultEffect: {
             drawCard: 1,
