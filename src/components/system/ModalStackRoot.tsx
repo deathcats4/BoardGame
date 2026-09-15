@@ -1,4 +1,4 @@
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
@@ -100,10 +100,17 @@ export const ModalStackRoot = () => {
                         ? (entry.allowPointerThrough ? 'none' : 'auto')
                         : 'none';
                     return (
-                        <div
+                        <motion.div
                             key={entry.id}
                             // 非栈顶禁止交互，只保留视觉层级
                             className="fixed inset-0"
+                            initial={{ opacity: 1, visibility: 'visible' }}
+                            animate={{ opacity: 1, visibility: 'visible' }}
+                            exit={{
+                                opacity: 0,
+                                visibility: 'hidden',
+                                transition: { duration: 0.01 },
+                            }}
                             style={{ zIndex, pointerEvents }}
                         >
                             <div className={entry.allowPointerThrough ? 'pointer-events-auto' : undefined}>
@@ -112,7 +119,7 @@ export const ModalStackRoot = () => {
                                     closeOnBackdrop: entry.closeOnBackdrop ?? true,
                                 })}
                             </div>
-                        </div>
+                        </motion.div>
                     );
                 })}
             </AnimatePresence>

@@ -44,6 +44,12 @@ const isRabbitFootAlreadyUsed = (core: Partial<BetrayalCore> | undefined): boole
 const isWaitingForEventRollConfirmation = (core: Partial<BetrayalCore> | undefined): boolean =>
     Boolean(core?.pendingEventRollResolution);
 
+const stepHandlesEventRollConfirmation = (step: TutorialStepSnapshot): boolean =>
+    Boolean(
+        step.allowedCommands?.includes(BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL)
+        || step.aiActions?.some((action) => action.commandType === BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL),
+    );
+
 const validateBetrayalBasicSetupStep = (
     state: MatchState<unknown>,
     step: TutorialStepSnapshot,
@@ -55,18 +61,21 @@ const validateBetrayalBasicSetupStep = (
     if (step.id === 'use-rabbit-foot') {
         return !isRabbitFootAlreadyUsed(core);
     }
+    if (isWaitingForEventRollConfirmation(core)) {
+        return stepHandlesEventRollConfirmation(step);
+    }
     if (step.id === 'finish') {
-        return !isWaitingForEventRollConfirmation(core) && Boolean(core?.pendingDamageAllocation);
+        return Boolean(core?.pendingDamageAllocation);
     }
     if (step.id === 'return-to-table-after-damage') {
-        return !isWaitingForEventRollConfirmation(core) && !core?.pendingDamageAllocation;
+        return !core?.pendingDamageAllocation;
     }
     return true;
 };
 
 const BETRAYAL_BASIC_SETUP_AND_TURN: TutorialManifest = {
     id: 'basic-setup-and-turn',
-    revision: 2,
+    revision: 3,
     numPlayers: 3,
     allowManualSkip: true,
     stepValidator: validateBetrayalBasicSetupStep,
@@ -487,7 +496,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     payload: { roomId: 'ground-east' },
                 },
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '1',
                 },
                 {
@@ -535,7 +544,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '2',
                 },
                 {
@@ -577,7 +586,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '1',
                 },
             ],
@@ -743,7 +752,7 @@ const BETRAYAL_HAUNT_ACTIONS_AND_FINISH: TutorialManifest = {
 
 const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
     id: 'basic-setup-and-turn',
-    revision: 2,
+    revision: 3,
     numPlayers: 3,
     allowManualSkip: true,
     stepValidator: validateBetrayalBasicSetupStep,
@@ -780,7 +789,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '1',
                 },
                 {
@@ -821,7 +830,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '2',
                 },
                 {
@@ -895,7 +904,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
+                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
                     playerId: '1',
                 },
             ],

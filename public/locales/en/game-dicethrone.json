@@ -1481,6 +1481,17 @@
       }
     }
   },
+  "passiveOpportunity": {
+    "title": "Use {{abilityName}}?",
+    "badge": "Post-attack optional ability",
+    "description": "This attack dealt {{damage}} damage. You may now use {{actionLabel}}.",
+    "damageLabel": "Damage dealt",
+    "damageValue": "{{damage}}",
+    "costLabel": "Cost",
+    "noCost": "Free",
+    "use": "Use {{actionLabel}}",
+    "skip": "Skip and continue"
+  },
   "choices": {
     "default": "Choose an option",
     "title": "Ability Resolution Choice",

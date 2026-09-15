@@ -2,7 +2,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { GameModeProvider, type GameMode } from '../../../contexts/GameModeContext';
-import { ToastProvider } from '../../../contexts/ToastContext';
+import { ToastProvider, useToast } from '../../../contexts/ToastContext';
 import { TutorialProvider } from '../../../contexts/TutorialContext';
 import { EventStreamRollbackContext, type EventStreamRollbackValue } from '../../../engine/hooks/EventStreamRollbackContext';
 import { resetFxFrameClockForTests, type FxAnchorSnapshot, type FxBus, type FxEvent } from '../../../engine/fx';
@@ -307,11 +307,25 @@ function renderFxRenderer(
     );
 }
 
+function ToastProbe() {
+    const { toasts } = useToast();
+    return (
+        <output data-testid="mage-wars-toast-probe">
+            {toasts.map((toast) => {
+                if (toast.message.kind === 'text') return toast.message.text;
+                if (toast.message.kind === 'i18n') return toast.message.key;
+                return toast.message.text;
+            }).join('\n')}
+        </output>
+    );
+}
+
 function withBoardProviders(board: ReactElement, mode: GameMode = 'test'): ReactElement {
     return (
         <ToastProvider>
             <GameModeProvider mode={mode}>
                 <TutorialProvider>
+                    <ToastProbe />
                     {board}
                 </TutorialProvider>
             </GameModeProvider>
@@ -2218,6 +2232,7 @@ describe('MageWarsBoard spell cast choices', () => {
         fireEvent.click(callOfTheWildPreparedCard!);
 
         expect(dispatch).not.toHaveBeenCalled();
+        expect(screen.getByTestId('mage-wars-toast-probe')).toHaveTextContent('error.insufficientMana');
     });
 
     it('marks creature summon targets as explicit zone targets for whole-zone highlighting', async () => {
@@ -2274,6 +2289,7 @@ describe('MageWarsBoard spell cast choices', () => {
         fireEvent.click(screen.getByTestId('mage-wars-arena-zone-c3'));
 
         expect(dispatch).not.toHaveBeenCalledWith(MAGE_WARS_COMMANDS.CAST_SPELL, expect.anything());
+        expect(screen.getByTestId('mage-wars-toast-probe')).toHaveTextContent('error.invalidSpellTarget');
     });
 
     it('casts Jet Stream by selecting an object and legal push destination from ChoiceRequest', async () => {
@@ -2431,7 +2447,7 @@ describe('MageWarsBoard spell cast choices', () => {
         });
     });
 
-    it('does not expose a blocked prepared spell as a selectable spell source', () => {
+    it('keeps a blocked prepared spell on the formal cast entry with a denial toast', () => {
         const dispatch = vi.fn();
         const { container } = renderBoardWithProviders(
             <MageWarsBoard
@@ -2445,13 +2461,14 @@ describe('MageWarsBoard spell cast choices', () => {
         );
         expect(blockedPreparedCard).not.toBeNull();
         expect(blockedPreparedCard?.getAttribute('data-primary-action')).toBe('true');
-        expect(blockedPreparedCard?.getAttribute('data-primary-action-state')).toBe('disabled');
+        expect(blockedPreparedCard?.getAttribute('data-primary-action-state')).toBe('enabled');
         expect(blockedPreparedCard?.getAttribute('data-secondary-inspect')).toBe('true');
-        expect(blockedPreparedCard).toBeDisabled();
+        expect(blockedPreparedCard).not.toBeDisabled();
 
         fireEvent.click(blockedPreparedCard!);
 
         expect(dispatch).not.toHaveBeenCalled();
+        expect(screen.getByTestId('mage-wars-toast-probe')).toHaveTextContent('error.spellRequiresCodeSupport');
         expect(blockedPreparedCard?.getAttribute('data-selected')).toBeNull();
         expect(container.querySelector('[data-testid="mage-wars-selected-card-frame"]')).toBeNull();
         expect(container.querySelector('[data-testid="mage-wars-zone-mage-entity"][data-player-id="0"]')?.getAttribute('role'))

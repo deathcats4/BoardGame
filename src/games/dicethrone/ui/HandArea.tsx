@@ -269,6 +269,7 @@ export const HandArea = ({
     const { t } = useTranslation('game-dicethrone');
     const isCoarsePointer = useCoarsePointer();
     const [draggingCardKey, setDraggingCardKey] = React.useState<string | null>(null);
+    const screenDragOffsetRef = React.useRef({ x: 0, y: 0 });
     const dragOffsetRef = React.useRef({ x: 0, y: 0 });
     const draggingCardRef = React.useRef<HandCardEntry | null>(null);
     const dragEndHandledRef = React.useRef(false);
@@ -710,11 +711,12 @@ export const HandArea = ({
         if (dragEndHandledRef.current && source === 'drag') return;
         dragEndHandledRef.current = true;
         const { x, y } = dragOffsetRef.current;
+        const screenOffset = screenDragOffsetRef.current;
         const overDiscard = isOverDiscardPile();
         const currentIndex = handEntries.findIndex(item => item.key === entry.key);
         const offset = { x, y };
         const card = entry.card;
-        const releaseIntent = resolveHandDragReleaseIntent({ overDiscard, yOffset: y });
+        const releaseIntent = resolveHandDragReleaseIntent({ overDiscard, yOffset: screenOffset.y });
 
         let actionTaken = false;
         if (releaseIntent === 'sell') {
@@ -743,6 +745,7 @@ export const HandArea = ({
         setDraggingCardKey(null);
         draggingCardRef.current = null;
         lastPointerPointRef.current = null;
+        screenDragOffsetRef.current = { x: 0, y: 0 };
         dragOffsetRef.current = { x: 0, y: 0 };
         onPlayHintChange?.(false);
         setShowSellHint(false);
@@ -767,8 +770,16 @@ export const HandArea = ({
         triggerReturn,
     ]);
 
-    const handleDrag = (_cardKey: string, info: { offset: { x: number; y: number } }) => {
-        dragOffsetRef.current = info.offset;
+    const handleDrag = (cardKey: string, info: { offset: { x: number; y: number } }) => {
+        screenDragOffsetRef.current = info.offset;
+        const boardShellOffset = {
+            x: convertScreenPixelsToBoardShellPixels(info.offset.x),
+            y: convertScreenPixelsToBoardShellPixels(info.offset.y),
+        };
+        dragOffsetRef.current = boardShellOffset;
+        const dragValues = dragValueMap.get(cardKey);
+        dragValues?.x.set(boardShellOffset.x);
+        dragValues?.y.set(boardShellOffset.y);
         const canSellInPhase = canSellCardsInPhase(currentPhase);
         const nextSellHint = canSellInPhase && isOverDiscardPile();
         if (showSellHint !== nextSellHint) {
@@ -782,6 +793,8 @@ export const HandArea = ({
         clearLongPressState(entry.key);
         dragEndHandledRef.current = false;
         draggingCardRef.current = entry;
+        screenDragOffsetRef.current = { x: 0, y: 0 };
+        dragOffsetRef.current = { x: 0, y: 0 };
         dragValues.x.set(0);
         dragValues.y.set(0);
         setDraggingCardKey(entry.key);

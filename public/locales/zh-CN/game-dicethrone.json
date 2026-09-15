@@ -1549,6 +1549,17 @@
       }
     }
   },
+  "passiveOpportunity": {
+    "title": "是否发动{{abilityName}}",
+    "badge": "攻击后可选能力",
+    "description": "本次攻击已经造成 {{damage}} 点伤害，现在可以发动 {{actionLabel}}。",
+    "damageLabel": "已造成伤害",
+    "damageValue": "{{damage}} 点",
+    "costLabel": "需要消耗",
+    "noCost": "免费",
+    "use": "发动{{actionLabel}}",
+    "skip": "不发动，继续"
+  },
   "choices": {
     "default": "请选择一个选项",
     "title": "技能结算选择",

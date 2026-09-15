@@ -56,6 +56,7 @@ import { RightSidebar } from './ui/RightSidebar';
 import { CompareRollOverlay } from './ui/CompareRollOverlay';
 import { BoardOverlays } from './ui/BoardOverlays';
 import { GameHints } from './ui/GameHints';
+import { PassiveActionOpportunityModal, type PassiveActionOpportunity } from './ui/PassiveActionOpportunityModal';
 import { useGameMode } from '../../contexts/GameModeContext';
 import { useEndgame } from '../../hooks/game/useEndgame';
 import { useCurrentChoice, useCurrentDefenderChoice, useDiceThroneState } from './hooks/useDiceThroneState';
@@ -778,6 +779,7 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
     const canOperateView = isSelfView && !isSpectator;
     const hasRolled = G.rollCount > 0;
     const [rerollSelectingAction, setRerollSelectingAction] = React.useState<{ passiveId: string; actionIndex: number } | null>(null);
+    const shouldResumeAfterPostDamagePassiveRef = React.useRef(false);
     const passiveResponseWindowType = React.useMemo((): DtResponseWindowType | undefined => {
         if (!currentResponseWindow) return undefined;
         const canActInCurrentWindow = currentResponderId === rootPid || isDirectDiceActor;
@@ -1374,6 +1376,39 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
         return map;
     }, [playerPassives, G, rootPid, currentPhase, isSpectator, passiveResponseWindowType]);
 
+    const postDamagePassiveOpportunity = React.useMemo<PassiveActionOpportunity | null>(() => {
+        const pendingAttack = G.pendingAttack;
+        if (
+            isSpectator
+            || currentPhase !== 'offensiveRoll'
+            || !pendingAttack
+            || pendingAttack.attackerId !== rootPid
+            || pendingAttack.damageResolved !== true
+            || pendingAttack.postDamagePassiveActionOpportunityOffered !== true
+            || (pendingAttack.resolvedDamage ?? 0) <= 0
+        ) {
+            return null;
+        }
+
+        for (const passive of playerPassives) {
+            const usability = passiveActionUsability.get(passive.id) ?? [];
+            const actionIndex = passive.actions.findIndex((action, idx) => (
+                action.requiresCurrentAttackDamageDealt === true
+                && usability[idx] === true
+            ));
+            if (actionIndex < 0) continue;
+
+            return {
+                passive,
+                action: passive.actions[actionIndex],
+                actionIndex,
+                resolvedDamage: pendingAttack.resolvedDamage ?? 0,
+            };
+        }
+
+        return null;
+    }, [G.pendingAttack, currentPhase, isSpectator, passiveActionUsability, playerPassives, rootPid]);
+
     const handlePassiveActionClick = React.useCallback((passiveId: string, actionIndex: number) => {
         const passive = playerPassives.find(p => p.id === passiveId);
         if (!passive) return;
@@ -1388,6 +1423,33 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
             engineMoves.usePassiveAbility(passiveId, actionIndex);
         }
     }, [playerPassives, engineMoves]);
+
+    const handlePostDamagePassiveOpportunityUse = React.useCallback(() => {
+        if (!postDamagePassiveOpportunity) return;
+        shouldResumeAfterPostDamagePassiveRef.current = true;
+        engineMoves.usePassiveAbility(
+            postDamagePassiveOpportunity.passive.id,
+            postDamagePassiveOpportunity.actionIndex,
+        );
+    }, [engineMoves, postDamagePassiveOpportunity]);
+
+    const handlePostDamagePassiveOpportunitySkip = React.useCallback(() => {
+        shouldResumeAfterPostDamagePassiveRef.current = false;
+        if (!canAdvancePhase) return;
+        engineMoves.advancePhase();
+    }, [canAdvancePhase, engineMoves]);
+
+    React.useEffect(() => {
+        if (!shouldResumeAfterPostDamagePassiveRef.current) return;
+        if (currentPhase !== 'offensiveRoll' || !G.pendingAttack) {
+            shouldResumeAfterPostDamagePassiveRef.current = false;
+            return;
+        }
+        if (postDamagePassiveOpportunity || !canAdvancePhase) return;
+
+        shouldResumeAfterPostDamagePassiveRef.current = false;
+        engineMoves.advancePhase();
+    }, [canAdvancePhase, currentPhase, engineMoves, G.pendingAttack, postDamagePassiveOpportunity]);
 
     // 被动重掷：骰子选择回调
     const handlePassiveRerollDieSelect = React.useCallback((dieId: number) => {
@@ -1413,6 +1475,29 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
             onCancelRerollSelect: () => setRerollSelectingAction(null),
         };
     }, [playerPassives, passiveActionUsability, player.resources, rerollSelectingAction, handlePassiveActionClick]);
+    const passiveActionOpportunityModalEntry = React.useMemo(() => ({
+        closeOnBackdrop: false,
+        closeOnEsc: false,
+        render: () => postDamagePassiveOpportunity ? (
+            <PassiveActionOpportunityModal
+                opportunity={postDamagePassiveOpportunity}
+                canUse
+                canSkip={canAdvancePhase}
+                onUse={handlePostDamagePassiveOpportunityUse}
+                onSkip={handlePostDamagePassiveOpportunitySkip}
+            />
+        ) : null,
+    }), [
+        canAdvancePhase,
+        handlePostDamagePassiveOpportunitySkip,
+        handlePostDamagePassiveOpportunityUse,
+        postDamagePassiveOpportunity,
+    ]);
+    useSyncedModalStackEntry({
+        enabled: postDamagePassiveOpportunity !== null,
+        entryId: 'dicethrone_post_damage_passive_opportunity',
+        entry: passiveActionOpportunityModalEntry,
+    });
     const showRailDiceTray = shouldShowRailDiceTray({
         hasKeptDice: currentRollDice.some((die) => die.isKept),
     });

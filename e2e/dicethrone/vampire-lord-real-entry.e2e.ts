@@ -2210,7 +2210,7 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
         });
     });
 
-    test('鲜血之力 4 档应通过玩家板按钮按已造成伤害治疗', async ({ page, game }, testInfo) => {
+    test('鲜血之力 4 档应通过攻击后弹窗按已造成伤害治疗并收口', async ({ page, game }, testInfo) => {
         await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
         await game.setupScene({
             gameId: 'dicethrone',
@@ -2247,16 +2247,27 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                     attackModifierBonusDamage: 0,
                     damageResolved: true,
                     resolvedDamage: 7,
+                    postDamagePassiveActionOpportunityOffered: true,
                 },
             },
         });
         await closeDebugPanelIfVisible(page);
 
-        const healButton = page.getByTestId('passive-action-vampire-lord-blood-power-3');
+        const modalRoot = page.locator('#modal-root');
+        const opportunityModal = modalRoot.getByTestId('dicethrone-passive-opportunity-modal');
+        const useOpportunityButton = modalRoot.getByTestId('dicethrone-passive-opportunity-use-button');
+        const skipOpportunityButton = modalRoot.getByTestId('dicethrone-passive-opportunity-skip-button');
         await expect(page.getByTestId('player-board-surface')).toBeVisible({ timeout: 10000 });
-        await expect(healButton).toBeVisible({ timeout: 10000 });
-        await expect(healButton).toBeEnabled();
-        await expect(healButton).not.toContainText('消耗4');
+        await expect(opportunityModal).toBeVisible({ timeout: 10000 });
+        await expect(modalRoot.getByText('是否发动鲜血之力')).toBeVisible();
+        await expect(opportunityModal).toContainText('攻击后可选能力');
+        await expect(opportunityModal).toContainText('本次攻击已经造成 7 点伤害');
+        await expect(opportunityModal).toContainText('4 鲜血之力');
+        await expect(useOpportunityButton).toContainText('发动吸血治疗');
+        await expect(useOpportunityButton).toBeEnabled();
+        await expect(skipOpportunityButton).toContainText('不发动，继续');
+        await expect(skipOpportunityButton).toBeEnabled();
+        await expect(page.getByTestId('passive-action-vampire-lord-blood-power-3')).toHaveCount(0);
         await expect.poll(async () => {
             const state = await game.getState();
             return {
@@ -2266,14 +2277,14 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 damageResolved: state?.core?.pendingAttack?.damageResolved ?? null,
             };
         }, { timeout: 10000 }).toEqual({
-                bloodPower: 4,
+            bloodPower: 4,
             hp: 38,
             resolvedDamage: 7,
             damageResolved: true,
         });
-        await game.screenshot('吸血鬼领主-鲜血之力治疗入口-使用前', testInfo);
+        await game.screenshot('吸血鬼领主-鲜血之力攻击后治疗弹窗-使用前', testInfo);
 
-        await healButton.click();
+        await useOpportunityButton.click();
 
         await expect.poll(async () => {
             const state = await game.getState();
@@ -2287,6 +2298,8 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 && event.payload?.tokenId === TOKEN_IDS.BLOOD_POWER
             ));
             return {
+                phase: state?.sys?.phase ?? null,
+                hasPendingAttack: Boolean(state?.core?.pendingAttack),
                 bloodPower: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.BLOOD_POWER] ?? null,
                 hp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.HP] ?? null,
                 hasTokenConsumed: getLastEventTypes(state).includes('TOKEN_CONSUMED'),
@@ -2295,6 +2308,8 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
                 events: getLastEventTypes(state),
             };
         }, { timeout: 10000 }).toEqual({
+            phase: 'main2',
+            hasPendingAttack: false,
             bloodPower: 0,
             hp: 45,
             hasTokenConsumed: true,
@@ -2310,11 +2325,86 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
             }),
             events: expect.arrayContaining(['HEAL_APPLIED']),
         });
-        await expect(healButton).toBeVisible({ timeout: 10000 });
-        await expect(healButton).toBeDisabled();
+        await expect(opportunityModal).toBeHidden({ timeout: 10000 });
+        await expect(page.getByTestId('passive-action-vampire-lord-blood-power-3')).toHaveCount(0);
         await expect(page.getByTestId(`dt-player-0-token-${TOKEN_IDS.BLOOD_POWER}`)).toHaveCount(0);
         await waitForDiceThroneVisualIdle(page);
         await game.screenshot('吸血鬼领主-鲜血之力治疗后收口', testInfo);
+    });
+
+    test('鲜血之力 4 档攻击后弹窗允许不发动并继续收口', async ({ page, game }, testInfo) => {
+        await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
+        await game.setupScene({
+            gameId: 'dicethrone',
+            player0: {
+                resources: { CP: 2, HP: 38 },
+                tokens: { [TOKEN_IDS.BLOOD_POWER]: 4 },
+            },
+            player1: {
+                resources: { CP: 2, HP: 43 },
+            },
+            currentPlayer: '0',
+            phase: 'offensiveRoll',
+            extra: {
+                selectedCharacters: { '0': 'vampire_lord', '1': 'monk' },
+                hostStarted: true,
+                activePlayerId: '0',
+                rollCount: 1,
+                rollLimit: 3,
+                rollConfirmed: true,
+                dice: [
+                    { id: 0, value: 1, isKept: false },
+                    { id: 1, value: 2, isKept: false },
+                    { id: 2, value: 3, isKept: false },
+                    { id: 3, value: 4, isKept: false },
+                    { id: 4, value: 6, isKept: false },
+                ],
+                pendingAttack: {
+                    attackerId: '0',
+                    defenderId: '1',
+                    sourceAbilityId: 'blood-thirst',
+                    settlementStage: 'postDamagePending',
+                    isDefendable: true,
+                    bonusDamage: 0,
+                    attackModifierBonusDamage: 0,
+                    damageResolved: true,
+                    resolvedDamage: 7,
+                    postDamagePassiveActionOpportunityOffered: true,
+                },
+            },
+        });
+        await closeDebugPanelIfVisible(page);
+
+        const modalRoot = page.locator('#modal-root');
+        const opportunityModal = modalRoot.getByTestId('dicethrone-passive-opportunity-modal');
+        const skipOpportunityButton = modalRoot.getByTestId('dicethrone-passive-opportunity-skip-button');
+        await expect(opportunityModal).toBeVisible({ timeout: 10000 });
+        await expect(skipOpportunityButton).toContainText('不发动，继续');
+
+        await skipOpportunityButton.click();
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const eventTypes = getLastEventTypes(state);
+            return {
+                phase: state?.sys?.phase ?? null,
+                hasPendingAttack: Boolean(state?.core?.pendingAttack),
+                bloodPower: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.BLOOD_POWER] ?? null,
+                hp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                healed: eventTypes.includes('HEAL_APPLIED'),
+                attackResolved: eventTypes.includes('ATTACK_RESOLVED'),
+            };
+        }, { timeout: 10000 }).toEqual({
+            phase: 'main2',
+            hasPendingAttack: false,
+            bloodPower: 4,
+            hp: 38,
+            healed: false,
+            attackResolved: true,
+        });
+        await expect(opportunityModal).toBeHidden({ timeout: 10000 });
+        await waitForDiceThroneVisualIdle(page);
+        await game.screenshot('吸血鬼领主-鲜血之力不发动后进入主要阶段2', testInfo);
     });
 
     test('血色杀戮应通过玩家板终极技打开抽牌堆搜牌交互并结算', async ({ page, game }, testInfo) => {

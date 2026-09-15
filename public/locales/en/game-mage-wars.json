@@ -231,7 +231,29 @@
     }
   },
   "error": {
-    "unsupportedCommand": "This command is not in the foundation implementation scope yet."
+    "unsupportedCommand": "This command is not in the foundation implementation scope yet.",
+    "actionUnavailable": "You cannot do that right now.",
+    "wrongPhase": "You cannot do that during the current phase.",
+    "tutorialBlocked": "The tutorial step does not allow that action yet. Follow the current prompt first.",
+    "invalidSpellTarget": "That target cannot receive the selected spell.",
+    "invalidMoveTarget": "You cannot move to that zone.",
+    "invalidAttackTarget": "You cannot attack that target right now.",
+    "invalidAbilityTarget": "That target cannot receive the selected ability.",
+    "invalidArenaObjectAbility": "That object ability cannot be used that way right now.",
+    "invalidMageAbility": "That mage ability cannot be used that way right now.",
+    "insufficientMana": "Not enough mana to cast that spell.",
+    "manaCostMismatch": "The mana cost does not match the selected spell.",
+    "spellNotPrepared": "That spell has not been prepared, so it cannot be cast.",
+    "spellNotQuick": "That spell is not a quick spell, so it cannot be used in a quickcast window.",
+    "quickcastSpent": "The quickcast marker is spent, so you cannot quickcast again.",
+    "actionSpent": "The action marker is spent, so you cannot act again.",
+    "objectActionSpent": "That unit's action marker is spent, so it cannot act again.",
+    "notYourObject": "You do not control that object.",
+    "invalidTargetObject": "That target object is invalid.",
+    "targetOutOfRange": "The target is out of range.",
+    "wallEdgeOccupied": "That edge already has a wall.",
+    "missingTarget": "Choose a legal target first.",
+    "spellRequiresCodeSupport": "That spell is not in the current playable scope yet."
   },
   "spellbook": {
     "previousPage": "Previous page",

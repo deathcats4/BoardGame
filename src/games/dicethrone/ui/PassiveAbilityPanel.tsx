@@ -38,6 +38,10 @@ const ACTION_ICON: Record<string, React.ReactNode> = {
     custom: <Sparkles style={{ width: dtUnit(0.9), height: dtUnit(0.9) }} />,
 };
 
+const isCurrentOpportunityOnlyAction = (action: PassiveActionDef): boolean => (
+    action.requiresCurrentAttackDamageDealt === true
+);
+
 export const PassiveAbilityPanel: React.FC<PassiveAbilityPanelProps> = ({
     passives,
     actionUsability,
@@ -62,7 +66,10 @@ export const PassiveAbilityPanel: React.FC<PassiveAbilityPanelProps> = ({
                     isSelecting,
                 };
             })
-            .filter(item => item.isUsable || item.isSelecting || item.action.showWhenUnavailable);
+            .filter(item => (
+                !isCurrentOpportunityOnlyAction(item.action)
+                && (item.isUsable || item.isSelecting || item.action.showWhenUnavailable)
+            ));
     });
 
     if (visibleActions.length === 0) return null;

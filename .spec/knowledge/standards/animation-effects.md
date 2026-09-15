@@ -31,6 +31,28 @@ metadata:
 
 暂不把 PixiJS / Phaser / Cocos 作为默认特效后端。若某个游戏确实要引入外部渲染器，必须先写清它替代哪些 Board / FX 职责、如何接入状态与输入命令、如何回退和压测。
 
+## Web 微交互动效参数
+
+普通 Web UI 动画先用项目已有 token、组件和动效语法；缺 token 时新增到共享样式 / 组件层，不能在多个组件里手写近似曲线或时长。
+
+| 场景 | 默认参数 |
+| --- | --- |
+| 按钮 / 可点击物按压反馈 | `transform: scale(0.97)`，100-160ms |
+| Tooltip / 小型 popover | 125-200ms |
+| Dropdown / select / 菜单 | 150-250ms |
+| Modal / drawer / 结算浮层 | 200-500ms；超过 300ms 必须说明原因 |
+| 列表 / 网格成组进入 | 30-80ms stagger；不得阻塞交互 |
+
+- 进入和退出默认使用 `ease-out`；屏幕内移动或形态变化使用 `ease-in-out`；hover / 颜色变化使用 `ease`；持续转动、进度或循环使用 `linear`。
+- UI 动画禁止使用 `ease-in` 作为进入、退出或玩家等待的主曲线；它会把最该即时反馈的开头变慢。
+- 需要新增强曲线时，优先使用并沉淀为共享 token：`cubic-bezier(0.23, 1, 0.32, 1)` 作为强 `ease-out`，`cubic-bezier(0.77, 0, 0.175, 1)` 作为强 `ease-in-out`，`cubic-bezier(0.32, 0.72, 0, 1)` 作为 drawer / sheet 曲线。
+- 进入动画禁止从 `scale(0)` 开始；默认从 `scale(0.9-0.97)` 加透明度进入，让对象来源和尺寸关系可读。
+- Popover、dropdown、menu、tooltip 这类有触发点的浮层，`transform-origin` 必须来自触发点或等价锚点；modal / 全屏结算层不绑定单一触发点时保持居中。
+- Toast、toggle、快速重复触发 UI 和可逆状态变化优先使用可中断的 transition 或 spring；不要用每次从零重播的 keyframes 抢占当前展示值。
+- 手势、拖拽、滑动和可被中途反向操作的动画使用 spring 或等价可中断机制，并从当前屏幕展示值继续；不得先停住或跳回目标值再开始下一段。
+- 简单挂载进入可用 CSS `@starting-style`；需要程序控制且不值得引入 Motion 时可用 WAAPI；不要为了淡入、颜色或轻位移新增更重的动效框架。
+- `prefers-reduced-motion` 必须随动画一起处理：保留有助理解的透明度 / 颜色反馈，移除或减弱大位移、弹跳、视差和循环运动。hover 动效必须用 `(hover: hover) and (pointer: fine)` 限制，避免触屏误触发。
+
 ## FX 架构
 
 - `FxCue`：分层 cue 名，例如 `fx.summon`、`fx.combat.hit`。
@@ -82,9 +104,11 @@ metadata:
 - 新增特效前先写清玩家可见语义和成本来源：渲染数量、布局测量、绘制属性、图片 / shader 预热、跨组件刷新。
 - 性能优化只能减少真实工作量、隔离重渲染、使用合成属性、预热资源或改渲染载体；改变强度、节奏、时机、位置或可见对象属于表现变更。
 - Canvas、WebGL、粒子和投射物路径接入共享 FX 帧时钟；普通 React UI 反馈、hover、glow、轻量 timer 不把 FX 帧时钟当通用 `setTimeout`。
-- 优先动画 `transform`、`opacity`、必要时 `filter`；避免 `transition-all`、频繁动画 `border-*`、`box-shadow` 和布局属性。
+- 优先动画 `transform`、`opacity`、必要时 `filter`；避免 `transition-all`、频繁动画 `border-*`、`box-shadow` 和 `width` / `height` / `margin` / `padding` / `top` / `left` 等布局属性。
 - `transition` 与 `@keyframes` 不要同时控制同一属性；同一元素只能有一个权威动画源。
 - 毛玻璃保持静态，若要动效只动遮罩层透明度，不反复改变 blur 半径。
+- 不要在父元素上反复写 CSS 变量来驱动大量子元素的 transform；高频动效应直接写目标元素的 `transform` / motion value，避免整棵子树样式重算。
+- Framer Motion 在高负载或帧级交互中不要默认使用 `x` / `y` / `scale` 简写作为性能结论；需要性能稳定时优先写完整 `transform` 字符串或使用项目已有 motion value 封装，并用 trace / 录屏验证。
 
 ## Canvas 与 Shader
 
