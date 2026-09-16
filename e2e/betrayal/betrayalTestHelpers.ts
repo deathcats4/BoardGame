@@ -899,6 +899,10 @@ export const expectEventRollWorkbenchReadable = async (
       (target) => target.selected,
     ).length;
     expect(
+      selectedRerollTargetCount,
+      `${label}同一批改骰目标最多只能有一个选中态：${JSON.stringify(metrics)}`,
+    ).toBeLessThanOrEqual(1);
+    expect(
       metrics.rerollHighlightRenderer,
       `${label}兔脚改骰必须保留 Three.js 骰体描边作为本体外壳辅助：${JSON.stringify(metrics)}`,
     ).toBe("threejs-backside-shader-shell");
@@ -1099,7 +1103,7 @@ export const expectEventRollWorkbenchReadable = async (
           `${label}选中描边不能外扩成离体大框：${evidence}`,
         ).toBeLessThanOrEqual(1.075);
         expect(
-        target.webglShell?.opacity,
+          target.webglShell?.opacity,
           `${label}选中 Three.js 外壳要可见，但主要清晰度由贴脸 SVG 描边承担：${evidence}`,
         ).toBeGreaterThanOrEqual(0.8);
         expect(
@@ -1132,7 +1136,7 @@ export const expectEventRollWorkbenchReadable = async (
           `${label}候选描边不能外扩成离体大框：${evidence}`,
         ).toBeLessThanOrEqual(1.055);
         expect(
-        target.webglShell?.opacity,
+          target.webglShell?.opacity,
           `${label}候选 Three.js 外壳必须低透明，避免盖住骰面：${evidence}`,
         ).toBeGreaterThanOrEqual(0.65);
         expect(
