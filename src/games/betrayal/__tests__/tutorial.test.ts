@@ -1495,14 +1495,16 @@ describe('Betrayal 教程配置', () => {
         expect(zhCNLocale.tutorial.omenConfirmation.steps.review).toContain('你获得这张预兆');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.title).toContain('作祟自然触发');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).toContain('正常回合');
-        expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).toContain('其它席位在后台按正式流程推进');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).toContain('轮序回到你时继续行动');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).not.toContain('后台');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).toContain('你以英雄视角阅读英雄剧本书');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).toContain('第一个英雄目标行动');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).not.toContain('两个英雄目标行动');
         expect(zhCNLocale.tutorial.hauntNaturalTrigger.description).not.toContain('你探索预兆房间');
         expect(enLocale.tutorial.hauntNaturalTrigger.title).toContain('Natural Haunt Trigger');
         expect(enLocale.tutorial.hauntNaturalTrigger.description).toContain('normal turns');
-        expect(enLocale.tutorial.hauntNaturalTrigger.description).toContain('other seats advance in the background');
+        expect(enLocale.tutorial.hauntNaturalTrigger.description).toContain('when turn order returns to you');
+        expect(enLocale.tutorial.hauntNaturalTrigger.description).not.toContain('background');
         expect(enLocale.tutorial.hauntNaturalTrigger.description).toContain('Hero Scenario Book');
         expect(enLocale.tutorial.hauntNaturalTrigger.description).toContain('first hero objective action');
         expect(enLocale.tutorial.hauntNaturalTrigger.description).not.toContain('first two hero objective actions');

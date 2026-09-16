@@ -1121,7 +1121,7 @@
     },
     "hauntNaturalTrigger": {
       "title": "Natural Haunt Trigger: Omen to First Hero Action",
-      "description": "Continue through normal turns: control only your own turn while other seats advance in the background through the normal flow. Once the haunt is public, read the Hero Scenario Book and complete the first hero objective action: finding the Mummy's true name.",
+      "description": "Continue through normal turns: control only your own turns, then act again when turn order returns to you. Once the haunt is public, read the Hero Scenario Book and complete the first hero objective action: finding the Mummy's true name.",
       "steps": {
         "setupNaturalHauntFlow": "This section teaches the majority hero perspective: you end your turn beside the Library and control only your own turn. The traitor book has its own chapter.",
         "handOffToTeammateOne": "Choose End Turn to pass play to the next explorer. Haunt risk rises as players actually gain Omens.",

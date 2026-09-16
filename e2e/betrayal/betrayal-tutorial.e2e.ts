@@ -62,7 +62,7 @@ const STEP_40 = `${EVIDENCE_DIR}/topic-omen-confirmation/01-预兆牌确认与�
 const STEP_42 = `${EVIDENCE_DIR}/topic-omen-confirmation/02-确认后回牌桌持有区.jpg`;
 const STEP_43 = `${EVIDENCE_DIR}/topic-omen-confirmation/03-确认后预兆进度条.jpg`;
 const STEP_HAUNT_NATURAL_01 = `${HAUNT_NATURAL_DIR}/01-当前玩家结束回合前.jpg`;
-const STEP_HAUNT_NATURAL_02 = `${HAUNT_NATURAL_DIR}/02-后台推进后回到当前玩家.jpg`;
+const STEP_HAUNT_NATURAL_02 = `${HAUNT_NATURAL_DIR}/02-回到你的回合继续行动.jpg`;
 const STEP_HAUNT_NATURAL_03 = `${HAUNT_NATURAL_DIR}/03-当前玩家看到英雄开场过场.jpg`;
 const STEP_HAUNT_NATURAL_04 = `${HAUNT_NATURAL_DIR}/04-开场过场继续进入英雄剧本书.jpg`;
 const STEP_HAUNT_NATURAL_05 = `${HAUNT_NATURAL_DIR}/05-英雄剧本书目标页与图书馆原因.jpg`;
@@ -2938,7 +2938,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     assertNoFatalFrontendErrors([{ label: "betrayal-tutorial", diagnostics }]);
   });
 
-  test("[haunt-natural] 其它席位后台自然触发作祟后当前玩家读英雄书并执行找真名再回到结束回合入口", async ({
+  test("[haunt-natural] 正式轮序触发作祟后当前玩家读英雄书并执行找真名再回到结束回合入口", async ({
     page,
     context,
   }) => {
@@ -3092,7 +3092,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       });
     await expect
       .poll(readHauntState, {
-        message: "其它席位后台推进结束后必须回到当前玩家且仍处于作祟前",
+        message: "正式轮序承接后必须回到当前玩家且仍处于作祟前",
         timeout: 30000,
       })
       .toMatchObject({
@@ -3276,7 +3276,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toContainText("从上层平台可前往的房间");
     await expect
       .poll(readHauntState, {
-        message: "作祟读本关闭后后台轮序必须交回当前英雄",
+        message: "作祟读本关闭后正式轮序必须交回当前英雄",
         timeout: 30000,
       })
       .toMatchObject({
@@ -5265,7 +5265,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       });
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "其它席位后台推进结束后必须回到当前玩家，不能停成中间教程页",
+        message: "正式轮序承接后必须回到当前玩家，不能停成中间教程页",
         timeout: 30000,
       })
       .toMatchObject({
@@ -5287,7 +5287,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     expect(visibleMainFlowStepIds).not.toContain("teammate-two-omen-results");
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "后台确认后必须回到当前玩家，不能进入代操作其它席位流程",
+        message: "正式自动承接后必须回到当前玩家，不能进入代操作其它席位流程",
         timeout: 30000,
       })
       .toMatchObject({
@@ -5299,7 +5299,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "move-to-grand-staircase",
-      mainFlowFullShot(26, "后台推进后移动到大阶梯"),
+      mainFlowFullShot(26, "回到你的回合后移动到大阶梯"),
     );
 
     await page.getByTestId("betrayal-action-move").click();
@@ -5571,7 +5571,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toContainText("从上层平台可前往的房间");
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "作祟读本关闭后后台轮序必须交回当前英雄",
+        message: "作祟读本关闭后正式轮序必须交回当前英雄",
         timeout: 30000,
       })
       .toMatchObject({
