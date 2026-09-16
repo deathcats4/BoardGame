@@ -3,7 +3,7 @@ import { initAllAbilities, resetAbilityInit } from '../../abilities';
 import { clearRegistry } from '../../domain/abilityRegistry';
 import { clearBaseAbilityRegistry, triggerBaseAbility, triggerExtendedBaseAbility } from '../../domain/baseAbilities';
 import { clearInteractionHandlers } from '../../domain/abilityInteractionHandlers';
-import { clearOngoingEffectRegistry, fireTriggers } from '../../domain/ongoingEffects';
+import { clearOngoingEffectRegistry, collectTriggers, fireTriggers } from '../../domain/ongoingEffects';
 import { maybeResolveReactionQueue } from '../../domain/reactionQueue';
 import {
     SU_COMMANDS,
@@ -336,7 +336,7 @@ describe('DIY 杀人狂 abilities', () => {
             matchState: makeMatchState(core),
             baseIndex: 0,
             baseDefId: 'base_diy_killers_camp_crystal_lake',
-            playerId: '1',
+            playerId: '0',
             destroyerId: '0',
             minionPower: 3,
             now: 11,
@@ -401,6 +401,118 @@ describe('DIY 杀人狂 abilities', () => {
         );
         expect(destroyed.success, destroyed.error).toBe(true);
         expect(destroyed.finalState.core.bases[0].minions.some(minion => minion.uid === 'victim1')).toBe(false);
+    });
+
+    it('人皮脸响应提交后摧毁同基地弱仆从，并写入本回合已发动', () => {
+        const core = makeState({
+            turnNumber: 12,
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_diy_killers_camp_crystal_lake', [
+                makeMinion('leatherface', 'diy_killers_leatherface', '0', 5),
+                makeMinion('weak', 'ghosts_spectre', '1', 2),
+            ])],
+        });
+
+        const queued = collectTriggers(core, 'onMinionAffected', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            baseIndex: 0,
+            triggerMinionUid: 'leatherface',
+            triggerMinionDefId: 'diy_killers_leatherface',
+            triggerMinion: core.bases[0].minions[0],
+            counterChangeKind: 'added',
+            counterDelta: 1,
+            random: defaultTestRandom,
+            now: 21,
+        }, { sourceDefIds: ['diy_killers_leatherface'] });
+        expect(queued).toBeDefined();
+
+        const prompted = maybeResolveReactionQueue(
+            makeMatchState({ ...core, triggerQueue: queued!.payload.triggers } as any),
+            defaultTestRandom,
+            21,
+        );
+        const opened = respondToPromptOption(
+            prompted!.state,
+            option => option.value?.triggerId === queued!.payload.triggers[0].id,
+            '人皮脸可选触发',
+            '0',
+            defaultTestRandom,
+        );
+        const resolved = respondToPromptOption(
+            opened.finalState,
+            option => option.value?.minionUid === 'weak',
+            '人皮脸摧毁弱仆从',
+            '0',
+            defaultTestRandom,
+        );
+
+        expect(resolved.finalState.core.bases[0].minions.some(minion => minion.uid === 'weak')).toBe(false);
+        expect(resolved.finalState.core.bases[0].minions.find(minion => minion.uid === 'leatherface')?.metadata?.diyKillersLeatherfaceUsedTurn).toBe(12);
+    });
+
+    it('电锯响应提交后把宿主移动到玩家选择的基地', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase('base_diy_killers_camp_crystal_lake', [
+                    makeMinion('host', 'robot_microbot_alpha', '0', 2, {
+                        attachedActions: [{ uid: 'chainsaw', defId: 'diy_killers_chainsaw', ownerId: '0' } as any],
+                    }),
+                    makeMinion('victim', 'ghosts_spectre', '1', 2),
+                ]),
+                makeBase('base_the_deep', []),
+            ],
+        });
+
+        const queued = collectTriggers(core, 'onMinionDestroyed', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            baseIndex: 0,
+            triggerMinionUid: 'victim',
+            triggerMinionDefId: 'ghosts_spectre',
+            triggerMinion: core.bases[0].minions[1],
+            random: defaultTestRandom,
+            now: 22,
+        }, { sourceDefIds: ['diy_killers_chainsaw'] });
+        expect(queued).toBeDefined();
+
+        const prompted = maybeResolveReactionQueue(
+            makeMatchState({ ...core, triggerQueue: queued!.payload.triggers } as any),
+            defaultTestRandom,
+            22,
+        );
+        const opened = respondToPromptOption(
+            prompted!.state,
+            option => option.value?.triggerId === queued!.payload.triggers[0].id,
+            '电锯可选触发',
+            '0',
+            defaultTestRandom,
+        );
+        const movePrompt = getSimpleChoicePrompt(opened.finalState, 'diy_killers_chainsaw_move');
+        const moveOption = getPromptOption(
+            movePrompt,
+            option => option.value?.toBaseIndex === 1,
+            '电锯目标基地',
+        );
+        const moved = respondToPrompt(
+            opened.finalState,
+            moveOption.id,
+            '0',
+            defaultTestRandom,
+        );
+
+        expect(moved.finalState.core.bases[0].minions.some(minion => minion.uid === 'host')).toBe(false);
+        const movedHost = moved.finalState.core.bases[1].minions.find(minion => minion.uid === 'host');
+        expect(movedHost?.attachedActions.some(action => action.uid === 'chainsaw')).toBe(true);
     });
 
     it('大砍刀天赋把宿主移动到有其他玩家仆从的基地', () => {

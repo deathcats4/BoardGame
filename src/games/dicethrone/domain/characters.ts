@@ -549,7 +549,7 @@ export function initHeroState(
         upgradeCardByAbilityId: {},
         passiveAbilities: data.passiveAbilities ? JSON.parse(JSON.stringify(data.passiveAbilities)) : undefined,
         ...(characterId === 'lieren'
-            ? { companion: { id: 'nyra' as const, hp: 7, maxHp: 7 } }
+            ? { companion: { id: 'nyra' as const, hp: 7, maxHp: 7, active: true } }
             : {}),
     };
 }

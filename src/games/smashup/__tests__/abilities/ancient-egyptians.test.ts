@@ -261,6 +261,36 @@ describe('Ancient Egyptians queued source-controller runtime context', () => {
         const pharaohTrigger = (queued as any).payload.triggers.find((trigger: any) => trigger.sourceCardUid === 'pharaoh-pod-1');
         expect(pharaohTrigger).toBeDefined();
         expect(pharaohTrigger.ownerPlayerId).toBe('1');
+
+        const queuedState = maybeResolveReactionQueue(
+            makeMatchState({ ...core, triggerQueue: (queued as any).payload.triggers }),
+            defaultTestRandom,
+            4104,
+        );
+        expect(queuedState).toBeDefined();
+        const reactionOption = getPromptOption(
+            getReactionPrompt(queuedState!.state),
+            option => option.value?.triggerId === pharaohTrigger.id,
+            'Pharaoh POD before scoring trigger',
+        );
+        const opened = respondToPrompt(queuedState!.state, reactionOption.id, '1', defaultTestRandom);
+        const sourcePrompt = getSimpleChoicePrompt(opened.finalState, 'ancient_egyptians_pharaoh_before_scoring_choose_source');
+        const sourceOption = getPromptOption(
+            sourcePrompt,
+            option => (option.value?.sourceUid ?? option.value?.minionUid) === 'pharaoh-pod-1',
+            'Pharaoh POD source minion',
+        );
+        const sourceStep = respondToPrompt(opened.finalState, sourceOption.id, '1', defaultTestRandom);
+        const uncoverPrompt = getSimpleChoicePrompt(sourceStep.finalState, 'ancient_egyptians_pharaoh_before_scoring');
+        const uncoverOption = getPromptOption(
+            uncoverPrompt,
+            option => option.value?.cardUid === 'buried-2',
+            'Pharaoh POD buried card',
+        );
+        const resolved = respondToPrompt(sourceStep.finalState, uncoverOption.id, '1', defaultTestRandom);
+
+        expect(resolved.finalState.core.bases[0].buriedCards?.some(card => card.uid === 'buried-2')).toBe(false);
+        expect(resolved.finalState.core.bases[0].minions.some(minion => minion.uid === 'buried-2')).toBe(true);
     });
 
     it('ancient_egyptians_seal_the_tomb 真实 uncover 多选若先翻开随从再翻开 Blessing of Anubis，后者也应看到新翻开的随从', () => {

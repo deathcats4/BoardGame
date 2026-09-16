@@ -3,7 +3,7 @@
 import { registerCustomActionHandler, type CustomActionContext } from '../effects';
 import { LIEREN_DICE_FACE_IDS as FACE } from '../ids';
 import { RESOURCE_IDS } from '../resources';
-import { getActiveDice, getFaceCounts } from '../rules';
+import { getActiveDice, getFaceCounts, isNyraCompanionActive } from '../rules';
 import type { DiceThroneEvent } from '../types';
 
 type NyraEffect = 'heal' | 'grant-bond' | 'grant-bond-and-heal';
@@ -44,7 +44,7 @@ function handleKindredBond(context: CustomActionContext): DiceThroneEvent[] {
     const sabertoothDamage = context.action.params?.includeSabertooth === true
         ? (faceCounts[FACE.SABERTOOTH] ?? 0)
         : 0;
-    const clawDamage = player.companion.hp > 0 ? (faceCounts[FACE.CLAW] ?? 0) * 2 : 0;
+    const clawDamage = isNyraCompanionActive(player) ? (faceCounts[FACE.CLAW] ?? 0) * 2 : 0;
     const totalDamage = spearDamage + sabertoothDamage + clawDamage;
     const healAmount = faceCounts[FACE.NYRAS_BOND] ?? 0;
     const opponent = context.state.players[context.ctx.defenderId];

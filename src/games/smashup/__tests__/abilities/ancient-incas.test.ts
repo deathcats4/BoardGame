@@ -208,6 +208,74 @@ describe('古代印加人代表性玩法行为', () => {
         expect(selectedTrigger.finalState.core.players['0'].hand.map(card => card.uid)).toEqual(['draw-card']);
     });
 
+    it('太阳之子响应提交后授予额外行动，并在同回合写入已触发标记', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_machu_picchu', [
+                makeMinion('child', 'ancient_incas_child_of_the_sun', '0', 2),
+            ])],
+        });
+
+        const queued = collectTriggers(core, 'onActionPlayed', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            baseIndex: 0,
+            actionTargetBaseIndex: 0,
+            actionTargetType: 'base',
+            triggerCardUid: 'played-action',
+            triggerCardDefId: 'ancient_incas_temple_of_the_sun',
+            triggerCardOwnerId: '0',
+            random: FIXED_RANDOM,
+            now: 35,
+        });
+        const childTrigger = queued?.payload.triggers.find(trigger => trigger.sourceDefId === 'ancient_incas_child_of_the_sun');
+        expect(childTrigger).toBeDefined();
+
+        const prompted = maybeResolveReactionQueue(
+            makeMatchState({ ...core, triggerQueue: queued!.payload.triggers } as any),
+            FIXED_RANDOM,
+            36,
+        );
+        const resolved = respondToPromptOption(
+            prompted!.state,
+            option => option.value?.triggerId === childTrigger!.id,
+            'choose 太阳之子 trigger',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(resolved.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.LIMIT_MODIFIED,
+            payload: expect.objectContaining({
+                playerId: '0',
+                limitType: 'action',
+                delta: 1,
+                reason: 'ancient_incas_child_of_the_sun',
+            }),
+        }));
+        expect(resolved.finalState.core.players['0'].actionLimit).toBe(2);
+        expect(resolved.finalState.core.bases[0].minions[0].metadata?.ancientIncasChildOfTheSunTriggeredTurn).toBe(1);
+
+        const duplicate = collectTriggers(resolved.finalState.core, 'onActionPlayed', {
+            state: resolved.finalState.core,
+            matchState: resolved.finalState,
+            playerId: '0',
+            baseIndex: 0,
+            actionTargetBaseIndex: 0,
+            actionTargetType: 'base',
+            triggerCardUid: 'second-action',
+            triggerCardDefId: 'ancient_incas_fortress_walls',
+            triggerCardOwnerId: '0',
+            random: FIXED_RANDOM,
+            now: 37,
+        });
+        expect(duplicate?.payload.triggers.some(trigger => trigger.sourceDefId === 'ancient_incas_child_of_the_sun')).not.toBe(true);
+    });
+
     it('萨帕·印加在己方行动打到基地后给该基地己方随从放置指示物', () => {
         const core = makeState({
             bases: [

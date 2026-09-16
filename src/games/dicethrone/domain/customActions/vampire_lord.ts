@@ -120,6 +120,7 @@ function createMesmerizeRerollInteraction(
         titleKey: 'interaction.selectOpponentDieToReroll',
         selectCount: 1,
         selected: [],
+        skipAbilityReselection: true,
         diceOwnerId: diceOwnerIds.length === 1 ? diceOwnerIds[0] : undefined,
         targetOpponentDice: true,
         allowedDieIds: opponentDice.map((die) => die.id),

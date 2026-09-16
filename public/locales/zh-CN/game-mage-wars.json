@@ -114,7 +114,8 @@
     "inspectCardAria": "放大查看 {{name}}",
     "observeOpponentPublicView": "观察对手公开区",
     "opponentPublicView": "对手公开视角",
-    "backToSelfView": "返回自己视角"
+    "backToSelfView": "返回自己视角",
+    "phaseProgressTitle": "回合流程"
   },
   "zonesPanel": {
     "title": "私有与附着区",

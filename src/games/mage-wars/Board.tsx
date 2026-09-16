@@ -35,6 +35,7 @@ import { buildChoiceRequestFromOpportunity } from '../../engine/TimingOpportunit
 import type { PlayerId } from '../../engine/types';
 import type { GameBoardProps } from '../../engine/transport/protocol';
 import { useRuntimeViewport } from '../../hooks/ui/useRuntimeViewport';
+import { useTouchInspectGesture } from '../../hooks/ui/useTouchInspectGesture';
 import { useEndgame } from '../../hooks/game/useEndgame';
 import { useToast } from '../../contexts/ToastContext';
 import { useTutorial, useTutorialBridge } from '../../contexts/TutorialContext';
@@ -51,9 +52,9 @@ import {
     type MageWarsArenaObjectState,
     type MageWarsCastSpellCommand,
     type MageWarsCore,
-    type MageWarsPhase,
     type MageWarsPlayerState,
 } from './domain';
+import { MAGE_WARS_PHASE_ORDER, type MageWarsPhase } from './domain/types';
 import type { MageWarsWallState } from './domain/types';
 import {
     getMageWarsMageAbilityFromConfig,
@@ -161,14 +162,11 @@ const MAGE_WARS_SPELLBOOK_VISIBLE_CARD_COUNT = 6;
 const MAGE_WARS_TUTORIAL_JUNGLE_WOLF_CARD_ID = 2819;
 const MAGE_WARS_TUTORIAL_ROUSE_THE_BEAST_CARD_ID = 3403;
 const MAGE_WARS_TUTORIAL_THORNS_WALL_CARD_ID = 25700;
-// 与大杀四方手牌放大镜同量级：2vw / 8.5vw ≈ 23.5% 卡宽；用卡牌容器宽度自适应，避免 16:9 放大后图标相对变小。
+// 与召唤师战争卡牌/单位检视入口同量级；用卡牌容器宽度自适应，避免宽屏放大后图标相对变小。
 const MAGE_WARS_REFERENCE_INSPECT_BUTTON_SIZE = 'clamp(28px, 18.5cqw, 34px)';
 const MAGE_WARS_REFERENCE_INSPECT_ICON_SIZE = 'clamp(15px, 10cqw, 19px)';
-const MAGE_WARS_HUD_HINT_CARD_HEIGHT_CSS_VAR = 'var(--mage-wars-desktop-hud-hint-card-height, 15.75rem)';
+const MAGE_WARS_HUD_HINT_CARD_HEIGHT_CSS_VAR = 'var(--mage-wars-desktop-hud-hint-card-height, calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem)))';
 const MAGE_WARS_HUD_COMPACT_HINT_CARD_HEIGHT_REM = 4.5;
-const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MIN = 240;
-const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_RATIO = 0.24;
-const MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MAX_RATIO = 0.32;
 const MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET = 316;
 const MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO = 0.28;
 const MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO = 0.45;
@@ -306,6 +304,7 @@ function CardInspectButton({
     onInspect: () => void;
 }) {
     const { t } = useTranslation('game-mage-wars');
+    const shouldShowInspectButton = alwaysVisible;
     const referenceButtonStyle: CSSProperties | undefined = compact
         ? undefined
         : {
@@ -324,11 +323,11 @@ function CardInspectButton({
             className={cx(
                 'absolute right-1 top-1 z-40 grid place-items-center rounded-full border border-amber-100/55 bg-black/74 text-amber-50 shadow-[0_6px_14px_rgba(0,0,0,0.5)] transition-[opacity,border-color,background-color,color] duration-150 hover:border-amber-100 hover:bg-amber-300 hover:text-stone-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-100',
                 compact && (readableCompact ? 'h-10 w-10' : 'h-5 w-5'),
-                alwaysVisible
+                shouldShowInspectButton
                     ? 'pointer-events-auto opacity-100'
                     : cx(
-                        'pointer-events-none opacity-0 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100',
-                        revealOnGroupHover && 'group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                        'pointer-events-none opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100',
+                        revealOnGroupHover && 'group-hover:pointer-events-auto group-hover:opacity-100',
                     ),
             )}
             style={referenceButtonStyle}
@@ -626,6 +625,66 @@ function MageWarsLifeToggle({
         >
             <MageWarsLifeVisibilityIcon />
         </button>
+    );
+}
+
+function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
+    const { t } = useTranslation('game-mage-wars');
+    const currentIndex = Math.max(0, MAGE_WARS_PHASE_ORDER.indexOf(phase));
+
+    return (
+        <aside
+            className="pointer-events-none absolute z-20 w-[clamp(8.25rem,8.2vw,10rem)] rounded-[0.4rem] border border-amber-100/18 bg-stone-950/48 p-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
+            style={{
+                left: 'var(--mage-wars-desktop-side-inset, 1rem)',
+                top: 'calc(var(--mage-wars-desktop-top-inset, 0.875rem) + 3.4rem)',
+            }}
+            data-testid="mage-wars-phase-progress-indicator"
+            data-tutorial-id="mw-phase-progress"
+            data-current-phase={phase}
+            data-current-phase-index={currentIndex}
+            aria-label={t('ui.phaseProgressTitle')}
+        >
+            <div className="mb-1.5 text-[0.62rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/76">
+                {t('ui.phaseProgressTitle')}
+            </div>
+            <ol className="flex flex-col gap-1">
+                {MAGE_WARS_PHASE_ORDER.map((phaseId, index) => {
+                    const active = phaseId === phase;
+                    const complete = index < currentIndex;
+                    return (
+                        <li
+                            key={phaseId}
+                            className={cx(
+                                'flex min-h-5 items-center gap-1.5 rounded-[0.22rem] px-1.5 py-0.5 text-[0.64rem] font-bold leading-tight transition-colors',
+                                active
+                                    ? 'bg-amber-200/88 text-stone-950 shadow-[0_0_12px_rgba(251,191,36,0.24)]'
+                                    : complete
+                                        ? 'text-amber-100/78'
+                                        : 'text-stone-300/62',
+                            )}
+                            data-testid="mage-wars-phase-progress-item"
+                            data-phase-id={phaseId}
+                            data-phase-active={active ? 'true' : 'false'}
+                            data-phase-complete={complete ? 'true' : 'false'}
+                        >
+                            <span
+                                className={cx(
+                                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                                    active
+                                        ? 'bg-stone-950'
+                                        : complete
+                                            ? 'bg-amber-200/70'
+                                            : 'bg-stone-500/70',
+                                )}
+                                aria-hidden="true"
+                            />
+                            <span className="min-w-0 truncate">{t(`phases.${phaseId}`)}</span>
+                        </li>
+                    );
+                })}
+            </ol>
+        </aside>
     );
 }
 
@@ -1117,9 +1176,9 @@ function PreparedSpellCard({
     planningDraft = false,
     planSlotIndex,
     copyCount,
-    disabled = false,
     primaryActionIntent = false,
     onClick,
+    onUnavailable,
     onInspect,
     tutorialId,
 }: {
@@ -1135,9 +1194,9 @@ function PreparedSpellCard({
     planningDraft?: boolean;
     planSlotIndex?: number;
     copyCount?: number;
-    disabled?: boolean;
     primaryActionIntent?: boolean;
     onClick?: () => void;
+    onUnavailable?: () => void;
     onInspect?: () => void;
     tutorialId?: string;
 }) {
@@ -1154,9 +1213,24 @@ function PreparedSpellCard({
         ...(!compact ? { height: 'var(--mage-wars-desktop-card-height, 14rem)' } : {}),
     };
     const hasPrimaryActionIntent = Boolean(primaryActionIntent || onClick);
-    const primaryActionEnabled = Boolean(onClick && !disabled);
+    const primaryActionEnabled = Boolean(onClick);
     const hasBrowseInspectAction = !hasPrimaryActionIntent && Boolean(onInspect);
     const hasSecondaryInspect = Boolean(hasPrimaryActionIntent && onInspect);
+    const touchInspectKey = [
+        'prepared',
+        preparedScope ?? 'none',
+        testId ?? 'card',
+        cardId ?? 'empty',
+        planSlotIndex ?? 'slot',
+    ].join(':');
+    const {
+        getTouchInspectProps,
+        shouldBlockInspectClick,
+    } = useTouchInspectGesture<string, null>({
+        enabled: Boolean(onInspect),
+        onInspect: () => onInspect?.(),
+    });
+    const touchInspectProps = getTouchInspectProps(touchInspectKey, null);
 
     const content = (
         <>
@@ -1232,10 +1306,15 @@ function PreparedSpellCard({
                     data-primary-action="true"
                     data-primary-action-state={primaryActionEnabled ? 'enabled' : 'disabled'}
                     data-secondary-inspect={hasSecondaryInspect ? 'true' : undefined}
-                    disabled={!primaryActionEnabled}
+                    aria-disabled={!primaryActionEnabled ? 'true' : undefined}
+                    {...touchInspectProps}
                     onClick={(event) => {
                         event.stopPropagation();
-                        if (!primaryActionEnabled) return;
+                        if (shouldBlockInspectClick(touchInspectKey)) return;
+                        if (!primaryActionEnabled) {
+                            onUnavailable?.();
+                            return;
+                        }
                         onClick?.();
                     }}
                     aria-label={title}
@@ -1262,7 +1341,6 @@ function PreparedSpellCard({
                 className={cx(
                     'relative block shrink-0 cursor-zoom-in text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-100',
                     cardSizeClass,
-                    disabled && !onInspect && 'cursor-not-allowed opacity-45',
                     onClick && 'cursor-pointer',
                 )}
                 style={cardSizeStyle}
@@ -1278,8 +1356,10 @@ function PreparedSpellCard({
                 data-plan-slot-index={planSlotIndex ?? undefined}
                 data-browse-inspectable={onInspect ? 'true' : undefined}
                 disabled={false}
+                {...touchInspectProps}
                 onClick={(event) => {
                     event.stopPropagation();
+                    if (shouldBlockInspectClick(touchInspectKey)) return;
                     onInspect?.();
                 }}
                 aria-label={title}
@@ -1357,6 +1437,15 @@ function ZoneFieldCard({
     const cardSizeStyle: CSSProperties = { aspectRatio: cardAspectRatio };
     const life = visualLife ?? object?.life ?? 0;
     const damage = visualDamage ?? 0;
+    const touchInspectKey = `field:${object?.id ?? cardId}`;
+    const {
+        getTouchInspectProps,
+        shouldBlockInspectClick,
+    } = useTouchInspectGesture<string, null>({
+        enabled: Boolean(onInspect),
+        onInspect: () => onInspect?.(),
+    });
+    const touchInspectProps = getTouchInspectProps(touchInspectKey, null);
 
     if (!previewRef) return null;
     const hasPrimaryActionIntent = Boolean(primaryActionIntent || onClick);
@@ -1435,9 +1524,12 @@ function ZoneFieldCard({
             )}
             ref={fxAnchorRef}
             style={cardSizeStyle}
-            disabled={!primaryActionEnabled && !hasBrowseInspectAction}
+            disabled={!primaryActionEnabled && !hasBrowseInspectAction && !hasSecondaryInspect}
+            aria-disabled={!primaryActionEnabled && (hasPrimaryActionIntent || hasSecondaryInspect) ? 'true' : undefined}
+            {...touchInspectProps}
             onClick={(event) => {
                 event.stopPropagation();
+                if (shouldBlockInspectClick(touchInspectKey)) return;
                 if (primaryActionEnabled) {
                     onClick?.();
                     return;
@@ -1521,6 +1613,15 @@ function ArenaAttachmentCard({
                 : 'h-14';
     const cardAspectRatio = getMageWarsSpellCardAspectRatio(object.sourceSpellCardId) ?? SPELL_CARD_BACK_ASPECT_RATIO;
     const cardSizeStyle: CSSProperties = { aspectRatio: cardAspectRatio };
+    const touchInspectKey = `attachment:${object.id}`;
+    const {
+        getTouchInspectProps,
+        shouldBlockInspectClick,
+    } = useTouchInspectGesture<string, null>({
+        enabled: Boolean(onInspect),
+        onInspect: () => onInspect?.(),
+    });
+    const touchInspectProps = getTouchInspectProps(touchInspectKey, null);
 
     if (!previewRef) return null;
     const hasPrimaryActionIntent = Boolean(primaryActionIntent || onClick);
@@ -1585,9 +1686,12 @@ function ArenaAttachmentCard({
                 type="button"
                 className={className}
                 ref={fxAnchorRef as (element: HTMLButtonElement | null) => void}
-                disabled={!primaryActionEnabled && !hasBrowseInspectAction}
+                disabled={!primaryActionEnabled && !hasBrowseInspectAction && !hasSecondaryInspect}
+                aria-disabled={!primaryActionEnabled && (hasPrimaryActionIntent || hasSecondaryInspect) ? 'true' : undefined}
+                {...touchInspectProps}
                 onClick={(event) => {
                     event.stopPropagation();
+                    if (shouldBlockInspectClick(touchInspectKey)) return;
                     if (primaryActionEnabled) {
                         onClick?.();
                         return;
@@ -1780,6 +1884,7 @@ function DiscardPile({
             data-tutorial-id={tutorialId}
             data-discard-owner-role={ownerRole}
             data-discard-owner-id={player.id}
+            data-layout-position="right-action-column-above-main-action"
         >
             <button
                 type="button"
@@ -1825,6 +1930,7 @@ function SpellbookShelf({
     selectedCardIds,
     onSelectedCardIdsChange,
     onInspectCard,
+    onUnavailableAction,
     tutorialStepId,
     onTutorialPlanningStepComplete,
     isTutorialTargetAllowed,
@@ -1837,6 +1943,7 @@ function SpellbookShelf({
     selectedCardIds: number[];
     onSelectedCardIdsChange: Dispatch<SetStateAction<number[]>>;
     onInspectCard?: (cardId: number, label?: string) => void;
+    onUnavailableAction?: (reason?: string) => void;
     tutorialStepId?: string;
     onTutorialPlanningStepComplete?: (stepId: string) => void;
     isTutorialTargetAllowed?: (targetId: string) => boolean;
@@ -1990,9 +2097,9 @@ function SpellbookShelf({
                             selected={(selectedCountsByCardId.get(entry.spellCardId) ?? 0) > 0}
                             selectedCount={selectedCountsByCardId.get(entry.spellCardId) ?? 0}
                             copyCount={entry.count}
-                            disabled={!cardCanPlan}
                             primaryActionIntent={planning}
                             onClick={cardCanPlan ? () => togglePlannedCard(entry.spellCardId, entry.count) : undefined}
+                            onUnavailable={cardCanPlan ? undefined : () => onUnavailableAction?.('tutorialBlocked')}
                             onInspect={() => onInspectCard?.(
                                 entry.spellCardId,
                                 getMageWarsSpellCardName(entry.spellCardId) ?? t('privateZones.spell'),
@@ -2067,6 +2174,7 @@ function PreparedSpellsDock({
     planningDraftCardIds = [],
     onSelect,
     onInspectCard,
+    onUnavailableAction,
     onPlanningDraftRemove,
 }: {
     player: MageWarsPlayerState;
@@ -2077,6 +2185,7 @@ function PreparedSpellsDock({
     planningDraftCardIds?: number[];
     onSelect: (cardId: number) => void;
     onInspectCard?: (cardId: number, label?: string) => void;
+    onUnavailableAction?: (reason?: string) => void;
     onPlanningDraftRemove?: (slotIndex: number) => void;
 }) {
     const { t } = useTranslation('game-mage-wars');
@@ -2123,8 +2232,7 @@ function PreparedSpellsDock({
                             selected={visibleCardId === selectedCardId || isPlanningDraftCard}
                             planningDraft={isPlanningDraftCard}
                             planSlotIndex={slot + 1}
-                            disabled={visibleCardId == null || (!canAttemptVisibleSpell && !canRemovePlanningDraft)}
-                            primaryActionIntent={visibleCardId != null && (canAttemptVisibleSpell || canRemovePlanningDraft)}
+                            primaryActionIntent={visibleCardId != null}
                             onClick={visibleCardId == null
                                 ? undefined
                                 : canRemovePlanningDraft
@@ -2132,6 +2240,17 @@ function PreparedSpellsDock({
                                     : canAttemptVisibleSpell
                                         ? () => onSelect(visibleCardId)
                                         : undefined}
+                            onUnavailable={visibleCardId == null || canRemovePlanningDraft || canAttemptVisibleSpell
+                                ? undefined
+                                : () => onUnavailableAction?.(
+                                    !canAct
+                                        ? 'actionUnavailable'
+                                        : !canCast
+                                            ? 'tutorialBlocked'
+                                            : !CAST_PHASES.has(phase)
+                                                ? 'wrongPhase'
+                                                : 'actionUnavailable',
+                                )}
                             onInspect={visibleCardId == null
                                 ? undefined
                                 : () => onInspectCard?.(
@@ -3545,26 +3664,20 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
     const isLandscapeMobileViewport = viewport.width <= 1023 && viewport.width > viewport.height;
     const desktopBottomGap = isLandscapeMobileViewport ? 0 : MAGE_WARS_DESKTOP_BOTTOM_GAP_PX;
     const cameraFitInsets = useMemo(() => {
-        const minBottomInset = isLandscapeMobileViewport
-            ? MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET
-            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MIN;
-        const bottomInsetRatio = isLandscapeMobileViewport
-            ? MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO
-            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_RATIO;
-        const maxBottomInsetRatio = isLandscapeMobileViewport
-            ? MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO
-            : MAGE_WARS_DESKTOP_CAMERA_BOTTOM_UI_INSET_MAX_RATIO;
+        if (!isLandscapeMobileViewport) {
+            return undefined;
+        }
 
         return {
             bottom: Math.min(
                 Math.max(
-                    minBottomInset,
-                    Math.round(viewport.height * bottomInsetRatio),
+                    MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET,
+                    Math.round(viewport.height * MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO),
                 ),
-                Math.round(viewport.height * maxBottomInsetRatio),
-            ) + desktopBottomGap,
+                Math.round(viewport.height * MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO),
+            ),
         };
-    }, [desktopBottomGap, isLandscapeMobileViewport, viewport.height]);
+    }, [isLandscapeMobileViewport, viewport.height]);
     const phase = G.sys.phase ?? 'reset';
     const core = G.core;
     const players = core.playerOrder.map((id) => core.players[id]).filter(Boolean);
@@ -4211,7 +4324,10 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
         return edgeSelections[0];
     };
     const handleZoneSelect = (zoneId: ArenaZoneId) => {
-        if (pendingObjectAbility || pendingMageAbility) return;
+        if (pendingObjectAbility || pendingMageAbility) {
+            showDeniedActionToast('invalidAbilityTarget');
+            return;
+        }
         const pendingSpellTargetObject = pendingSpellTargetObjectId ? core.objects[pendingSpellTargetObjectId] : undefined;
         const pendingSpellTargetPlayer = pendingSpellTargetPlayerId ? core.players[pendingSpellTargetPlayerId] : undefined;
         if (selectedSpellCardId != null && selectedSpell && pendingSpellTargetObject) {
@@ -4285,7 +4401,10 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
         }
     };
     const handleWallEdgeSelect = (edgeId: MageWarsWallEdgeId) => {
-        if (pendingObjectAbility || pendingMageAbility) return;
+        if (pendingObjectAbility || pendingMageAbility) {
+            showDeniedActionToast('invalidAbilityTarget');
+            return;
+        }
         if (selectedSpellCardId == null || !selectedSpell || !spellNeedsWallEdgeTarget) return;
         const wallEdgeSelection = findSpellCastWallEdgeSelection(edgeId);
         if (wallEdgeSelection) {
@@ -4727,9 +4846,9 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             inset: 0,
             '--mage-wars-desktop-hud-width': 'clamp(18.25rem, 17vw, 21.5rem)',
             '--mage-wars-desktop-self-hud-left': 'var(--mage-wars-desktop-side-inset, 1rem)',
-            '--mage-wars-desktop-hud-hint-card-height': 'clamp(15.75rem, 22vh, 18.75rem)',
             '--mage-wars-hud-icon-size': 'clamp(3.75rem, 5vh, 4.25rem)',
             '--mage-wars-hud-icon-gap': 'clamp(0.16rem, 0.22vh, 0.3rem)',
+            '--mage-wars-desktop-hud-hint-card-height': 'calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem))',
             '--mage-wars-hud-icon-rail-gap': 'clamp(0.35rem, 0.48vw, 0.6rem)',
             '--mage-wars-desktop-prepared-width': 'clamp(19.125rem, 19vw, 31rem)',
             '--mage-wars-desktop-prepared-card-height': 'clamp(13.5rem, 20.75vh, 17rem)',
@@ -4874,6 +4993,9 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                 }}
                 className={isLandscapeMobileViewport ? 'left-4 top-4' : undefined}
             />
+            {!isLandscapeMobileViewport ? (
+                <MageWarsPhaseProgressIndicator phase={phase} />
+            ) : null}
 
             <MageWarsInteractionDock
                 interaction={G.sys.interaction?.current}
@@ -4990,15 +5112,6 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                     </div>
                 </aside>
             ) : null}
-            {publicViewPlayer ? (
-                <aside className="pointer-events-none absolute right-14 top-[50.5%] z-20">
-                    <DiscardPile
-                        player={publicViewPlayer}
-                        onInspectCard={handleInspectSpellCard}
-                        ownerRole={isOpponentPublicView ? 'opponent' : 'self'}
-                    />
-                </aside>
-            ) : null}
             <div
                 className="pointer-events-none absolute z-30 grid items-end"
                 style={{
@@ -5022,6 +5135,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                             selectedCardIds={selectedPlanningSpellCardIds}
                             onSelectedCardIdsChange={setSelectedPlanningSpellCardIds}
                             onInspectCard={handleInspectSpellCard}
+                            onUnavailableAction={showDeniedActionToast}
                             tutorialStepId={tutorialStep?.id}
                             onTutorialPlanningStepComplete={() => nextStep('manual')}
                             isTutorialTargetAllowed={isTutorialTargetAllowed}
@@ -5030,6 +5144,13 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                     ) : null}
                 </aside>
                 <aside className="pointer-events-none flex flex-col items-center gap-2 justify-self-end">
+                    {publicViewPlayer ? (
+                        <DiscardPile
+                            player={publicViewPlayer}
+                            onInspectCard={handleInspectSpellCard}
+                            ownerRole={isOpponentPublicView ? 'opponent' : 'self'}
+                        />
+                    ) : null}
                     <div className="pointer-events-auto">
                         <TurnStatusDock
                             action={turnMainAction}
@@ -5046,6 +5167,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                             planningDraftCardIds={selectedPlanningSpellCardIds}
                             onSelect={handlePreparedSpellSelect}
                             onInspectCard={handleInspectSpellCard}
+                            onUnavailableAction={showDeniedActionToast}
                             onPlanningDraftRemove={removePlanningDraftAtSlot}
                         />
                     ) : null}

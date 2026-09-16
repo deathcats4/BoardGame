@@ -365,12 +365,14 @@ export interface HealAppliedEvent extends GameEvent<'HEAL_APPLIED'> {
     };
 }
 
-/** 妮拉受到伤害或治疗。伙伴不复用英雄 HP，避免影响胜负与队伍共享生命。 */
+/** 妮拉受到伤害、治疗或翻回激活面。伙伴不复用英雄 HP，避免影响胜负与队伍共享生命。 */
 export interface CompanionHealthChangedEvent extends GameEvent<'COMPANION_HEALTH_CHANGED'> {
     payload: {
         playerId: PlayerId;
         companionId: 'nyra';
         delta: number;
+        /** 显式设置妮拉激活态；省略时保留原激活态，血量降到 0 会自动倒下。 */
+        active?: boolean;
         sourceAbilityId?: string;
     };
 }

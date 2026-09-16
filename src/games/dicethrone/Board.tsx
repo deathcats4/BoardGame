@@ -18,6 +18,7 @@ import {
     getOpponents,
     areTeammates,
     getUpgradeTargetAbilityId,
+    isNyraCompanionActive,
 } from './domain/rules';
 import { useTranslation } from 'react-i18next';
 import { OptimizedImage } from '../../components/common/media/OptimizedImage';
@@ -606,8 +607,7 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
         isTokenResponseInteraction
         && pendingDamage
         && isTokenResponder
-        && player?.characterId === 'lieren'
-        && (player.companion?.hp ?? 0) > 0
+        && isNyraCompanionActive(player)
         && !G.pendingAttack?.isUltimate
         && Math.max(0, pendingDamage.currentDamage) > 0,
     );
@@ -935,9 +935,7 @@ export const DiceThroneBoard: React.FC<DiceThroneBoardProps> = ({ G: rawG, dispa
             !isTokenResponseInteraction
             || !pendingDamage
             || !isTokenResponder
-            || player?.characterId !== 'lieren'
-            || !companion
-            || companion.hp <= 0
+            || !isNyraCompanionActive(player)
             || G.pendingAttack?.isUltimate
             || currentDamage <= 0
         ) {

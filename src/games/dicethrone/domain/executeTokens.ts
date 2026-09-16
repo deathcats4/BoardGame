@@ -16,7 +16,7 @@ import type {
     StatusAppliedEvent,
     DtResponseWindowType,
 } from './types';
-import { getPendingBonusSettlementDice, getPlayerDieFace, getTokenStackLimit } from './rules';
+import { getPendingBonusSettlementDice, getPlayerDieFace, getTokenStackLimit, isNyraCompanionActive } from './rules';
 import { reduce } from './reducer';
 import { RESOURCE_IDS } from './resources';
 import { DICETHRONE_COMMANDS, STATUS_IDS, TOKEN_IDS } from './ids';
@@ -306,7 +306,7 @@ export function executeTokenCommand(
                     command.playerId !== pendingDamage.responderId
                     || state.pendingAttack?.isUltimate
                     || player?.characterId !== 'lieren'
-                    || (player.companion?.hp ?? 0) <= 0
+                    || !isNyraCompanionActive(player)
                     || amount !== pendingDamage.currentDamage
                 ) break;
                 events.push({
@@ -342,7 +342,7 @@ export function executeTokenCommand(
                 const canAssignDamage = command.playerId === pendingDamage.responderId
                     && !state.pendingAttack?.isUltimate
                     && player?.characterId === 'lieren'
-                    && (player.companion?.hp ?? 0) > 0
+                    && isNyraCompanionActive(player)
                     && (player.tokens[TOKEN_IDS.NYRAS_BOND] ?? 0) >= 1
                     && Number.isInteger(amount)
                     && amount >= 1
@@ -706,7 +706,7 @@ export function executeTokenCommand(
             ) {
                 // 攻击方结束增伤后，普通不可防御伤害仍允许符合条件的卡牌与状态 Token 响应。
                 const defender = state.players[pendingDamage.targetPlayerId];
-                const hasNyraRedirect = defender?.characterId === 'lieren' && (defender.companion?.hp ?? 0) > 0;
+                const hasNyraRedirect = isNyraCompanionActive(defender);
                 const hasDefenderResponse = hasDefensiveTokens(
                     state,
                     pendingDamage.targetPlayerId,

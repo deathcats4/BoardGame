@@ -45,6 +45,7 @@ import {
     isTeamMode,
     getPendingBonusSettlementDice,
     hasPendingBonusDiceSettlement,
+    isNyraCompanionActive,
 } from './rules';
 import { resolveAttack, resolveAttackWithSneakImmunityAfterDefense, resolveOffensivePreDefenseEffects, resolvePostDamageEffects, resolveWithDamageAfterChoice } from './attack';
 import { resourceSystem } from './resourceSystem';
@@ -91,6 +92,8 @@ const BLINDED_CHECK_SETTLEMENT_ID = 'blinded-check';
 const TIANSHi_DAZZLE_CHECK_SETTLEMENT_ID = 'tianshi-dazzle-check';
 const STATUS_CHECK_ORDER_DAZZLE_FIRST = 'status-check-order-dazzle-first';
 const STATUS_CHECK_ORDER_BLINDED_FIRST = 'status-check-order-blinded-first';
+const NYRA_DOWNED_UPKEEP_HEAL_SOURCE_ID = 'upkeep-nyra-downed-heal';
+const NYRA_UPKEEP_REVIVAL_SOURCE_ID = 'upkeep-nyra-revival';
 
 const isLegacySelectedHeroMissingInitialization = (
     player: DiceThroneCore['players'][string] | undefined,
@@ -162,19 +165,26 @@ const shouldPauseForPostDamagePassiveAction = (
     core: DiceThroneCore,
     events: readonly GameEvent[],
     phase: TurnPhase,
+    commandType: string,
+    timestamp: number,
 ): { events: GameEvent[]; halt: true } | null => {
     const attackResolvedIndex = events.findIndex(event => event.type === 'ATTACK_RESOLVED');
-    if (attackResolvedIndex < 0) return null;
-
-    const eventsBeforeAttackResolved = events.slice(0, attackResolvedIndex) as DiceThroneEvent[];
-    const attackResolved = events[attackResolvedIndex] as Extract<DiceThroneEvent, { type: 'ATTACK_RESOLVED' }>;
-    const attackerId = attackResolved.payload.attackerId;
+    const eventsBeforeAttackResolved = (
+        attackResolvedIndex >= 0
+            ? events.slice(0, attackResolvedIndex)
+            : events
+    ) as DiceThroneEvent[];
+    const attackResolved = attackResolvedIndex >= 0
+        ? events[attackResolvedIndex] as Extract<DiceThroneEvent, { type: 'ATTACK_RESOLVED' }>
+        : undefined;
     const coreBeforeAttackResolved = applyEvents(core, eventsBeforeAttackResolved, reduce);
     const pendingAttack = coreBeforeAttackResolved.pendingAttack;
+    const attackerId = attackResolved?.payload.attackerId ?? pendingAttack?.attackerId;
     if (!pendingAttack || pendingAttack.attackerId !== attackerId) {
         return null;
     }
     if (pendingAttack.postDamagePassiveActionOpportunityOffered === true) return null;
+    if (getPendingAttackSettlementStage(pendingAttack) !== 'postDamagePending') return null;
 
     const damageDealtThisBatch = eventsBeforeAttackResolved.some(event => event.type === 'DAMAGE_DEALT');
     const hasResolvedAttackDamage = (pendingAttack.resolvedDamage ?? 0) > 0;
@@ -192,18 +202,19 @@ const shouldPauseForPostDamagePassiveAction = (
         payload: {
             attackerId,
             patch: {
+                damageResolved: true,
                 postDamagePassiveActionOpportunityOffered: true,
             },
         },
-        sourceCommandType: attackResolved.sourceCommandType,
-        timestamp: attackResolved.timestamp,
+        sourceCommandType: attackResolved?.sourceCommandType ?? commandType,
+        timestamp: attackResolved?.timestamp ?? timestamp,
     };
 
     return {
         events: [
-            ...events.slice(0, attackResolvedIndex),
+            ...eventsBeforeAttackResolved,
             opportunityOfferedEvent,
-            ...events.slice(attackResolvedIndex + 1),
+            ...(attackResolvedIndex >= 0 ? events.slice(attackResolvedIndex + 1) : []),
         ],
         halt: true,
     };
@@ -845,7 +856,7 @@ function resolvePostAttackFollowUp(
     timestamp: number,
     phase: TurnPhase
 ): PhaseExitResult {
-    const postDamagePassivePause = shouldPauseForPostDamagePassiveAction(core, events, phase);
+    const postDamagePassivePause = shouldPauseForPostDamagePassiveAction(core, events, phase, commandType, timestamp);
     if (postDamagePassivePause) {
         return postDamagePassivePause;
     }
@@ -993,6 +1004,50 @@ function resolveBleedUpkeepEvents(
     }
 
     return events;
+}
+
+function resolveNyraUpkeepEvents(
+    core: DiceThroneCore,
+    playerId: string,
+    sourceCommandType: string,
+    timestamp: number,
+): DiceThroneEvent[] {
+    const player = core.players[playerId];
+    const companion = player?.companion;
+    if (player?.characterId !== 'lieren' || companion?.id !== 'nyra') return [];
+    if (isNyraCompanionActive(player)) return [];
+
+    if (companion.hp >= 5) {
+        return [{
+            type: 'COMPANION_HEALTH_CHANGED',
+            payload: {
+                playerId,
+                companionId: 'nyra',
+                delta: 0,
+                active: true,
+                sourceAbilityId: NYRA_UPKEEP_REVIVAL_SOURCE_ID,
+            },
+            sourceCommandType,
+            timestamp,
+        } as DiceThroneEvent];
+    }
+
+    if (companion.hp < companion.maxHp) {
+        return [{
+            type: 'COMPANION_HEALTH_CHANGED',
+            payload: {
+                playerId,
+                companionId: 'nyra',
+                delta: 1,
+                active: false,
+                sourceAbilityId: NYRA_DOWNED_UPKEEP_HEAL_SOURCE_ID,
+            },
+            sourceCommandType,
+            timestamp,
+        } as DiceThroneEvent];
+    }
+
+    return [];
 }
 
 function appendPendingAttackResolvedEvent(
@@ -2755,6 +2810,13 @@ export const diceThroneFlowHooks: FlowHooks<DiceThroneCore> = {
                     random,
                 ));
             }
+
+            events.push(...resolveNyraUpkeepEvents(
+                phaseEnterCore,
+                activeId,
+                command.type,
+                timestamp + 0.05,
+            ));
         }
 
         // ========== 状态修复：检测并修复未完成英雄初始化的旧存档 ==========

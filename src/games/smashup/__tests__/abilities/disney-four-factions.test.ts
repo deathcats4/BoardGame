@@ -1681,6 +1681,100 @@ describe('迪士尼四派系代表性玩法行为', () => {
         }));
     });
 
+    it('狮子王：生命的循环响应提交后授予额外角色，并可实际把合格角色打到基地', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [
+                        makeCard('eligible-zazu', 'lion_king_zazu', 'minion', '0'),
+                        makeCard('too-strong-nala', 'lion_king_nala', 'minion', '0'),
+                    ],
+                    deck: [
+                        makeCard('scar-draw-a', 'frozen_snowgie', 'minion', '0'),
+                        makeCard('scar-draw-b', 'lion_king_zazu', 'minion', '0'),
+                    ],
+                    minionsPlayed: 1,
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase('test_base', [
+                    makeMinion('scar', 'lion_king_scar', '0', 5),
+                    makeMinion('circle-host', 'frozen_snowgie', '0', 2, {
+                        attachedActions: [
+                            { uid: 'circle-life', defId: 'lion_king_circle_of_life', ownerId: '0' },
+                        ],
+                    }),
+                ]),
+                makeBase('base_pride_rock'),
+            ],
+        });
+
+        const result = invokeRegisteredAbilityContract('lion_king_scar', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            cardUid: 'scar',
+            defId: 'lion_king_scar',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 38,
+        });
+        const destroyed = respondToPromptOption(
+            result.matchState!,
+            option => option.value?.minionUid === 'circle-host',
+            '刀疤消灭附着生命的循环的角色',
+            '0',
+            FIXED_RANDOM,
+        );
+        const reactionPrompt = getReactionPrompt(destroyed.finalState);
+        const circleOption = getReactionPromptOptionBySourceDefId(destroyed.finalState, reactionPrompt, 'lion_king_circle_of_life');
+
+        const granted = respondToPrompt(destroyed.finalState, circleOption.id, '0', FIXED_RANDOM);
+
+        expect(granted.success, granted.error).toBe(true);
+        expect(granted.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.LIMIT_MODIFIED,
+            payload: expect.objectContaining({
+                playerId: '0',
+                limitType: 'minion',
+                delta: 1,
+                reason: 'lion_king_circle_of_life',
+                powerMax: 3,
+            }),
+        }));
+        expect(granted.finalState.core.triggerQueue).toBeUndefined();
+        expect(granted.finalState.core.players['0'].discard.map(card => card.uid)).toEqual(expect.arrayContaining([
+            'circle-host',
+            'circle-life',
+        ]));
+
+        const rejectedTooStrong = runCommand(granted.finalState, {
+            type: SU_COMMANDS.PLAY_MINION,
+            playerId: '0',
+            payload: { cardUid: 'too-strong-nala', baseIndex: 1 },
+        }, FIXED_RANDOM);
+        expect(rejectedTooStrong.success).toBe(false);
+
+        const playedExtra = runCommand(granted.finalState, {
+            type: SU_COMMANDS.PLAY_MINION,
+            playerId: '0',
+            payload: { cardUid: 'eligible-zazu', baseIndex: 1 },
+        }, FIXED_RANDOM);
+
+        expect(playedExtra.success, playedExtra.error).toBe(true);
+        expect(playedExtra.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.MINION_PLAYED,
+            payload: expect.objectContaining({
+                cardUid: 'eligible-zazu',
+                defId: 'lion_king_zazu',
+                baseIndex: 1,
+            }),
+        }));
+        expect(playedExtra.finalState.core.bases[1].minions.map(minion => minion.uid)).toContain('eligible-zazu');
+        expect(playedExtra.finalState.core.players['0'].hand.map(card => card.uid)).toEqual(['too-strong-nala', 'scar-draw-a', 'scar-draw-b']);
+    });
+
     it('花木兰：集体训练给己方全场角色放指示物，金宝保护己方角色不受敌方影响', () => {
         const core = makeState({
             bases: [

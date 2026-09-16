@@ -895,6 +895,8 @@ export interface HeroState {
         id: 'nyra';
         hp: number;
         maxHp: number;
+        /** 妮拉是否处于激活面。倒下后普通治疗只恢复血量，不立即恢复承伤/加伤资格。 */
+        active?: boolean;
     };
 }
 

@@ -271,6 +271,7 @@ const createMesmerizeOpponentRollState = (tokens = 1) => {
         attackerId: '0',
         defenderId: '1',
         sourceAbilityId: 'blood-thirst',
+        defenseAbilityId: 'meditation',
         settlementStage: 'preDefense',
         isDefendable: true,
         bonusDamage: 0,
@@ -1045,6 +1046,7 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             oldValue: 6,
             newValue: 2,
             playerId: '0',
+            sourceCardId: TOKEN_IDS.MESMERIZE,
             ownerId: '1',
         });
         expect(rerolled.state.core.dice.find(die => die.id === 0)?.value).toBe(2);
@@ -1061,6 +1063,36 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(confirmed.success).toBe(true);
         if (!confirmed.success) return;
         expectNoPrompt(confirmed.state);
+
+        const eventsAfterMesmerize = [
+            ...used.events,
+            ...settled.events,
+            ...rerolled.events,
+            ...confirmed.events,
+        ] as DiceThroneEvent[];
+        expect(eventsOfType(eventsAfterMesmerize, 'ABILITY_RESELECTION_REQUIRED')).toHaveLength(0);
+        expect(confirmed.state.core.pendingAttack?.sourceAbilityId).toBe('blood-thirst');
+
+        const advanced = executePipeline(
+            pipelineConfig,
+            confirmed.state,
+            command('ADVANCE_PHASE', '1'),
+            random,
+            ['0', '1'],
+        );
+        expect(advanced.success).toBe(true);
+        if (!advanced.success) return;
+
+        const finishEvents = advanced.events as DiceThroneEvent[];
+        const damage = eventsOfType(finishEvents, 'DAMAGE_DEALT')
+            .find(event => event.payload.targetId === '1');
+        expect(damage?.payload.actualDamage ?? damage?.payload.amount ?? 0).toBeGreaterThan(0);
+        expect(eventsOfType(finishEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'blood-thirst',
+        });
+        expect(advanced.state.core.players['1'].resources[RESOURCE_IDS.HP]).toBeLessThan(INITIAL_HEALTH);
     });
 
     it('鲜血盛宴的治疗与鲜血之力获得落到最终 HP / token 状态，并按上限封顶', () => {
@@ -1538,6 +1570,97 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             isDefendable: false,
         });
         expect(next.pendingAttack?.isDefendable).toBe(false);
+    });
+
+    it('基础魅惑之力造成不可防御伤害后仍暂停，让鲜血之力 4 档吸血', () => {
+        const state = createBloodPowerPassiveState(4);
+        state.sys.phase = 'offensiveRoll';
+        state.core.activePlayerId = '0';
+        state.core.rollCount = 1;
+        state.core.rollDiceCount = 5;
+        state.core.rollConfirmed = true;
+        state.core.players['0'].resources[RESOURCE_IDS.HP] = INITIAL_HEALTH - 10;
+        setVampireDice(state.core, [4, 4, 4, 1, 1]);
+
+        const selectCommand = command('SELECT_ABILITY', '0', { abilityId: 'mesmerize-power' });
+        const pipelineConfig = { domain: DiceThroneDomain, systems: testSystems };
+        const selected = executePipeline(pipelineConfig, state, selectCommand, fixedRandom, ['0', '1']);
+        expect(selected.success).toBe(true);
+        if (!selected.success) return;
+        expect(selected.state.core.pendingAttack).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'mesmerize-power',
+            isDefendable: false,
+        });
+
+        const advanced = executePipeline(
+            pipelineConfig,
+            selected.state,
+            command('ADVANCE_PHASE', '0'),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(advanced.success).toBe(true);
+        if (!advanced.success) return;
+        const advancedEvents = advanced.events as DiceThroneEvent[];
+
+        expect(eventsOfType(advancedEvents, 'DAMAGE_DEALT')[0]?.payload).toMatchObject({
+            targetId: '1',
+            amount: 4,
+            actualDamage: 4,
+            sourceAbilityId: 'mesmerize-power',
+        });
+        expect(eventsOfType(advancedEvents, 'ATTACK_RESOLVED')).toHaveLength(0);
+        expect(eventsOfType(advancedEvents, 'PENDING_ATTACK_UPDATED').some(event => (
+            event.payload.patch.postDamagePassiveActionOpportunityOffered === true
+        ))).toBe(true);
+        expect(advanced.state.sys.phase).toBe('offensiveRoll');
+        expect(advanced.state.sys.flowHalted).toBe(true);
+        expect(advanced.state.core.pendingAttack?.settlementStage).toBe('postDamagePending');
+        expect(advanced.state.core.pendingAttack?.resolvedDamage).toBe(4);
+        expect(advanced.state.core.pendingAttack?.damageResolved).toBe(true);
+        expect(advanced.state.core.pendingAttack?.postDamagePassiveActionOpportunityOffered).toBe(true);
+        expect(advanced.state.core.players['0'].resources[RESOURCE_IDS.CP]).toBe(11);
+        expect(advanced.state.core.players['0'].tokens[TOKEN_IDS.MESMERIZE]).toBe(1);
+        expect(advanced.state.core.players['1'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH - 4);
+        expect(validateCommand(advanced.state.core, useBloodPower(3), 'offensiveRoll').valid).toBe(true);
+
+        const healed = executePipeline(
+            pipelineConfig,
+            advanced.state,
+            useBloodPower(3),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(healed.success).toBe(true);
+        if (!healed.success) return;
+        const healEvents = healed.events as DiceThroneEvent[];
+        expect(eventsOfType(healEvents, 'HEAL_APPLIED')[0]?.payload).toMatchObject({
+            targetId: '0',
+            amount: 4,
+            sourceAbilityId: 'vampire-lord-blood-power',
+        });
+        expect(healed.state.core.players['0'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH - 6);
+        expect(healed.state.core.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(0);
+
+        const finished = executePipeline(
+            pipelineConfig,
+            healed.state,
+            command('ADVANCE_PHASE', '0'),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(finished.success).toBe(true);
+        if (!finished.success) return;
+        expect(finished.state.sys.phase).toBe('main2');
+        expect(finished.state.core.pendingAttack).toBeNull();
+        expect(eventsOfType(finished.events as DiceThroneEvent[], 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+            attackerId: '0',
+            defenderId: '1',
+            sourceAbilityId: 'mesmerize-power',
+            totalDamage: 4,
+        });
     });
 
     it('不死之身 I / II 按最终防御骰结算流血、鲜血之力和偷取生命', () => {

@@ -1,6 +1,8 @@
-import type { MageWarsArenaObjectState, MageWarsCore, MageWarsSpellCasterRef, MageWarsSpellcastingSource } from './core-types';
+import type { MageWarsConfigSpellCard } from '../data/configPackage';
+import type { MageWarsArenaObjectState, MageWarsCore, MageWarsPhase, MageWarsSpellCasterRef, MageWarsSpellcastingSource } from './core-types';
 
 export type MageWarsSpellcastingSourceKind = 'familiar' | 'spawn-point';
+export type MageWarsSpellCastMode = 'quickcast' | 'action' | 'deployment';
 
 export function getMageWarsSpellcastingSourceKind(
     source: MageWarsSpellcastingSource | undefined,
@@ -64,4 +66,31 @@ export function resolveMageWarsSpellCasterRef(
         objectId: object.id,
         ownerId: object.ownerId,
     };
+}
+
+export function resolveMageWarsMageSpellCastMode(
+    phase: MageWarsPhase,
+    spell: Pick<MageWarsConfigSpellCard, 'spellActionSpeed'>,
+): MageWarsSpellCastMode | undefined {
+    if (phase === 'deployment') return 'deployment';
+    if (spell.spellActionSpeed === 'quick') {
+        return phase === 'initiativeQuickcast' || phase === 'finalQuickcast' || phase === 'creatureAction'
+            ? 'quickcast'
+            : undefined;
+    }
+    if (spell.spellActionSpeed === 'standard') {
+        return phase === 'creatureAction' ? 'action' : undefined;
+    }
+    return undefined;
+}
+
+export function resolveMageWarsSpellCastMode(
+    phase: MageWarsPhase,
+    caster: MageWarsSpellCasterRef,
+    spell: Pick<MageWarsConfigSpellCard, 'spellActionSpeed'>,
+): MageWarsSpellCastMode | undefined {
+    if (caster.kind === 'mage') return resolveMageWarsMageSpellCastMode(phase, spell);
+    if (phase === 'deployment') return 'deployment';
+    if (phase === 'creatureAction') return 'action';
+    return undefined;
 }

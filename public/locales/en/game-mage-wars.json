@@ -114,7 +114,8 @@
     "inspectCardAria": "Magnify {{name}}",
     "observeOpponentPublicView": "Observe opponent public area",
     "opponentPublicView": "Opponent public view",
-    "backToSelfView": "Back to your view"
+    "backToSelfView": "Back to your view",
+    "phaseProgressTitle": "Turn Flow"
   },
   "zonesPanel": {
     "title": "Private And Attached Zones",

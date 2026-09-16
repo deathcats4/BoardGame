@@ -29,7 +29,7 @@ import { getMaxTokenUseAmount, getTokenEffectValue } from './tokenTypes';
 import { RESOURCE_IDS } from './resources';
 import { STATUS_IDS, TOKEN_IDS } from './ids';
 import { hasSpentTreantTreeSpiritThisTurn } from './passiveAbility';
-import { getTokenStackLimit } from './rules';
+import { getTokenStackLimit, isNyraCompanionActive } from './rules';
 import { isPurifiableDebuffId } from './statusRemoval';
 import { getRemainingArtificerBotActivations, isArtificerBotTokenId } from './artificerBots';
 import {
@@ -436,8 +436,7 @@ export function maybeCreateDamageResponseEvent(params: {
     const bypassShields = dmgPayload.bypassShields === true;
     const damageScope = dmgPayload.damageScope ?? (state.pendingAttack ? 'attack' : 'direct');
     const target = state.players[dmgTargetId];
-    const hasNyraRedirect = target?.characterId === 'lieren'
-        && (target.companion?.hp ?? 0) > 0
+    const hasNyraRedirect = isNyraCompanionActive(target)
         && state.pendingAttack?.isUltimate !== true;
     const hasDefenderAvoidanceResponse = hasBeforeDamageReceivedCard(state, dmgTargetId)
         || hasDefensiveTokens(state, dmgTargetId, damageScope, dmgAmount)

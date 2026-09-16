@@ -1807,6 +1807,7 @@ export function registerDiyKillersAbilities(): void {
     registerTrigger('diy_killers_chainsaw', 'onMinionDestroyed', chainsawDestroyTrigger, {
         optional: true,
         perInstance: true,
+        playerContext: 'sourceController',
         canTrigger: canTriggerChainsawDestroy,
     });
     registerTrigger('diy_killers_clawed_glove', 'onMinionDestroyed', clawedGloveDestroyTrigger, {

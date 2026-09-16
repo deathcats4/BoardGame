@@ -44,10 +44,14 @@ const isRabbitFootAlreadyUsed = (core: Partial<BetrayalCore> | undefined): boole
 const isWaitingForEventRollConfirmation = (core: Partial<BetrayalCore> | undefined): boolean =>
     Boolean(core?.pendingEventRollResolution);
 
-const stepHandlesEventRollConfirmation = (step: TutorialStepSnapshot): boolean =>
+const stepHandlesPendingEventRoll = (step: TutorialStepSnapshot): boolean =>
     Boolean(
         step.allowedCommands?.includes(BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL)
-        || step.aiActions?.some((action) => action.commandType === BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL),
+        || step.allowedCommands?.includes(BETRAYAL_COMMANDS.USE_POSSESSION)
+        || step.allowedCommands?.includes(BETRAYAL_COMMANDS.USE_RABBIT_FOOT)
+        || step.allowedCommands?.includes(BETRAYAL_COMMANDS.USE_ROLL_REROLL_ITEM)
+        || step.aiActions?.some((action) => action.commandType === BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL)
+        || step.id === 'view-book',
     );
 
 const validateBetrayalBasicSetupStep = (
@@ -62,7 +66,7 @@ const validateBetrayalBasicSetupStep = (
         return !isRabbitFootAlreadyUsed(core);
     }
     if (isWaitingForEventRollConfirmation(core)) {
-        return stepHandlesEventRollConfirmation(step);
+        return stepHandlesPendingEventRoll(step);
     }
     if (step.id === 'finish') {
         return Boolean(core?.pendingDamageAllocation);
@@ -496,7 +500,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     payload: { roomId: 'ground-east' },
                 },
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
                 {
@@ -544,7 +548,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '2',
                 },
                 {
@@ -586,7 +590,7 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
             ],
@@ -789,7 +793,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
                 {
@@ -830,7 +834,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '2',
                 },
                 {
@@ -904,7 +908,7 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             viewAs: '0',
             aiActions: [
                 {
-                    commandType: BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+                    commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
             ],

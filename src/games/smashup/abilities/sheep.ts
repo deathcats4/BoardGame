@@ -26,6 +26,7 @@ import {
     getExternalActionEffectiveHandSize,
     type ExternalActionAbilityContinuationContext,
 } from '../domain/externalActionPlay';
+import { buildOngoingDetachedEvent } from '../domain/ongoingDetach';
 import { registerProtection, registerTrigger, type TriggerContext } from '../domain/ongoingEffects';
 import { registerOngoingPowerModifier } from '../domain/ongoingModifiers';
 import { collectLegalActionPlayTargets, validateActionPlaySemantics, validateImmediateHandExtraMinionPlaySemantics } from '../domain/playLegality';

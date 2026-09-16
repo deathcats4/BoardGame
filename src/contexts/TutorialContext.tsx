@@ -100,6 +100,9 @@ const buildTutorialController = (dispatch: DispatchFn): TutorialController => {
 const hasAiActions = (step: TutorialStepSnapshot): boolean =>
     Array.isArray(step.aiActions) && step.aiActions.length > 0;
 
+const yieldTutorialAiBatch = (): Promise<void> =>
+    Promise.resolve();
+
 const normalizeTutorialState = (nextTutorial: TutorialState): TutorialState => {
     const steps = Array.isArray(nextTutorial.steps) ? nextTutorial.steps : [];
     const derivedStep = nextTutorial.step ?? steps[nextTutorial.stepIndex] ?? null;
@@ -447,8 +450,8 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 let completed = false;
                 try {
                     // setup 步骤必须同步完成初始化，避免棋盘挂载与关键图门禁互等。
-                    // 后续运行中 AI actions 只在命令之间让出一个状态帧，保证下一条命令
-                    // 能读到前一条命令产生的当前交互、待处理伤害等运行态。
+                    // 后续运行中同一步的批量 AI actions 只让出微任务，不要求教程步骤签名变化；
+                    // 有些正式状态变化只改变游戏状态，不改变教程步骤，但下一条 AI 动作仍应继续执行。
                     for (let i = 0; i < aiActions.length; i++) {
                         if (aiExecutionGenerationRef.current !== executionGeneration) return;
                         const action = aiActions[i] as TutorialAiAction;
@@ -459,14 +462,11 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                         if (action.playerId) {
                             actionPayload.__tutorialPlayerId = action.playerId;
                         }
-                        const beforeBoardSyncVersion = boardSyncVersionRef.current;
                         const liveController = controllerRef.current ?? controller;
+                        const beforeBoardSyncVersion = boardSyncVersionRef.current;
                         liveController.dispatchCommand(action.commandType, actionPayload);
                         const isLastAiAction = i === aiActions.length - 1;
-                        const mustWaitForBoardSync = (
-                            (shouldYieldBetweenAiActions && !isLastAiAction)
-                            || action.waitForBoardSyncAfter === true
-                        );
+                        const mustWaitForBoardSync = action.waitForBoardSyncAfter === true;
                         if (mustWaitForBoardSync) {
                             const didObserveBoardSync = await new Promise<boolean>((resolve) => {
                                 const startedAt = Date.now();
@@ -492,6 +492,8 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                                 window.setTimeout(poll, 0);
                             });
                             if (!didObserveBoardSync) return;
+                        } else if (shouldYieldBetweenAiActions && !isLastAiAction) {
+                            await yieldTutorialAiBatch();
                         }
                     }
                     completed = true;

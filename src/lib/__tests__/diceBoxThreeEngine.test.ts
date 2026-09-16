@@ -530,6 +530,63 @@ describe('DiceBoxThreeEngine', () => {
         expect(engine.finalizeSettledFrame).toHaveBeenCalledTimes(1);
     });
 
+    it('恢复稳定骰面时会先补齐第三方骰子的当前面，再同步到目标值', () => {
+        type ResultEntry = { value: number; label: string; reason: string };
+        const result: ResultEntry[] = [];
+        const die = {
+            result,
+            getLastValue: vi.fn(function getLastValue(this: { result: ResultEntry[] }) {
+                return this.result.at(-1) ?? { value: undefined, label: '', reason: '' };
+            }),
+            storeRolledValue: vi.fn(function storeRolledValue(this: { result: ResultEntry[] }, reason: string) {
+                const currentValue = this.result.at(-1)?.value ?? 2;
+                this.result.push({
+                    value: currentValue,
+                    label: String(currentValue),
+                    reason,
+                });
+            }),
+        };
+        const box = {
+            diceList: [die],
+            swapDiceFace: vi.fn((targetDie: typeof die, value: number) => {
+                expect(targetDie.getLastValue().value).toBe(2);
+                targetDie.result.length = 0;
+                targetDie.result.push({
+                    value,
+                    label: String(value),
+                    reason: 'swap',
+                });
+            }),
+            renderer: { render: vi.fn() },
+            scene: {},
+            camera: {},
+        };
+        const engine = Object.create(DiceBoxThreeEngine.prototype) as DiceBoxThreeEngine & {
+            box: typeof box;
+            dieSkins: [];
+            diceHighlights: [];
+            diceHighlightShells: Map<number, unknown>;
+            applyCurrentSkins: ReturnType<typeof vi.fn>;
+            syncDiceHighlightShells: ReturnType<typeof vi.fn>;
+            finalizeSettledFrame: ReturnType<typeof vi.fn>;
+        };
+        engine.box = box;
+        engine.dieSkins = [];
+        engine.diceHighlights = [];
+        engine.diceHighlightShells = new Map();
+        engine.applyCurrentSkins = vi.fn();
+        engine.syncDiceHighlightShells = vi.fn();
+        engine.finalizeSettledFrame = vi.fn();
+
+        engine.syncSettledValues([6]);
+
+        expect(die.storeRolledValue).toHaveBeenNthCalledWith(1, 'restore-seed');
+        expect(die.storeRolledValue).toHaveBeenNthCalledWith(2, 'forced');
+        expect(box.swapDiceFace).toHaveBeenCalledWith(die, 6);
+        expect(engine.getValues()).toEqual([6]);
+    });
+
     it('受控重掷过程会同步物理 body 旋转，避免渲染帧覆盖成闪现', async () => {
         const originalRequestAnimationFrame = window.requestAnimationFrame;
         const originalCancelAnimationFrame = window.cancelAnimationFrame;

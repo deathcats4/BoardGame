@@ -1275,6 +1275,23 @@ const updatePendingBonusSettlementDie = (
     };
 };
 
+const shouldPreserveConfirmedRollAfterMesmerizeReroll = (
+    state: DiceThroneCore,
+    event: Extract<DiceThroneEvent, { type: 'DIE_MODIFIED' | 'DIE_REROLLED' }>,
+): boolean => {
+    if (!state.rollConfirmed || !state.currentRollContext) return false;
+    if (event.payload.sourceCardId !== TOKEN_IDS.MESMERIZE) return false;
+
+    const { dieId, ownerId, playerId, target } = event.payload;
+    if (target !== undefined && target !== 'activeDie') return false;
+
+    const contextDie = state.currentRollContext.dice.find(die => die.id === dieId);
+    if (!contextDie) return false;
+
+    const dieOwnerId = ownerId ?? contextDie.ownerId ?? state.currentRollContext.ownerPlayerId;
+    return typeof dieOwnerId === 'string' && dieOwnerId !== playerId;
+};
+
 /**
  * 处理骰子修改事件
  * 
@@ -1355,7 +1372,13 @@ const handleDieModified: EventHandler<Extract<DiceThroneEvent, { type: 'DIE_MODI
         })
         : state.dice;
 
-    const rollConfirmed = (state.rollConfirmed && didDieValueChange) ? false : state.rollConfirmed;
+    const rollConfirmed = (
+        state.rollConfirmed
+        && didDieValueChange
+        && !shouldPreserveConfirmedRollAfterMesmerizeReroll(state, event)
+    )
+        ? false
+        : state.rollConfirmed;
 
     const contextDice = state.currentRollContext && (target === undefined || target === 'activeDie')
         ? state.currentRollContext.dice.map(die => {
@@ -1442,7 +1465,13 @@ const handleDieRerolled: EventHandler<Extract<DiceThroneEvent, { type: 'DIE_RERO
         return { ...d, value: newValue, symbol: face, symbols: face ? [face] : [] };
     });
 
-    const rollConfirmed = (state.rollConfirmed && didDieValueChange) ? false : state.rollConfirmed;
+    const rollConfirmed = (
+        state.rollConfirmed
+        && didDieValueChange
+        && !shouldPreserveConfirmedRollAfterMesmerizeReroll(state, event)
+    )
+        ? false
+        : state.rollConfirmed;
 
     const contextDice = state.currentRollContext && (target === undefined || target === 'activeDie')
         ? state.currentRollContext.dice.map(die => {

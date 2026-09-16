@@ -58,6 +58,7 @@ import {
     getAvailableAbilityIds,
     getActiveDice,
     getAttackSnapshotDieIndex,
+    isNyraCompanionActive,
     getSeatingOrder,
     isAttackSnapshotDieId,
 } from './rules';
@@ -1370,7 +1371,7 @@ const validateUseToken = (
         const blockedError = getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false });
         if (blockedError) return fail(blockedError);
         if (state.pendingAttack?.isUltimate) return fail('invalid_token_timing');
-        if (player?.characterId !== 'lieren' || (player.companion?.hp ?? 0) <= 0) return fail('no_token');
+        if (!isNyraCompanionActive(player)) return fail('no_token');
         return cmd.payload.amount === pendingDamage.currentDamage ? ok() : fail('invalid_amount');
     }
 
@@ -1388,7 +1389,7 @@ const validateUseToken = (
         const blockedError = getActionBlockedByStunLikeStatus(state, playerId, { requireActivePlayer: false });
         if (blockedError) return fail(blockedError);
         if (state.pendingAttack?.isUltimate) return fail('invalid_token_timing');
-        if (player?.characterId !== 'lieren' || (player.companion?.hp ?? 0) <= 0) return fail('no_token');
+        if (!isNyraCompanionActive(player)) return fail('no_token');
         if ((player.tokens[TOKEN_IDS.NYRAS_BOND] ?? 0) < 1) return fail('no_token');
         const maxAssignableDamage = Math.max(0, pendingDamage.currentDamage - 1);
         return Number.isInteger(cmd.payload.amount) && cmd.payload.amount >= 1 && cmd.payload.amount <= maxAssignableDamage

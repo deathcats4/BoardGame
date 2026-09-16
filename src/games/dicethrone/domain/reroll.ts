@@ -28,6 +28,7 @@ export interface BuildCurrentRollRerollEventsOptions {
     random: RandomFn;
     timestamp: number;
     sourceCommandType: string;
+    sourceCardId?: string;
     skipAbilityReselection?: boolean;
 }
 
@@ -55,6 +56,7 @@ export const buildCurrentRollRerollEvents = ({
     random,
     timestamp,
     sourceCommandType,
+    sourceCardId,
     skipAbilityReselection = false,
 }: BuildCurrentRollRerollEventsOptions): DiceThroneEvent[] => {
     const currentRollContext = resolveCurrentRollContext(state, phase);
@@ -70,6 +72,7 @@ export const buildCurrentRollRerollEvents = ({
             oldValue,
             newValue,
             playerId,
+            ...(sourceCardId ? { sourceCardId } : {}),
             ownerId: currentDie.die.ownerId ?? getCurrentRollOwnerId(state, phase),
             target: getRerollTarget(currentRollContext.kind),
         },

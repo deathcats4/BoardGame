@@ -742,11 +742,17 @@ export function execute(
         case 'REROLL_DIE': {
             const { dieId } = command.payload as { dieId: number };
             const currentInteraction = matchState.sys?.interaction?.current;
+            const interactionData = currentInteraction?.kind === 'multistep-choice'
+                ? (currentInteraction.data as { meta?: { dtType?: string; skipAbilityReselection?: boolean }; sourceId?: unknown } | undefined)
+                : undefined;
             const interactionMeta = currentInteraction?.kind === 'multistep-choice'
-                ? (currentInteraction.data as { meta?: { dtType?: string; skipAbilityReselection?: boolean } } | undefined)?.meta
+                ? interactionData?.meta
                 : undefined;
             const skipAbilityReselection = interactionMeta?.dtType === 'selectDie'
                 && interactionMeta?.skipAbilityReselection === true;
+            const sourceCardId = typeof interactionData?.sourceId === 'string'
+                ? interactionData.sourceId
+                : undefined;
             events.push(...buildCurrentRollRerollEvents({
                 state,
                 phase,
@@ -755,6 +761,7 @@ export function execute(
                 random,
                 timestamp,
                 sourceCommandType: command.type,
+                sourceCardId,
                 skipAbilityReselection,
             }));
             break;

@@ -398,6 +398,8 @@ export function BetrayalRoomMapSurface({
             canPickUpMummyGirlRoomId === room.id;
           const isDiscovered = room.state === "discovered";
           const isReachableRoom = moveTargetRoomIds.has(room.id);
+          const shouldShowPassiveMoveTarget =
+            interactionMode === "default" && isReachableRoom;
           const isSkeletonKeyMoveTarget =
             skeletonKeyMoveTargetRoomIds.has(room.id);
           const isMoveTarget =
@@ -520,11 +522,11 @@ export function BetrayalRoomMapSurface({
                       isExploreTarget ||
                       isPendingRoomPlacementSlot
                     ? 30
-                    : isActive
-                      ? 25
-                      : isReachableRoom
-                        ? 20
-                        : 1,
+                      : isActive
+                        ? 25
+                        : shouldShowPassiveMoveTarget
+                          ? 20
+                          : 1,
               }}
             >
               <button
@@ -583,6 +585,8 @@ export function BetrayalRoomMapSurface({
                 }}
                 disabled={!canSelectRoom}
                 data-testid={`betrayal-room-${room.id}`}
+                data-room-state={room.state}
+                data-room-visual-id={room.visualId}
                 data-haunt-target-room={isHauntTargetRoom ? "true" : undefined}
                 data-haunt-target-dimmed={
                   shouldDimForHauntTargetGuide ? "true" : undefined
@@ -641,7 +645,7 @@ export function BetrayalRoomMapSurface({
                                     ? "rgba(34, 197, 94, 0.96)"
                                     : isRoomSelectionTarget
                                       ? "rgba(34, 197, 94, 0.68)"
-                                      : isReachableRoom
+                                      : shouldShowPassiveMoveTarget
                                         ? "rgba(96, 155, 125, 0.42)"
                                         : isExploreTarget
                                           ? "rgba(34, 197, 94, 0.20)"
@@ -669,7 +673,7 @@ export function BetrayalRoomMapSurface({
                                     ? "0 0 0 3px rgba(74,222,128,0.62), 0 0 28px rgba(34,197,94,0.48), 0 8px 16px rgba(0,0,0,0.18)"
                                     : isRoomSelectionTarget
                                       ? "0 0 0 2px rgba(74,222,128,0.48), 0 0 22px rgba(34,197,94,0.34), 0 8px 16px rgba(0,0,0,0.16)"
-                                      : isReachableRoom
+                                      : shouldShowPassiveMoveTarget
                                         ? "0 0 0 2px rgba(96,155,125,0.46), 0 0 18px rgba(96,155,125,0.24), 0 8px 16px rgba(0,0,0,0.16)"
                                         : isPendingRoomPlacementSlot
                                           ? "0 0 0 3px rgba(74,222,128,0.62), 0 0 28px rgba(34,197,94,0.48), 0 8px 16px rgba(0,0,0,0.18)"
@@ -691,7 +695,7 @@ export function BetrayalRoomMapSurface({
                           isDynamiteTargetRoom ||
                           isMoveTarget ||
                           isRoomSelectionTarget ||
-                          isReachableRoom ||
+                          shouldShowPassiveMoveTarget ||
                           isExploreTarget
                         ? 1
                         : 0.92,
@@ -723,7 +727,7 @@ export function BetrayalRoomMapSurface({
                             ? "bg-[radial-gradient(circle_at_50%_42%,rgba(34,197,94,0.14),transparent_58%)]"
                             : isMoveTarget
                               ? "bg-[radial-gradient(circle_at_50%_42%,rgba(118,189,153,0.10),transparent_58%)]"
-                              : isReachableRoom
+                              : shouldShowPassiveMoveTarget
                                 ? "bg-[radial-gradient(circle_at_50%_42%,rgba(96,155,125,0.07),transparent_58%)]"
                                 : "bg-[linear-gradient(180deg,rgba(3,6,5,0.02),rgba(3,5,5,0.16))]"
                   }`}
@@ -883,7 +887,7 @@ export function BetrayalRoomMapSurface({
                 onOpenMonsterDetails={onOpenMonsterDetails}
                 onPickUpMummyGirl={onPickUpMummyGirl}
               />
-              {isReachableRoom && !isMoveTarget ? (
+              {shouldShowPassiveMoveTarget ? (
                 <span
                   data-testid={`betrayal-room-move-card-highlight-${room.id}`}
                   data-highlight-layer-count="1"

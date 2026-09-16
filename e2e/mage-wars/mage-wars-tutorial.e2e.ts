@@ -512,9 +512,9 @@ async function expectSpellbookInspectIconOpensWithoutPlanning(page: Page, card: 
     await expect(inspectButton).toBeAttached({ timeout: 5_000 });
     await expect(inspectButton.locator('svg')).toHaveCount(1);
     await expectReferenceSizedInspectButton(card, inspectButton, `法术书卡牌 ${cardId}`);
-    const isCoarsePointer = await page.evaluate(() => window.matchMedia('(pointer: coarse)').matches);
-    if (!isCoarsePointer) {
-        const defaultAudit = await inspectButton.evaluate((element) => {
+    const isTouchFirstInteraction = await page.evaluate(() => window.matchMedia('(pointer: coarse), (hover: none)').matches);
+    if (!isTouchFirstInteraction) {
+        const readDefaultAudit = () => inspectButton.evaluate((element) => {
             const style = window.getComputedStyle(element);
             const rect = element.getBoundingClientRect();
             const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -525,6 +525,15 @@ async function expectSpellbookInspectIconOpensWithoutPlanning(page: Page, card: 
                 hitTestId: hit?.closest<HTMLElement>('[data-testid]')?.dataset.testid ?? null,
             };
         });
+        await expect.poll(async () => {
+            const audit = await readDefaultAudit();
+            return audit.opacity <= 0.05
+                && audit.pointerEvents === 'none'
+                && !audit.hitInspectButton;
+        }, {
+            message: `法术书卡牌 ${cardId} 桌面默认放大镜必须退场且不能抢点击`,
+        }).toBe(true);
+        const defaultAudit = await readDefaultAudit();
         expect(defaultAudit.opacity, `桌面放大镜默认应隐藏，不能常驻显示: ${JSON.stringify(defaultAudit)}`).toBeLessThanOrEqual(0.05);
         expect(defaultAudit.pointerEvents, `桌面隐藏放大镜默认不能抢卡牌点击: ${JSON.stringify(defaultAudit)}`).toBe('none');
         expect(defaultAudit.hitInspectButton, `桌面隐藏放大镜默认不能成为前景命中目标: ${JSON.stringify(defaultAudit)}`).toBe(false);
@@ -581,7 +590,11 @@ async function expectSpellbookCardBodyDoesNotPlanWhenNotTutorialTarget(page: Pag
     await expect(card, `${label} 非当前教程目标时主操作必须置为不可执行`).toHaveAttribute('data-primary-action-state', 'disabled');
     await expect(card, `${label} 非当前教程目标时本体不能退回整卡浏览放大`).not.toHaveAttribute('data-browse-inspectable', 'true');
     await expect(card, `${label} 必须保留独立次级检视入口`).toHaveAttribute('data-secondary-inspect', 'true');
-    await expect(card, `${label} 非当前教程目标时本体按钮应不可执行`).toBeDisabled();
+    await expect(card, `${label} 非当前教程目标时用 aria-disabled 表达不可执行`).toHaveAttribute('aria-disabled', 'true');
+    expect(
+        await card.evaluate((element) => (element as HTMLButtonElement).disabled),
+        `${label} 不能使用原生 disabled，否则真实鼠标点击不会进入拒绝提示链`,
+    ).toBe(false);
     await expectMagnifyOverlayHidden(page);
     const draftsBefore = await readPlanningDrafts(page);
     const audit = await expectLocatorPointUnblocked(card, `${label} ${CARD_BODY_PLAYER_CLICK_POINT.label}`, CARD_BODY_PLAYER_CLICK_POINT);
@@ -594,6 +607,7 @@ async function expectSpellbookCardBodyDoesNotPlanWhenNotTutorialTarget(page: Pag
     expect(await readPlanningDrafts(page)).toEqual(draftsBefore);
     await expect(page.getByTestId('mage-wars-plan-spells')).toHaveAttribute('data-plan-progress', '0/2');
     await expect(page.getByTestId('mage-wars-plan-spells')).toBeDisabled();
+    await expect(page.getByText(/教程当前步骤不允许这个操作/)).toBeVisible();
     await expectMagnifyOverlayHidden(page);
     await page.mouse.move(4, 4);
     await expectSpellbookInspectIconOpensWithoutPlanning(page, card, sourceCardId);

@@ -10,6 +10,7 @@ import type {
 import type { MatchState } from '../../../engine/types';
 import { getTokenUseOptions } from './tokenTypes';
 import { getUsableTokenAmountForTiming, getUsableTokensForTiming } from './tokenResponse';
+import { isNyraCompanionActive } from './rules';
 import { TOKEN_IDS } from './ids';
 import {
     buildDiceThroneDamageShieldPreventionOpportunityId,
@@ -193,13 +194,10 @@ function buildNyraDamageResponseCandidates(
     pendingDamage: PendingDamage,
 ): ChoiceRequestCandidate<DiceThroneTokenResponseChoiceValue>[] {
     const player = state.players[pendingDamage.responderId];
-    const companionHp = player?.companion?.hp ?? 0;
     const currentDamage = Math.max(0, pendingDamage.currentDamage);
     if (
         pendingDamage.responseType !== 'beforeDamageReceived'
-        || player?.characterId !== 'lieren'
-        || player.companion?.id !== 'nyra'
-        || companionHp <= 0
+        || !isNyraCompanionActive(player)
         || state.pendingAttack?.isUltimate
         || currentDamage <= 0
     ) {

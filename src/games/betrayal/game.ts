@@ -335,6 +335,7 @@ import {
 import {
     cloneBetrayalRoom,
     refreshExplorableRoomSlots,
+    resolveOppositeRoomEdge,
     roomTileAdjustmentSelectionsMatch,
     roomDistanceByLayout,
 } from './roomMapModel';
@@ -1741,19 +1742,97 @@ function createBetrayalPlayerView(state: BetrayalCore, viewingPlayerId: PlayerId
     return view;
 }
 
+function removeRoomTileFromDiscoveryDeck(core: BetrayalCore, visualId: BetrayalRoomVisualId): void {
+    const deck = core.roomDiscoveryDeck ?? makeRoomDiscoveryDeckFromFloorPools(core.roomDiscoveryOrderByFloor);
+    const nextDeck = deck
+        .filter((entry) => entry.room.visualId !== visualId)
+        .map(cloneRoomDiscoveryDeckEntry);
+    core.roomDiscoveryDeck = nextDeck;
+    core.roomDiscoveryOrderByFloor = groupRoomDiscoveryDeckByFloor(nextDeck);
+}
+
 function ensureLibraryPresent(core: BetrayalCore): void {
-    const existingLibrary = core.rooms.find((room) => room.name === '图书馆');
-    if (existingLibrary) {
+    const libraryEntry = ROOM_DISCOVERY_DECK_POOL.find((entry) => entry.room.visualId === 'library');
+    if (!libraryEntry) {
         return;
     }
-    const upperWest = core.rooms.find((room) => room.id === 'upper-west');
-    if (upperWest) {
-        upperWest.name = '图书馆';
-        upperWest.hint = '翻找旧案、了解 Crimson Jack 的最佳地点';
-        upperWest.tags = ['知识', '调查', '图书馆'];
-        upperWest.state = 'discovered';
-        upperWest.discoveryReward = null;
+    const existingLibrary = core.rooms.find((room) => room.state === 'discovered' && room.visualId === 'library');
+    if (existingLibrary) {
+        removeRoomTileFromDiscoveryDeck(core, libraryEntry.room.visualId);
+        return;
     }
+
+    const upperWest = core.rooms.find((room) => room.id === 'upper-west');
+    if (!upperWest) {
+        return;
+    }
+
+    const entryRoomId = upperWest.entryRoomId
+        ?? upperWest.connectedRoomIds.find((roomId) => (
+            core.rooms.some((room) => room.id === roomId && room.state === 'discovered')
+        ));
+    const entryRoom = entryRoomId
+        ? core.rooms.find((room) => room.id === entryRoomId && room.state === 'discovered')
+        : undefined;
+    const entryEdge = upperWest.entryEdge
+        ?? (
+            entryRoom
+                ? entryRoom.doorways.find((doorway) => doorway.connectsToRoomId === upperWest.id)?.edge
+                : undefined
+        )
+        ?? 'west';
+    const libraryTemplate = cloneRoomTemplate(libraryEntry.room);
+    const oriented = orientDoorwaysForPlacement(
+        libraryTemplate.doorways,
+        entryEdge,
+        upperWest.orientationTurns,
+    );
+    const connectionEdge = resolveOppositeRoomEdge(entryEdge);
+    let connectedToEntry = false;
+    const doorways = oriented.doorways.map((doorway) => {
+        if (!connectedToEntry && entryRoom && doorway.edge === connectionEdge) {
+            connectedToEntry = true;
+            return {
+                ...doorway,
+                connectsToRoomId: entryRoom.id,
+            };
+        }
+        return { ...doorway };
+    });
+    if (entryRoom && !connectedToEntry) {
+        doorways.push({
+            edge: connectionEdge,
+            connectsToRoomId: entryRoom.id,
+        });
+    }
+
+    const connectedRoomIds = doorways
+        .map((doorway) => doorway.connectsToRoomId)
+        .filter((roomId): roomId is string => Boolean(roomId));
+    const placedLibrary: BetrayalRoomNode = {
+        ...cloneBetrayalRoom(upperWest),
+        name: libraryTemplate.name,
+        hint: libraryTemplate.hint,
+        tags: [...libraryTemplate.tags],
+        state: 'discovered',
+        discoveryReward: null,
+        visualId: libraryTemplate.visualId,
+        doorways,
+        backVisualId: upperWest.backVisualId,
+        discoveryEffect: libraryTemplate.discoveryEffect,
+        endTurnEffect: libraryTemplate.endTurnEffect,
+        enterEffect: libraryTemplate.enterEffect,
+        entryRoomId: entryRoom?.id,
+        entryEdge,
+        orientationTurns: oriented.orientationTurns,
+        connectedRoomIds: Array.from(new Set(connectedRoomIds)),
+    };
+
+    core.rooms = refreshExplorableRoomSlots([
+        ...core.rooms.filter((room) => room.id !== upperWest.id).map(cloneBetrayalRoom),
+        placedLibrary,
+    ]);
+    removeRoomTileFromDiscoveryDeck(core, libraryTemplate.visualId);
 }
 
 function createInitialRoomLayout(seeds: BetrayalRoomSeed[]): BetrayalRoomNode[] {

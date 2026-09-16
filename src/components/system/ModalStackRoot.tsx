@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
@@ -7,6 +7,48 @@ import { UI_Z_INDEX } from '../../core';
 
 // 默认起始层级，需覆盖常规页面元素且低于教程层
 const DEFAULT_Z_INDEX = UI_Z_INDEX.modalRoot;
+
+const ModalStackEntry = ({
+    entry,
+    isTop,
+    index,
+    closeModal,
+}: {
+    entry: ReturnType<typeof useModalStack>['stack'][number];
+    isTop: boolean;
+    index: number;
+    closeModal: (id: string) => void;
+}) => {
+    const isPresent = useIsPresent();
+    const zIndex = entry.zIndex ?? DEFAULT_Z_INDEX + index * 10;
+    const pointerEvents = isPresent && isTop
+        ? (entry.allowPointerThrough ? 'none' : 'auto')
+        : 'none';
+
+    return (
+        <motion.div
+            // 非栈顶以及退出中的条目禁止交互，避免退出动画覆盖新打开的弹窗或棋盘。
+            className="fixed inset-0"
+            initial={{ opacity: 1, visibility: 'visible' }}
+            animate={{ opacity: 1, visibility: 'visible' }}
+            exit={{
+                opacity: 0,
+                visibility: 'hidden',
+                pointerEvents: 'none',
+                transition: { duration: 0 },
+            }}
+            aria-hidden={!isPresent}
+            style={{ zIndex, pointerEvents }}
+        >
+            <div className={entry.allowPointerThrough ? 'pointer-events-auto' : undefined}>
+                {entry.render({
+                    close: () => closeModal(entry.id),
+                    closeOnBackdrop: entry.closeOnBackdrop ?? true,
+                })}
+            </div>
+        </motion.div>
+    );
+};
 
 export const ModalStackRoot = () => {
     const { stack, closeTop, closeModal, closeAll } = useModalStack();
@@ -93,35 +135,15 @@ export const ModalStackRoot = () => {
                     }
                 }}
             >
-                {stack.map((entry, index) => {
-                    const isTop = index === stack.length - 1;
-                    const zIndex = entry.zIndex ?? DEFAULT_Z_INDEX + index * 10;
-                    const pointerEvents = isTop
-                        ? (entry.allowPointerThrough ? 'none' : 'auto')
-                        : 'none';
-                    return (
-                        <motion.div
-                            key={entry.id}
-                            // 非栈顶禁止交互，只保留视觉层级
-                            className="fixed inset-0"
-                            initial={{ opacity: 1, visibility: 'visible' }}
-                            animate={{ opacity: 1, visibility: 'visible' }}
-                            exit={{
-                                opacity: 0,
-                                visibility: 'hidden',
-                                transition: { duration: 0.01 },
-                            }}
-                            style={{ zIndex, pointerEvents }}
-                        >
-                            <div className={entry.allowPointerThrough ? 'pointer-events-auto' : undefined}>
-                                {entry.render({
-                                    close: () => closeModal(entry.id),
-                                    closeOnBackdrop: entry.closeOnBackdrop ?? true,
-                                })}
-                            </div>
-                        </motion.div>
-                    );
-                })}
+                {stack.map((entry, index) => (
+                    <ModalStackEntry
+                        key={entry.id}
+                        entry={entry}
+                        isTop={index === stack.length - 1}
+                        index={index}
+                        closeModal={closeModal}
+                    />
+                ))}
             </AnimatePresence>
         </div>,
         portalRoot

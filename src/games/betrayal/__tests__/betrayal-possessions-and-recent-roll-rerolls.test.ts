@@ -369,7 +369,12 @@ it('兔脚会重掷刚刚事件检定的一颗骰子，并回写原事件分支�
         expect(core.currentExplorer.traitTracks.knowledge.position).toBe(knowledgePositionBeforeWhisper);
         expect(core.currentExplorer.traits.knowledge).toBe(3);
         expect(core.recentRoll?.dice).toEqual([0, 0, 0]);
-        expect(core.pendingEventRollResolution?.effect).toMatchObject({ mode: 'trait', trait: 'knowledge', amount: -1 });
+        expect(core.pendingEventRollResolution).toMatchObject({
+            effect: { mode: 'trait', trait: 'knowledge', amount: -1 },
+            requiredPlayerIds: ['0'],
+            acknowledgedPlayerIds: [],
+            requiresAcknowledgement: true,
+        });
 
         core = applyBetrayalCommand(
             core,

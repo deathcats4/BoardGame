@@ -82,6 +82,38 @@ const makeMultiActionManifest = (): TutorialManifest => ({
     ],
 });
 
+const makeExplicitWaitMultiActionManifest = (): TutorialManifest => ({
+    id: 'explicit-wait-multi-action-tutorial',
+    steps: [
+        {
+            id: 'intro',
+            content: 'intro',
+            position: 'center',
+        },
+        {
+            id: 'explicit-wait-ai-step',
+            content: 'multi',
+            position: 'center',
+            aiActions: [
+                {
+                    commandType: 'AI_ONE',
+                    payload: { order: 1 },
+                    playerId: '1',
+                    waitForBoardSyncAfter: true,
+                },
+                {
+                    commandType: 'AI_TWO',
+                    payload: { order: 2 },
+                    playerId: '1',
+                },
+            ],
+            advanceOnEvents: [
+                { type: TUTORIAL_COMMANDS.AI_CONSUMED, match: { stepId: 'explicit-wait-ai-step' } },
+            ],
+        },
+    ],
+});
+
 const makeSingleRuntimeActionManifest = (): TutorialManifest => ({
     id: 'single-runtime-action-tutorial',
     steps: [
@@ -109,6 +141,7 @@ const makeSingleRuntimeActionManifest = (): TutorialManifest => ({
 const runNextTutorialTimer = async () => {
     await act(async () => {
         await vi.runOnlyPendingTimersAsync();
+        await Promise.resolve();
     });
 };
 
@@ -339,7 +372,7 @@ describe('TutorialContext', () => {
         });
     });
 
-    it('多条教程 AI 动作会按状态帧逐条执行，最后才消费 AI', async () => {
+    it('同一步多条教程 AI 动作即使没有教程重同步也会全部执行，最后才消费 AI', async () => {
         const manifest = makeMultiActionManifest();
         const dispatched: Array<{ type: string; payload?: unknown }> = [];
         const { result } = renderHook(() => useTutorial(), { wrapper });
@@ -357,23 +390,13 @@ describe('TutorialContext', () => {
         });
 
         await runNextTutorialTimer();
-        expect(dispatched.map(item => item.type)).toContain('AI_ONE');
-        expect(dispatched.map(item => item.type)).not.toContain('AI_TWO');
-        expect(dispatched.map(item => item.type)).not.toContain(TUTORIAL_COMMANDS.AI_CONSUMED);
-
-        act(() => {
-            syncTutorialStep(result.current.syncTutorialState, manifest, 1, 'after-ai-one');
-        });
-        await runNextTutorialTimer();
-        expect(dispatched).toContainEqual({
-            type: 'AI_TWO',
-            payload: {
-                order: 2,
-                __tutorialAiCommand: true,
-                __tutorialPlayerId: '1',
-            },
-        });
-        expect(dispatched).toContainEqual({
+        expect(dispatched.map(item => item.type)).toEqual([
+            TUTORIAL_COMMANDS.START,
+            'AI_ONE',
+            'AI_TWO',
+            TUTORIAL_COMMANDS.AI_CONSUMED,
+        ]);
+        expect(dispatched.at(-1)).toEqual({
             type: TUTORIAL_COMMANDS.AI_CONSUMED,
             payload: { stepId: 'multi-ai-step' },
         });
@@ -412,8 +435,49 @@ describe('TutorialContext', () => {
         });
     });
 
-    it('多条教程 AI 动作没有状态帧同步时不会继续执行或消费 AI', async () => {
-        const manifest = makeMultiActionManifest();
+    it('显式要求等待 Board 同步的多条教程 AI 动作会等到同步后再继续', async () => {
+        const manifest = makeExplicitWaitMultiActionManifest();
+        const dispatched: Array<{ type: string; payload?: unknown }> = [];
+        const { result } = renderHook(() => useTutorial(), { wrapper });
+
+        let generation = 0;
+        act(() => {
+            generation = result.current.bindDispatch((type, payload) => {
+                dispatched.push({ type, payload });
+            });
+        });
+        act(() => {
+            result.current.startTutorial(manifest);
+            syncTutorialStep(result.current.syncTutorialState, manifest, 1, 'multi-ai-step-start');
+            result.current.notifyBoardMounted(generation);
+        });
+
+        await runNextTutorialTimer();
+        expect(dispatched.map(item => item.type)).toContain('AI_ONE');
+        expect(dispatched.map(item => item.type)).not.toContain('AI_TWO');
+        expect(dispatched.map(item => item.type)).not.toContain(TUTORIAL_COMMANDS.AI_CONSUMED);
+
+        act(() => {
+            syncTutorialStep(result.current.syncTutorialState, manifest, 1, 'after-ai-one');
+        });
+        await runNextTutorialTimer();
+
+        expect(dispatched).toContainEqual({
+            type: 'AI_TWO',
+            payload: {
+                order: 2,
+                __tutorialAiCommand: true,
+                __tutorialPlayerId: '1',
+            },
+        });
+        expect(dispatched).toContainEqual({
+            type: TUTORIAL_COMMANDS.AI_CONSUMED,
+            payload: { stepId: 'explicit-wait-ai-step' },
+        });
+    });
+
+    it('显式要求等待 Board 同步的多条教程 AI 动作没有同步时不会继续执行或消费 AI', async () => {
+        const manifest = makeExplicitWaitMultiActionManifest();
         const dispatched: Array<{ type: string; payload?: unknown }> = [];
         const { result } = renderHook(() => useTutorial(), { wrapper });
 

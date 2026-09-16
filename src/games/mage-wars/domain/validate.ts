@@ -21,6 +21,7 @@ import {
     getMageWarsSpellcastingSourceKind,
     isMageWarsConfiguredSpellcastingSource,
     isMageWarsSpellcastingObject,
+    resolveMageWarsMageSpellCastMode,
 } from './spellCasting';
 import {
     getMageWarsPlayerSpellbookCopyCount,
@@ -987,11 +988,16 @@ export function validateCommand(
                     return invalid('playerStunnedCannotCastStandardSpell');
                 }
             }
-            if (QUICKCAST_PHASES.includes(phase) && !isMageWarsQuickSpell(costResolution.spell)) {
-                return invalid('spellNotQuick');
+            if (!casterObject) {
+                const mageCastMode = resolveMageWarsMageSpellCastMode(phase, costResolution.spell);
+                if (!mageCastMode) {
+                    return invalid(QUICKCAST_PHASES.includes(phase) && !isMageWarsQuickSpell(costResolution.spell)
+                        ? 'spellNotQuick'
+                        : 'wrongPhase');
+                }
+                if (mageCastMode === 'quickcast' && !player.quickcastReady) return invalid('quickcastSpent');
+                if (mageCastMode === 'action' && !player.actionReady) return invalid('actionSpent');
             }
-            if (QUICKCAST_PHASES.includes(phase) && !player.quickcastReady) return invalid('quickcastSpent');
-            if (!casterObject && phase === 'creatureAction' && !player.actionReady) return invalid('actionSpent');
             if (
                 (isMageWarsCreatureSpell(costResolution.spell) || isMageWarsConjurationSpell(costResolution.spell))
                 && isMageWarsLegendarySpellObjectInPlay(state.core, costResolution.spell)

@@ -349,6 +349,58 @@ describe('俄罗斯童话代表性玩法行为', () => {
         expect(resolved.finalState.core.players['0'].hand.map(card => card.uid)).toEqual(['draw-card']);
     });
 
+    it('白桦木女神响应提交后可寻找白桦木进入手牌', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    deck: [makeCard('birch-card', 'russian_fairy_tales_the_birch', 'minion', '0')],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase('base_transformation_spring', [
+                    makeMinion('birch-woman', 'russian_fairy_tales_the_birch_woman', '0', 2),
+                ]),
+            ],
+        });
+
+        const queued = collectTriggers(core, 'onMinionDiscardedFromBase', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            baseIndex: 0,
+            triggerMinionUid: 'birch-woman',
+            triggerMinionDefId: 'russian_fairy_tales_the_birch_woman',
+            triggerMinion: core.bases[0].minions[0],
+            random: FIXED_RANDOM,
+            now: 42,
+        }, { sourceDefIds: ['russian_fairy_tales_the_birch_woman'] });
+        expect(queued).toBeDefined();
+
+        const prompted = maybeResolveReactionQueue(
+            makeMatchState({ ...core, triggerQueue: queued!.payload.triggers } as any),
+            FIXED_RANDOM,
+            42,
+        );
+        const opened = respondToPromptOption(
+            prompted!.state,
+            option => option.value?.triggerId === queued!.payload.triggers[0].id,
+            '白桦木女神可选触发',
+            '0',
+            FIXED_RANDOM,
+        );
+        const resolved = respondToPromptOption(
+            opened.finalState,
+            option => option.value?.cardUid === 'birch-card' && option.value?.mode === 'toHand',
+            '白桦木加入手牌',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(resolved.finalState.core.players['0'].hand.map(card => card.uid)).toContain('birch-card');
+        expect(resolved.finalState.core.players['0'].deck.some(card => card.uid === 'birch-card')).toBe(false);
+    });
+
     it('着魔为宿主 +2，并在宿主回手离场后转移到另一个随从', () => {
         const core = makeState({
             bases: [

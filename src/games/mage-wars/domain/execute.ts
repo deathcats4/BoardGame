@@ -72,7 +72,7 @@ import {
 } from './spellRules';
 import { MAGE_WARS_OBJECT_ABILITY_IDS, STATUS_TOKEN_IDS, type ArenaZoneId } from './ids';
 import { getArenaObject, getMageWarsWallBetweenZones } from './utils';
-import { resolveMageWarsSpellCasterRef } from './spellCasting';
+import { resolveMageWarsSpellCasterRef, resolveMageWarsSpellCastMode } from './spellCasting';
 import { getStatusTokenAmount } from './statusTokens';
 import { hasTemporaryTeleportMovement } from './temporaryTraits';
 import {
@@ -87,12 +87,6 @@ const VAMPIRIC_ENCHANTMENT_SOURCE_ID = 'mw.spell.1910';
 
 function resolveTimestamp(command: MageWarsCommand): number {
     return command.timestamp ?? 0;
-}
-
-function resolveCastMode(phase: MageWarsPhase): 'quickcast' | 'action' | 'deployment' {
-    if (phase === 'initiativeQuickcast' || phase === 'finalQuickcast') return 'quickcast';
-    if (phase === 'deployment') return 'deployment';
-    return 'action';
 }
 
 function resolveAttachedHiddenResponseEnchantment(
@@ -1384,6 +1378,12 @@ export function executeCommand(
                 command.payload.manaCost,
             );
             if (!costResolution) return [];
+            const castMode = resolveMageWarsSpellCastMode(
+                state.sys.phase as MageWarsPhase,
+                caster,
+                costResolution.spell,
+            );
+            if (!castMode) return [];
             const objectManaCost = caster.kind === 'arena-object'
                 ? Math.min(state.core.objects[caster.objectId]?.mana ?? 0, costResolution.manaCost)
                 : undefined;
@@ -1419,7 +1419,7 @@ export function executeCommand(
                         caster,
                         spellCardId: command.payload.spellCardId,
                         manaCost: costResolution.manaCost,
-                        castMode: resolveCastMode(state.sys.phase as MageWarsPhase),
+                        castMode,
                         ...(objectManaCost === undefined ? {} : { objectManaCost }),
                         playerManaCost,
                     },
@@ -1449,7 +1449,7 @@ export function executeCommand(
                              manaCost: costResolution.manaCost,
                              ...(objectManaCost === undefined ? {} : { objectManaCost }),
                              playerManaCost,
-                            castMode: resolveCastMode(state.sys.phase as MageWarsPhase),
+                            castMode,
                             sourceCommandType: command.type,
                             ...(targetSpellCounter && targetObject ? { targetObjectId: targetObject.id } : {}),
                         },
@@ -1468,7 +1468,7 @@ export function executeCommand(
                     caster,
                     spellCardId: command.payload.spellCardId,
                     manaCost: costResolution.manaCost,
-                    castMode: resolveCastMode(state.sys.phase as MageWarsPhase),
+                    castMode,
                     ...(objectManaCost === undefined ? {} : { objectManaCost }),
                     playerManaCost,
                     targetPlayerId: command.payload.targetPlayerId,

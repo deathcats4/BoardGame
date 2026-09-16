@@ -1,6 +1,6 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GameModeProvider, type GameMode } from '../../../contexts/GameModeContext';
 import { ToastProvider, useToast } from '../../../contexts/ToastContext';
 import { TutorialProvider } from '../../../contexts/TutorialContext';
@@ -117,6 +117,17 @@ vi.mock('../../../components/common/animations/ConeBlast', () => ({
         />
     ),
 }));
+
+afterEach(() => {
+    cleanup();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    Reflect.deleteProperty(
+        window as Window & { __BG_FORCE_COARSE_POINTER__?: boolean },
+        '__BG_FORCE_COARSE_POINTER__',
+    );
+    vi.useRealTimers();
+});
 
 vi.mock('../../../components/common/animations/SummonHybridEffect', () => ({
     SummonHybridEffect: ({
@@ -3140,6 +3151,10 @@ describe('MageWarsBoard object ability choices', () => {
         fireEvent.click(abilityButton!);
         expect(dispatch).not.toHaveBeenCalled();
 
+        fireEvent.click(screen.getByTestId('mage-wars-arena-zone-a2'));
+        expect(dispatch).not.toHaveBeenCalledWith(MAGE_WARS_COMMANDS.USE_ARENA_OBJECT_ABILITY, expect.anything());
+        expect(screen.getByTestId('mage-wars-toast-probe')).toHaveTextContent('error.invalidAbilityTarget');
+
         const targetCard = screen.getByText('Healing Target Cat')
             .closest<HTMLElement>('[data-testid="mage-wars-zone-field-card"]');
         expect(targetCard).not.toBeNull();
@@ -3515,7 +3530,8 @@ describe('MageWarsBoard spellbook planning UI', () => {
         expect(firstVisibleCard?.getAttribute('data-primary-action-state')).toBe('disabled');
         expect(firstVisibleCard?.getAttribute('data-browse-inspectable')).toBeNull();
         expect(firstVisibleCard?.getAttribute('data-secondary-inspect')).toBe('true');
-        expect(firstVisibleCard).toBeDisabled();
+        expect(firstVisibleCard?.getAttribute('aria-disabled')).toBe('true');
+        expect(firstVisibleCard).not.toBeDisabled();
         expect(screen.getByTestId('mage-wars-desktop-spellbook-shelf').getAttribute('data-planning-enabled')).toBe('false');
         expect(screen.getByTestId('mage-wars-spellbook-category-creature')).toBeEnabled();
         expect(screen.getByTestId('mage-wars-spellbook-category-all')).toBeDisabled();
@@ -3527,6 +3543,7 @@ describe('MageWarsBoard spellbook planning UI', () => {
                 '[data-testid="mage-wars-desktop-prepared-card"][data-planning-draft="true"]',
             )).toHaveLength(0);
         });
+        expect(screen.getByTestId('mage-wars-toast-probe')).toHaveTextContent('error.tutorialBlocked');
         expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
         const gatedPlanButton = screen.getByTestId('mage-wars-plan-spells');
         expect(gatedPlanButton.textContent).toBe('spellbook.planSelected:{"count":0,"total":2}');
@@ -3579,6 +3596,78 @@ describe('MageWarsBoard spellbook planning UI', () => {
             )).toHaveLength(1);
         });
         expect(screen.queryByText(preparedSummaryText(1, 2))).toBeNull();
+    });
+
+    it('uses Summoner Wars style touch long-press inspect without blocking the spellbook card primary action', () => {
+        vi.useFakeTimers();
+        (window as Window & { __BG_FORCE_COARSE_POINTER__?: boolean }).__BG_FORCE_COARSE_POINTER__ = true;
+        let unmount: (() => void) | undefined;
+
+        try {
+            const rendered = renderBoardWithProviders(
+                <MageWarsBoard
+                    {...boardProps(undefined, '0', { phase: 'planning' })}
+                />,
+            );
+            unmount = rendered.unmount;
+            const { container } = rendered;
+
+            let tanglevine = container.querySelector<HTMLElement>(
+                '[data-testid="mage-wars-desktop-spellbook-card"][data-source-card-id="2224"]',
+            );
+            for (let pageIndex = 0; pageIndex < 6 && !tanglevine; pageIndex += 1) {
+                const nextPage = screen.getByTestId('mage-wars-spellbook-next-page') as HTMLButtonElement;
+                if (nextPage.disabled) break;
+                fireEvent.click(nextPage);
+                tanglevine = container.querySelector<HTMLElement>(
+                    '[data-testid="mage-wars-desktop-spellbook-card"][data-source-card-id="2224"]',
+                );
+            }
+
+            expect(tanglevine).not.toBeNull();
+            expect(tanglevine?.getAttribute('data-primary-action')).toBe('true');
+            expect(tanglevine?.getAttribute('data-primary-action-state')).toBe('enabled');
+            expect(tanglevine?.getAttribute('data-browse-inspectable')).toBeNull();
+            expect(tanglevine?.getAttribute('data-secondary-inspect')).toBe('true');
+            const inspectButton = tanglevine?.parentElement?.querySelector<HTMLElement>(
+                '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="2224"]',
+            );
+            expect(inspectButton).not.toBeNull();
+            expect(inspectButton?.className).toContain('pointer-events-none');
+            expect(inspectButton?.className).toContain('opacity-0');
+
+            fireEvent.pointerDown(tanglevine!, { pointerType: 'touch', clientX: 24, clientY: 24 });
+            act(() => {
+                vi.advanceTimersByTime(500);
+            });
+            expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('false');
+            expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('2224');
+            expect(container.querySelectorAll('[data-testid="mage-wars-desktop-prepared-card"][data-planning-draft="true"]'))
+                .toHaveLength(0);
+
+            fireEvent.pointerUp(tanglevine!, { pointerType: 'touch', clientX: 24, clientY: 24 });
+            expect(container.querySelectorAll('[data-testid="mage-wars-desktop-prepared-card"][data-planning-draft="true"]'))
+                .toHaveLength(0);
+            fireEvent.click(tanglevine!);
+            expect(tanglevine?.getAttribute('data-selected-count')).toBeNull();
+            expect(container.querySelectorAll('[data-testid="mage-wars-desktop-prepared-card"][data-planning-draft="true"]'))
+                .toHaveLength(0);
+
+            fireEvent.click(screen.getByTestId('mage-wars-card-magnify-overlay-close'));
+            expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
+
+            fireEvent.pointerDown(tanglevine!, { pointerType: 'touch', clientX: 24, clientY: 24 });
+            fireEvent.pointerUp(tanglevine!, { pointerType: 'touch', clientX: 24, clientY: 24 });
+            fireEvent.click(tanglevine!);
+            expect(tanglevine?.getAttribute('data-selected-count')).toBe('1');
+        } finally {
+            unmount?.();
+            Reflect.deleteProperty(
+                window as Window & { __BG_FORCE_COARSE_POINTER__?: boolean },
+                '__BG_FORCE_COARSE_POINTER__',
+            );
+            vi.useRealTimers();
+        }
     });
 });
 

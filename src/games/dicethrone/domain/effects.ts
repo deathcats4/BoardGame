@@ -10,7 +10,7 @@ import type { EffectAction, RollDieConditionalEffect, RollDieDefaultEffect } fro
 export type { RollDieConditionalEffect, RollDieDefaultEffect };
 import type { AbilityEffect, EffectTiming, EffectResolutionContext } from './combat';
 import { combatAbilityManager } from './combatAbility';
-import { getActiveDice, getAttackDiceFaceCounts, getAttackDiceValues, getFaceCounts, getOpponents, getPendingBonusSettlementDice, getPlayerDieFace, getTokenStackLimit, hasPendingBonusDiceSettlement } from './rules';
+import { getActiveDice, getAttackDiceFaceCounts, getAttackDiceValues, getFaceCounts, getOpponents, getPendingBonusSettlementDice, getPlayerDieFace, getTokenStackLimit, hasPendingBonusDiceSettlement, isNyraCompanionActive } from './rules';
 import { RESOURCE_IDS } from './resources';
 import { STATUS_IDS } from './ids';
 import type {
@@ -1550,14 +1550,12 @@ export function resolveEffectsToEvents(
         if (ctx.accumulatedBonusDamage) {
             totalBonus += ctx.accumulatedBonusDamage;
         }
-        const attackerCompanion = ctx.state.players[ctx.attackerId]?.companion;
         if (
             !nyraAttackBonusApplied
             && timing === 'withDamage'
             && !ctx.isDefensiveContext
             && effect.action.type === 'damage'
-            && attackerCompanion?.id === 'nyra'
-            && attackerCompanion.hp > 0
+            && isNyraCompanionActive(ctx.state.players[ctx.attackerId])
         ) {
             totalBonus += 2;
             nyraAttackBonusApplied = true;

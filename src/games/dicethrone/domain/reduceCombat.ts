@@ -377,13 +377,19 @@ export const handleCompanionHealthChanged: EventHandler<Extract<DiceThroneEvent,
     if (!player || !companion || companion.id !== event.payload.companionId) return state;
 
     const hp = Math.max(0, Math.min(companion.maxHp, companion.hp + event.payload.delta));
+    const previousActive = companion.active ?? companion.hp > 0;
+    const active = hp <= 0
+        ? false
+        : typeof event.payload.active === 'boolean'
+            ? event.payload.active
+            : previousActive;
     return {
         ...state,
         players: {
             ...state.players,
             [event.payload.playerId]: {
                 ...player,
-                companion: { ...companion, hp },
+                companion: { ...companion, hp, active },
             },
         },
         lastEffectSourceByPlayerId: event.payload.sourceAbilityId

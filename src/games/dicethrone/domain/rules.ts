@@ -14,6 +14,7 @@ import type {
     DiceThroneCore,
     Die,
     DieFace,
+    HeroState,
     TurnPhase,
     AbilityCard,
     SelectableCharacterId,
@@ -188,6 +189,15 @@ export const hasPhaseBlockingPendingBonusDiceSettlement = (state: DiceThroneCore
 
     return true;
 };
+
+export const isNyraCompanionActive = (
+    player: Pick<HeroState, 'characterId' | 'companion'> | null | undefined,
+): boolean => Boolean(
+    player?.characterId === 'lieren'
+    && player.companion?.id === 'nyra'
+    && player.companion.hp > 0
+    && (player.companion.active ?? true)
+);
 
 /**
  * 奖励骰始终需要右侧骰盘的普通确认收口。

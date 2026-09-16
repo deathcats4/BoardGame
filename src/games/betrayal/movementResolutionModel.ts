@@ -33,7 +33,7 @@ export function resolveBetrayalExplorerMovedPayload(
     random: RandomFn,
 ): ExplorerMovedPayload | null {
     const room = core.rooms.find((item) => item.id === command.payload.roomId);
-    if (!room) {
+    if (!room || room.state !== 'discovered') {
         return null;
     }
     const actor = findExplorerByPlayerId(core, command.playerId) ?? core.currentExplorer;

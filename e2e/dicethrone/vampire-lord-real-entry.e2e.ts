@@ -151,7 +151,7 @@ const cloneVampireLordCard = (cardId: string) => {
     return structuredClone(card);
 };
 
-const buildVampireLordProofDice = () => VAMPIRE_LORD_DICE_VALUES.map((value, index) => {
+const buildVampireLordDiceForValues = (values: readonly number[]) => values.map((value, index) => {
     const symbol = VAMPIRE_LORD_DICE_FACE_BY_VALUE[value];
     return {
         id: index,
@@ -163,6 +163,7 @@ const buildVampireLordProofDice = () => VAMPIRE_LORD_DICE_VALUES.map((value, ind
         definitionId: 'vampire_lord-dice',
     };
 });
+const buildVampireLordProofDice = () => buildVampireLordDiceForValues(VAMPIRE_LORD_DICE_VALUES);
 
 const injectVampireLordMainProofState = async (matchId: string, page: Page): Promise<void> => {
     const current = await getMatchState(matchId, page) as JsonRecord;
@@ -2208,6 +2209,174 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
             await waitForDiceThroneVisualIdle(page);
             await game.screenshot('吸血鬼领主-饮血如酒-花费4血力获得8CP', testInfo);
         });
+    });
+
+    test('基础魅惑之力不可防御攻击后应暂停并允许鲜血之力 4 档吸血', async ({ page, game }, testInfo) => {
+        await clearEvidenceScreenshotsForTest(testInfo);
+        await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
+        await game.setupScene({
+            gameId: 'dicethrone',
+            player0: {
+                hand: [],
+                deck: [],
+                resources: { CP: 2, HP: 40 },
+                tokens: { [TOKEN_IDS.BLOOD_POWER]: 4 },
+            },
+            player1: {
+                hand: [],
+                deck: [],
+                resources: { CP: 2, HP: 50 },
+            },
+            currentPlayer: '0',
+            phase: 'offensiveRoll',
+            extra: {
+                selectedCharacters: { '0': VAMPIRE_LORD_HERO_ID, '1': VISIBLE_GUEST_HERO_ID },
+                hostStarted: true,
+                activePlayerId: '0',
+                rollCount: 1,
+                rollLimit: 3,
+                rollDiceCount: 5,
+                rollConfirmed: true,
+                dice: buildVampireLordDiceForValues([4, 4, 4, 1, 1]),
+                currentRollContext: undefined,
+                pendingAttack: null,
+                pendingDamage: undefined,
+                pendingBonusDiceSettlement: undefined,
+            },
+        });
+        await closeDebugPanelIfVisible(page);
+
+        await expect(page.getByTestId('player-board-surface'))
+            .toHaveAttribute('data-character-id', VAMPIRE_LORD_HERO_ID, { timeout: 10000 });
+        await expectVampireLordDiceSpritesForValues(page, [4, 4, 4, 1, 1]);
+        await clickResolvedAbilitySlot(page, 'chi', 'mesmerize-power', 'mesmerize-power');
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const pendingAttack = state?.core?.pendingAttack;
+            return {
+                phase: state?.sys?.phase ?? null,
+                sourceAbilityId: pendingAttack?.sourceAbilityId ?? null,
+                defenderId: pendingAttack?.defenderId ?? null,
+                isDefendable: pendingAttack?.isDefendable ?? null,
+                expectedDamage: pendingAttack ? getPendingAttackExpectedDamage(state.core, pendingAttack, 0) : null,
+                attackDiceValues: pendingAttack?.attackDiceValues ?? [],
+                bloodPower: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.BLOOD_POWER] ?? null,
+            };
+        }, { timeout: 10000 }).toEqual({
+            phase: 'offensiveRoll',
+            sourceAbilityId: 'mesmerize-power',
+            defenderId: '1',
+            isDefendable: false,
+            expectedDamage: 4,
+            attackDiceValues: [4, 4, 4, 1, 1],
+            bloodPower: 4,
+        });
+        await game.screenshot('吸血鬼领主-魅惑之力不可防御攻击已选中', testInfo);
+
+        const settleAttackButton = page.locator('[data-tutorial-id="advance-phase-button"]').first();
+        await expect(settleAttackButton).toBeVisible({ timeout: 10000 });
+        await expect(settleAttackButton).toBeEnabled({ timeout: 5000 });
+        await expect(settleAttackButton).toHaveText(/结算攻击|Settle Attack/i);
+        await settleAttackButton.click();
+
+        const modalRoot = page.locator('#modal-root');
+        const opportunityModal = modalRoot.getByTestId('dicethrone-passive-opportunity-modal');
+        const useOpportunityButton = modalRoot.getByTestId('dicethrone-passive-opportunity-use-button');
+        const skipOpportunityButton = modalRoot.getByTestId('dicethrone-passive-opportunity-skip-button');
+        await expect(opportunityModal).toBeVisible({ timeout: 10000 });
+        await expect(modalRoot.getByText('是否发动鲜血之力')).toBeVisible();
+        await expect(opportunityModal).toContainText('攻击后可选能力');
+        await expect(opportunityModal).toContainText('本次攻击已经造成 4 点伤害');
+        await expect(opportunityModal).toContainText('4 鲜血之力');
+        await expect(useOpportunityButton).toContainText('发动吸血治疗');
+        await expect(useOpportunityButton).toBeEnabled();
+        await expect(skipOpportunityButton).toContainText('不发动，继续');
+        await expect(skipOpportunityButton).toBeEnabled();
+        await expect(page.getByTestId('passive-action-vampire-lord-blood-power-3')).toHaveCount(0);
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const eventTypes = (state?.sys?.eventStream?.entries ?? [])
+                .map((entry: any) => entry?.event?.type)
+                .filter(Boolean);
+            return {
+                attackerHp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                attackerCp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.CP] ?? null,
+                defenderHp: state?.core?.players?.['1']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                bloodPower: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.BLOOD_POWER] ?? null,
+                mesmerize: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.MESMERIZE] ?? 0,
+                settlementStage: state?.core?.pendingAttack?.settlementStage ?? null,
+                resolvedDamage: state?.core?.pendingAttack?.resolvedDamage ?? null,
+                damageResolved: state?.core?.pendingAttack?.damageResolved ?? null,
+                damageDealt: eventTypes.includes('DAMAGE_DEALT'),
+                attackResolved: eventTypes.includes('ATTACK_RESOLVED'),
+            };
+        }, { timeout: 10000 }).toEqual({
+            attackerHp: 40,
+            attackerCp: 3,
+            defenderHp: 46,
+            bloodPower: 4,
+            mesmerize: 1,
+            settlementStage: 'postDamagePending',
+            resolvedDamage: 4,
+            damageResolved: true,
+            damageDealt: true,
+            attackResolved: false,
+        });
+        await game.screenshot('吸血鬼领主-魅惑之力不可防御攻击后鲜血之力弹窗-使用前', testInfo);
+
+        await useOpportunityButton.click();
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const events = (state?.sys?.eventStream?.entries ?? [])
+                .map((entry: any) => entry?.event)
+                .filter(Boolean);
+            const healed = [...events].reverse().find((event: any) => event.type === 'HEAL_APPLIED');
+            const consumed = [...events].reverse().find((event: any) => (
+                event.type === 'TOKEN_CONSUMED'
+                && event.payload?.tokenId === TOKEN_IDS.BLOOD_POWER
+            ));
+            const eventTypes = events.map((event: any) => event.type);
+            return {
+                phase: state?.sys?.phase ?? null,
+                hasPendingAttack: Boolean(state?.core?.pendingAttack),
+                attackerHp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                defenderHp: state?.core?.players?.['1']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                bloodPower: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.BLOOD_POWER] ?? null,
+                healedPayload: healed?.payload ?? null,
+                consumedPayload: consumed?.payload ?? null,
+                damageDealt: eventTypes.includes('DAMAGE_DEALT'),
+                healApplied: eventTypes.includes('HEAL_APPLIED'),
+                tokenConsumed: eventTypes.includes('TOKEN_CONSUMED'),
+                attackResolved: eventTypes.includes('ATTACK_RESOLVED'),
+            };
+        }, { timeout: 10000 }).toEqual({
+            phase: 'main2',
+            hasPendingAttack: false,
+            attackerHp: 44,
+            defenderHp: 46,
+            bloodPower: 0,
+            healedPayload: expect.objectContaining({
+                targetId: '0',
+                amount: 4,
+                sourceAbilityId: 'vampire-lord-blood-power',
+            }),
+            consumedPayload: expect.objectContaining({
+                tokenId: TOKEN_IDS.BLOOD_POWER,
+                amount: 4,
+                newTotal: 0,
+            }),
+            damageDealt: true,
+            healApplied: true,
+            tokenConsumed: true,
+            attackResolved: true,
+        });
+        await expect(opportunityModal).toBeHidden({ timeout: 10000 });
+        await expect(page.getByTestId('passive-action-vampire-lord-blood-power-3')).toHaveCount(0);
+        await expect(page.getByTestId(`dt-player-0-token-${TOKEN_IDS.BLOOD_POWER}`)).toHaveCount(0);
+        await waitForDiceThroneVisualIdle(page);
+        await game.screenshot('吸血鬼领主-魅惑之力不可防御攻击后鲜血之力治疗后收口', testInfo);
     });
 
     test('鲜血之力 4 档应通过攻击后弹窗按已造成伤害治疗并收口', async ({ page, game }, testInfo) => {

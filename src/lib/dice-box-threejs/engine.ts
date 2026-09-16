@@ -214,6 +214,18 @@ type DiceBoxDieTransformSnapshot = {
     bodyMass?: number;
 };
 
+type DiceBoxDieResultEntry = {
+    value: number;
+    label: string;
+    reason: string;
+    ignore?: boolean;
+};
+
+type DiceBoxDieWithMutableResult = DiceBoxDie & {
+    result?: DiceBoxDieResultEntry[];
+    setLastValue?: (value: DiceBoxDieResultEntry) => void;
+};
+
 type DiceBoxVisibleRollSnapshot = {
     die: DiceBoxDieWithBody;
     startPosition: { x: number; y: number; z: number };
@@ -630,6 +642,44 @@ function resolveFiniteNumber(value: number | undefined, fallback: number): numbe
 function readDieValue(die: DiceBoxDie | undefined): number | null {
     const value = die?.getLastValue?.().value;
     return typeof value === 'number' ? value : null;
+}
+
+function ensureDieHasReadableValue(die: DiceBoxDie): number | null {
+    const currentValue = readDieValue(die);
+    if (currentValue !== null) {
+        return currentValue;
+    }
+    try {
+        die.storeRolledValue?.('restore-seed');
+    } catch {
+        return null;
+    }
+    return readDieValue(die);
+}
+
+function forceDieLastValue(die: DiceBoxDie, value: number, reason = 'forced'): void {
+    const normalizedValue = Number(value);
+    if (!Number.isFinite(normalizedValue)) return;
+    const forcedValue: DiceBoxDieResultEntry = {
+        value: normalizedValue,
+        label: String(normalizedValue),
+        reason,
+    };
+    const mutableDie = die as DiceBoxDieWithMutableResult;
+    if (Array.isArray(mutableDie.result)) {
+        if (mutableDie.result.length > 0) {
+            mutableDie.result[mutableDie.result.length - 1] = forcedValue;
+        } else {
+            mutableDie.result.push(forcedValue);
+        }
+    } else {
+        mutableDie.result = [forcedValue];
+    }
+    try {
+        mutableDie.setLastValue?.(forcedValue);
+    } catch {
+        // Some dice-box builds expose result directly but reject setLastValue.
+    }
 }
 
 function createQuaternionFromEulerXYZ(x: number, y: number, z: number): DiceBoxQuaternionSnapshot {
@@ -1881,13 +1931,17 @@ export class DiceBoxThreeEngine {
             const die = this.box.diceList[index];
             const targetValue = values[index];
             if (!die || typeof targetValue !== 'number') continue;
-            const currentValue = readDieValue(die);
+            let currentValue = readDieValue(die);
             if (currentValue !== targetValue) {
+                currentValue = ensureDieHasReadableValue(die);
                 this.box.swapDiceFace(die, targetValue);
                 didChange = true;
             }
             if (commit) {
                 die.storeRolledValue('forced');
+                if (readDieValue(die) !== targetValue) {
+                    forceDieLastValue(die, targetValue);
+                }
             }
         }
 

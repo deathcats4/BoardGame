@@ -366,7 +366,6 @@ export function applyBetrayalEventChoiceResolvedState(
             sourceTitle: event.payload.sourceTitle,
             eventEffect: event.payload.eventEffect,
             nextPendingEventChoice: event.payload.nextPendingEventChoice,
-            requiredPlayerIds: core.playerIds.length > 0 ? core.playerIds : [event.payload.playerId],
             deathPrevention: event.payload.deathPrevention,
             hauntTriggered: event.payload.hauntTriggered,
             hauntCardNumber: event.payload.hauntCardNumber,
@@ -516,7 +515,6 @@ export function applyBetrayalEventRolledState(
             sourceTitle: event.payload.sourceTitle,
             eventEffect: event.payload.eventEffect,
             nextPendingEventChoice: event.payload.nextPendingEventChoice,
-            requiredPlayerIds: core.playerIds.length > 0 ? core.playerIds : [event.payload.playerId],
             deathPrevention: event.payload.deathPrevention,
         });
     } else {
