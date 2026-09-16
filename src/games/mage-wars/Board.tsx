@@ -634,56 +634,60 @@ function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
 
     return (
         <aside
-            className="pointer-events-none absolute z-20 w-[clamp(8.25rem,8.2vw,10rem)] rounded-[0.4rem] border border-amber-100/18 bg-stone-950/48 p-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
+            className="pointer-events-none absolute z-20 rounded-[0.42rem] border border-amber-100/18 bg-stone-950/48 px-2.5 py-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
             style={{
                 left: 'var(--mage-wars-desktop-side-inset, 1rem)',
+                right: 'calc(var(--mage-wars-desktop-side-inset, 1rem) + var(--mage-wars-desktop-hud-width, 23.25rem) + var(--mage-wars-opponent-plan-mirror-width, 10.75rem) + 0.75rem)',
                 top: 'calc(var(--mage-wars-desktop-top-inset, 0.875rem) + 3.4rem)',
             }}
             data-testid="mage-wars-phase-progress-indicator"
             data-tutorial-id="mw-phase-progress"
+            data-mage-ui-role="phase-progress-main-strip"
             data-current-phase={phase}
             data-current-phase-index={currentIndex}
             aria-label={t('ui.phaseProgressTitle')}
         >
-            <div className="mb-1.5 text-[0.62rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/76">
-                {t('ui.phaseProgressTitle')}
-            </div>
-            <ol className="flex flex-col gap-1">
-                {MAGE_WARS_PHASE_ORDER.map((phaseId, index) => {
-                    const active = phaseId === phase;
-                    const complete = index < currentIndex;
-                    return (
-                        <li
-                            key={phaseId}
-                            className={cx(
-                                'flex min-h-5 items-center gap-1.5 rounded-[0.22rem] px-1.5 py-0.5 text-[0.64rem] font-bold leading-tight transition-colors',
-                                active
-                                    ? 'bg-amber-200/88 text-stone-950 shadow-[0_0_12px_rgba(251,191,36,0.24)]'
-                                    : complete
-                                        ? 'text-amber-100/78'
-                                        : 'text-stone-300/62',
-                            )}
-                            data-testid="mage-wars-phase-progress-item"
-                            data-phase-id={phaseId}
-                            data-phase-active={active ? 'true' : 'false'}
-                            data-phase-complete={complete ? 'true' : 'false'}
-                        >
-                            <span
+            <div className="flex min-w-0 items-center gap-2.5">
+                <div className="shrink-0 text-[0.72rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/78">
+                    {t('ui.phaseProgressTitle')}
+                </div>
+                <ol className="grid min-w-0 flex-1 grid-cols-8 gap-1">
+                    {MAGE_WARS_PHASE_ORDER.map((phaseId, index) => {
+                        const active = phaseId === phase;
+                        const complete = index < currentIndex;
+                        return (
+                            <li
+                                key={phaseId}
                                 className={cx(
-                                    'h-1.5 w-1.5 shrink-0 rounded-full',
+                                    'flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-[0.26rem] px-1.5 py-1 text-center text-[0.74rem] font-bold leading-tight transition-colors',
                                     active
-                                        ? 'bg-stone-950'
+                                        ? 'bg-amber-200/88 text-stone-950 shadow-[0_0_12px_rgba(251,191,36,0.24)]'
                                         : complete
-                                            ? 'bg-amber-200/70'
-                                            : 'bg-stone-500/70',
+                                            ? 'bg-amber-100/8 text-amber-100/82'
+                                            : 'bg-black/12 text-stone-300/70',
                                 )}
-                                aria-hidden="true"
-                            />
-                            <span className="min-w-0 truncate">{t(`phases.${phaseId}`)}</span>
-                        </li>
-                    );
-                })}
-            </ol>
+                                data-testid="mage-wars-phase-progress-item"
+                                data-phase-id={phaseId}
+                                data-phase-active={active ? 'true' : 'false'}
+                                data-phase-complete={complete ? 'true' : 'false'}
+                            >
+                                <span
+                                    className={cx(
+                                        'h-1.5 w-1.5 shrink-0 rounded-full',
+                                        active
+                                            ? 'bg-stone-950'
+                                            : complete
+                                                ? 'bg-amber-200/72'
+                                                : 'bg-stone-500/70',
+                                    )}
+                                    aria-hidden="true"
+                                />
+                                <span className="min-w-0 truncate">{t(`phases.${phaseId}`)}</span>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </div>
         </aside>
     );
 }
@@ -4860,6 +4864,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             '--mage-wars-desktop-grid-gap': 'clamp(0.375rem, 0.45vw, 0.75rem)',
             '--mage-wars-desktop-section-gap': 'clamp(0.5rem, calc(1.805vw - 1.041rem), 1.125rem)',
             '--mage-wars-desktop-card-gap': 'clamp(0.375rem, calc(1.083vw - 0.551rem), 0.75rem)',
+            '--mage-wars-opponent-plan-mirror-width': '10.75rem',
             '--mage-wars-spellbook-control-width': 'clamp(4.75rem, 4.7vw, 5.5rem)',
             '--mage-wars-spellbook-page-rail-width': 'clamp(2.25rem, 2.5vw, 3rem)',
             '--mage-wars-spellbook-page-button-size': 'clamp(2.25rem, 2.1vw, 2.5rem)',

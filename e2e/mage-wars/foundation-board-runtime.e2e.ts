@@ -1313,7 +1313,16 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
     expect(layoutAudit.phaseProgress.text, '阶段进度必须使用玩家可读阶段文案').toContain('计划');
     expect(layoutAudit.rects.phaseProgressIndicator!.x, '阶段进度必须贴左上 UI 锚点').toBeLessThanOrEqual(24);
     expect(layoutAudit.rects.phaseProgressIndicator!.y, '阶段进度必须位于生命显示开关下方，不能叠住左上工具').toBeGreaterThanOrEqual(layoutAudit.rects.lifeToggle!.bottom + 4);
-    expect(layoutAudit.rects.phaseProgressIndicator!.right, '阶段进度是左上低权重读数，不能伸进牌桌中线').toBeLessThan(layoutAudit.viewport.width * 0.2);
+    const phaseProgressRightGap = layoutAudit.rects.opponentPreparedMirror!.x - layoutAudit.rects.phaseProgressIndicator!.right;
+    const phaseProgressAvailableWidth = layoutAudit.rects.opponentPreparedMirror!.x - layoutAudit.rects.phaseProgressIndicator!.x;
+    expect(layoutAudit.rects.phaseProgressIndicator!.width, '阶段进度是当前回合流程主提示，不能缩成左上小标签').toBeGreaterThan(layoutAudit.viewport.width * 0.55);
+    expect(layoutAudit.rects.phaseProgressIndicator!.right, '阶段进度应按剩余横向空间展开，而不是停在屏幕左侧 20%').toBeGreaterThan(layoutAudit.viewport.width * 0.7);
+    expect(phaseProgressRightGap, '阶段进度应自然让位给右上对手计划区，不能相交').toBeGreaterThanOrEqual(4);
+    expect(phaseProgressRightGap, '阶段进度右侧不能留下大段无职责空白').toBeLessThanOrEqual(28);
+    expect(
+        layoutAudit.rects.phaseProgressIndicator!.width / phaseProgressAvailableWidth,
+        '阶段进度应基本占满左侧工具到右上固定信息之间的剩余空间',
+    ).toBeGreaterThanOrEqual(0.96);
     expect(Math.abs(layoutAudit.rects.spellbookShelf!.bottom - layoutAudit.rects.preparedArea!.bottom)).toBeLessThanOrEqual(3);
     expect(Math.abs(layoutAudit.rects.firstSpellbookCard!.bottom - layoutAudit.rects.preparedCard!.bottom)).toBeLessThanOrEqual(3);
     expect(layoutAudit.rects.selfHud!.x, '己方 HUD 必须贴左下顶层服务区，不能预留无职责大空白').toBeGreaterThanOrEqual(0);
@@ -2492,7 +2501,16 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.phaseProgress!.text).toContain('生物行动');
         expect(desktopLayoutAudit.phaseProgress!.rect!.x, '左上阶段进度必须贴左侧锚点').toBeLessThanOrEqual(24);
         expect(desktopLayoutAudit.phaseProgress!.rect!.y, '左上阶段进度必须避开生命显示开关').toBeGreaterThanOrEqual(desktopLayoutAudit.lifeToggle!.rect!.bottom + 4);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.right, '阶段进度不能伸进桌面中线').toBeLessThan(desktopLayoutAudit.viewportWidth * 0.2);
+        const desktopPhaseProgressRightGap = desktopLayoutAudit.opponentPreparedMirror!.x - desktopLayoutAudit.phaseProgress!.rect!.right;
+        const desktopPhaseProgressAvailableWidth = desktopLayoutAudit.opponentPreparedMirror!.x - desktopLayoutAudit.phaseProgress!.rect!.x;
+        expect(desktopLayoutAudit.phaseProgress!.rect!.width, '阶段进度是当前回合流程主提示，不能缩成左上小标签').toBeGreaterThan(desktopLayoutAudit.viewportWidth * 0.55);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.right, '阶段进度应按剩余横向空间展开，而不是停在屏幕左侧 20%').toBeGreaterThan(desktopLayoutAudit.viewportWidth * 0.7);
+        expect(desktopPhaseProgressRightGap, '阶段进度应自然让位给右上对手计划区，不能相交').toBeGreaterThanOrEqual(4);
+        expect(desktopPhaseProgressRightGap, '阶段进度右侧不能留下大段无职责空白').toBeLessThanOrEqual(28);
+        expect(
+            desktopLayoutAudit.phaseProgress!.rect!.width / desktopPhaseProgressAvailableWidth,
+            '阶段进度应基本占满左侧工具到右上固定信息之间的剩余空间',
+        ).toBeGreaterThanOrEqual(0.96);
         expect(desktopLayoutAudit.selfHud).not.toBeNull();
         expect(desktopLayoutAudit.opponentHud).not.toBeNull();
         expect(desktopLayoutAudit.selfHudDensity).toBe('full');

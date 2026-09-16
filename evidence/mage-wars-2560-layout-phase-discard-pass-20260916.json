@@ -1,0 +1,32 @@
+{
+  "verdict": "PASS",
+  "scope": "current-user-request",
+  "display": {
+    "purpose": "final-user-visible-delivery",
+    "trigger": "user-requested-proxy-open",
+    "viewer": "web",
+    "finalPassBeforeOpen": true
+  },
+  "requirements": [
+    {
+      "requirement": "阶段提示必须按左侧工具到右上固定信息之间的剩余空间展开，不能缩成左上小标签。",
+      "status": "PASS",
+      "evidence": [
+        "真实浏览器 E2E 2560x1304 用例通过：Mage Wars foundation runtime board / 2560x1304 真实入口验证放大镜悬浮、宽屏布局和地图自由查看。",
+        "同一 E2E 断言阶段提示宽度超过视口 55%，右边界超过视口 70%，并占满左侧工具到右上对手计划区之间可用宽度的 96% 以上。",
+        "截图顶部可见横向“回合流程”阶段条，覆盖重置、聚魔、维持、计划、部署、先手快速施法、生物行动和最终快速施法，当前“计划”高亮。"
+      ]
+    },
+    {
+      "requirement": "弃牌堆必须位于右侧主动作按钮上方，不能被确认计划按钮遮挡。",
+      "status": "PASS",
+      "evidence": [
+        "同一 E2E 在计划按钮出现后断言弃牌堆与当前主动作按钮不相交。",
+        "截图右侧可见“弃牌 0”在“确认计划 2/2”上方，按钮未覆盖弃牌堆。"
+      ]
+    }
+  ],
+  "images": [
+    "D:\\gongzuo\\webgame\\BoardGame\\test-results\\evidence-screenshots\\mage-wars\\foundation-board-runtime\\e2e-desktop-2560x1304-board.png"
+  ]
+}
