@@ -489,10 +489,8 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
         {
             id: 'watch-teammate-omen-turns',
             content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.watchTeammateOmenTurns',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
             viewAs: '0',
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.EXPLORE_ROOM,
@@ -508,23 +506,16 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     playerId: '1',
                 },
             ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-omen-results',
-            content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.teammateOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
+            hiddenAutomation: compressedRepeat(
+                ['hand-off-to-teammate-one'],
+                'Teammate 1 repeats formal exploration, card acknowledgement, and turn handoff after the player has learned ending a turn; the next visible step waits for player 0 control.',
+            ),
         },
         {
             id: 'watch-teammate-two-omen-turn',
             content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.watchTeammateTwoOmenTurn',
-            highlightTarget: 'betrayal-discovery-continue',
-            position: 'right',
-            infoStep: true,
             viewAs: '0',
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.MOVE_TO_ROOM,
@@ -536,17 +527,6 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     playerId: '2',
                     payload: { roomId: 'frontier-ground-east-east' },
                 },
-            ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-two-omen-results',
-            content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.teammateTwoOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
-            aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '2',
@@ -556,7 +536,18 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
                     playerId: '2',
                 },
             ],
-            autoAdvanceAfterAi: false,
+            hiddenAutomation: compressedRepeat(
+                ['hand-off-to-teammate-one'],
+                'Teammate 2 repeats formal movement, exploration, card acknowledgement, and turn handoff; the tutorial resumes at the next player 0 decision.',
+            ),
+        },
+        {
+            id: 'teammate-two-omen-results',
+            content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.teammateTwoOmenResults',
+            highlightTarget: 'betrayal-haunt-risk-status',
+            position: 'top',
+            infoStep: true,
+            viewAs: '0',
         },
         {
             id: 'hand-off-to-teammate-second-cycle',
@@ -765,11 +756,9 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
         {
             id: 'watch-teammate-one-omen-turn',
             content: 'game-betrayal:tutorial.mainPath.steps.watchTeammateOneOmenTurn',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
             viewAs: '0',
             randomPolicy: { mode: 'fixed', values: [1] },
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.MOVE_TO_ROOM,
@@ -781,17 +770,6 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                     playerId: '1',
                     payload: { roomId: 'ground-east' },
                 },
-            ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-one-omen-results',
-            content: 'game-betrayal:tutorial.mainPath.steps.teammateOneOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
-            aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
@@ -801,16 +779,17 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                     playerId: '1',
                 },
             ],
-            autoAdvanceAfterAi: false,
+            hiddenAutomation: compressedRepeat(
+                ['return-to-table-after-damage'],
+                'Teammate 1 repeats formal movement, exploration, card acknowledgement, and turn handoff; no new player 0 decision is available until control returns.',
+            ),
         },
         {
             id: 'watch-teammate-two-omen-turn',
             content: 'game-betrayal:tutorial.mainPath.steps.watchTeammateTwoOmenTurn',
-            highlightTarget: 'betrayal-discovery-continue',
-            position: 'right',
-            infoStep: true,
             viewAs: '0',
             randomPolicy: { mode: 'fixed', values: [1] },
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.MOVE_TO_ROOM,
@@ -822,17 +801,6 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                     playerId: '2',
                     payload: { roomId: 'frontier-ground-east-east' },
                 },
-            ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-two-omen-results',
-            content: 'game-betrayal:tutorial.mainPath.steps.teammateTwoOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
-            aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '2',
@@ -842,7 +810,18 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                     playerId: '2',
                 },
             ],
-            autoAdvanceAfterAi: false,
+            hiddenAutomation: compressedRepeat(
+                ['return-to-table-after-damage'],
+                'Teammate 2 repeats formal movement, exploration, card acknowledgement, and turn handoff; the next visible tutorial step resumes at player 0.',
+            ),
+        },
+        {
+            id: 'teammate-two-omen-results',
+            content: 'game-betrayal:tutorial.mainPath.steps.teammateTwoOmenResults',
+            highlightTarget: 'betrayal-haunt-risk-status',
+            position: 'top',
+            infoStep: true,
+            viewAs: '0',
         },
         {
             id: 'move-to-grand-staircase',

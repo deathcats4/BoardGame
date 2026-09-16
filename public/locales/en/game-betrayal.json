@@ -1072,7 +1072,6 @@
       "steps": {
         "endTurnAfterEvent": "After damage allocation, discovering the Event room has already ended your turn. Choose End Turn to pass play to your teammate.",
         "watchTeammateOneOmenTurn": "It is not your turn now. Teammate 1 first moves back beside the Entrance Hall, explores a ground-floor Omen room, and reveals the Ring; this haunt roll does not trigger.",
-        "teammateOneOmenResults": "Teammate 1 gains the Ring, and the haunt has not started. Play passes to teammate 2.",
         "watchTeammateTwoOmenTurn": "Teammate 2 moves into the newly discovered ground-floor room, explores an adjacent Omen room, and reveals Dog. After an Omen is drawn, roll dice equal to the total number of Omens held by all players; this result is below 5+, so the haunt does not start. Dog's public result belongs to teammate 2 to confirm; this is not your confirmation, so choose Next to see the confirmed public result.",
         "teammateTwoOmenResults": "Teammate 2 has confirmed Dog and the public haunt roll result. Play returns to you; you are still in the Kitchen, and this turn you move to the Upper Landing beside the Library.",
         "moveToGrandStaircase": "You already know movement. Stay in move mode and move from the Kitchen through the Hallway to the Grand Staircase; it connects the floors.",
@@ -1129,7 +1128,6 @@
         "setupNaturalHauntFlow": "This section teaches the majority hero perspective: you end your turn beside the Library and control only your own turn, while teammates gain Omens through normal turns. The traitor book has its own chapter.",
         "handOffToTeammateOne": "Choose End Turn to pass play to the next explorer. Haunt risk rises as players actually gain Omens.",
         "watchTeammateOmenTurns": "It is not your turn now. Wait while teammate 1 explores an Omen room; this only reveals the first Omen and a failed haunt roll.",
-        "teammateOmenResults": "Teammate 1 gains the Ring, and one haunt die stays below 5+. Play now passes normally to teammate 2.",
         "watchTeammateTwoOmenTurn": "Teammate 2 moves beside the Observatory, explores the next Omen room, and reveals Dog. After the second Omen is drawn, roll dice equal to the total number of Omens held by all players; this result is below 5+, so the haunt does not start. Dog's public result belongs to teammate 2 to confirm; this is not your confirmation, so choose Next to return to your view.",
         "teammateTwoOmenResults": "After teammate 2 confirms Dog, the turn returns to you. Ring and Dog are in play, so the next Omen will roll three dice.",
         "handOffToTeammateSecondCycle": "It is your turn again. Choose End Turn to keep watching teammates explore through the normal rules; you are not acting for them.",

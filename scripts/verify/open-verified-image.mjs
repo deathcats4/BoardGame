@@ -15,7 +15,12 @@ const E2E_IMAGE_VIEWER_ENTRY = path.join(PROJECT_ROOT, 'scripts', 'verify', 'ope
 const OPEN_STATE_PATH = path.join(PROJECT_ROOT, 'test-results', 'evidence-screenshots', '.open-verified-image-state.json');
 const OPEN_HISTORY_LIMIT = 50;
 const FINAL_DISPLAY_PURPOSE = 'final-user-visible-delivery';
-const VALID_DISPLAY_TRIGGERS = new Set(['user-requested-open', 'task-final-delivery']);
+const VALID_DISPLAY_TRIGGERS = new Set([
+    'user-requested-evidence',
+    'user-requested-proxy-open',
+    'task-final-delivery',
+    'user-requested-open',
+]);
 
 const usage = () => {
     console.log(`用法:
@@ -26,16 +31,16 @@ const usage = () => {
   node scripts/verify/open-verified-image.mjs --pass-manifest <本轮要求达标清单.json> --latest [目录]
 
 选项:
-  --path <路径>     打开指定图片/GIF/视频；可重复传入多次，默认用本地网页查看器
-  --paths <路径...> 依次打开多张指定图片/GIF/视频；默认用本地网页查看器，要求同一目录
+  --path <路径>     指定图片/GIF/视频；可重复传入多次，默认用本地网页查看器代理打开
+  --paths <路径...> 依次指定多张图片/GIF/视频；默认用本地网页查看器代理打开，要求同一目录
   --latest [目录]   递归查找目录下最后修改的一张图片/GIF/视频，默认 test-results/evidence-screenshots
   --viewer <web|system|pureref>  指定查看器；默认 web。pureref 只保留为显式旧通道
   --web             等同于 --viewer web
   --pureref         等同于 --viewer pureref；非默认
-  --pass-manifest <路径>  本轮用户要求达标清单；没有清单禁止实际开图
+  --pass-manifest <路径>  本轮用户要求达标清单；没有清单禁止实际代理打开
   --confirmed-pass  历史参数，已废弃；请使用 --pass-manifest
-  --force-reopen    强制重开同一份已 PASS 媒体；只在用户明确说没看到、打开错图或要求重开时使用
-  --dry-run         只解析路径，不实际打开
+  --force-reopen    强制重开同一份已 PASS 媒体；只在用户明确说没看到、打开错图或要求代开重开时使用
+  --dry-run         只解析路径和校验清单，不实际代理打开
   --help            显示帮助
 `);
 };
@@ -369,13 +374,13 @@ const validatePassManifest = (manifestPath, imagePaths, viewer) => {
         throw new Error(`拒绝打开：PASS 清单 display.purpose 必须是 "${FINAL_DISPLAY_PURPOSE}"，用于声明这不是过程核图，而是最终用户展示`);
     }
     if (!VALID_DISPLAY_TRIGGERS.has(manifest?.display?.trigger)) {
-        throw new Error(`拒绝打开：PASS 清单 display.trigger 必须是 ${Array.from(VALID_DISPLAY_TRIGGERS).join(' 或 ')}，不能省略用户展示触发来源`);
+        throw new Error(`拒绝打开：PASS 清单 display.trigger 必须是 ${Array.from(VALID_DISPLAY_TRIGGERS).join(' 或 ')}，不能省略最终交付触发来源`);
     }
     if (manifest?.display?.viewer !== viewer) {
         throw new Error(`拒绝打开：PASS 清单 display.viewer 必须与本次 viewer 一致: ${viewer}`);
     }
     if (manifest?.display?.finalPassBeforeOpen !== true) {
-        throw new Error('拒绝打开：PASS 清单必须显式声明 display.finalPassBeforeOpen=true，表示最终 PASS 已先于开图完成');
+        throw new Error('拒绝打开：PASS 清单必须显式声明 display.finalPassBeforeOpen=true，表示最终 PASS 已先于证据交付或代理打开完成');
     }
     if (!Array.isArray(manifest.requirements) || manifest.requirements.length === 0) {
         throw new Error('拒绝打开：PASS 清单必须包含非空 requirements');
@@ -395,13 +400,13 @@ const validatePassManifest = (manifestPath, imagePaths, viewer) => {
 
     const manifestMedia = Array.isArray(manifest.media) ? manifest.media : manifest.images;
     if (!Array.isArray(manifestMedia) || manifestMedia.length === 0) {
-        throw new Error('拒绝打开：PASS 清单必须包含 media 或 images，并且必须覆盖本次打开的全部图片/视频');
+        throw new Error('拒绝打开：PASS 清单必须包含 media 或 images，并且必须覆盖本次交付涉及的全部图片/视频');
     }
 
     const manifestImageSet = new Set(manifestMedia.map((mediaPath) => normalizeForCompare(mediaPath)));
     const missingImages = imagePaths.filter((imagePath) => !manifestImageSet.has(normalizeForCompare(imagePath)));
     if (missingImages.length > 0) {
-        throw new Error(`拒绝打开：本次打开的图片/视频不在 PASS 清单 media/images 中: ${missingImages.join(', ')}`);
+            throw new Error(`拒绝打开：本次交付涉及的图片/视频不在 PASS 清单 media/images 中: ${missingImages.join(', ')}`);
     }
     validateLabeledImagesPreserveSourcePixels(manifest, imagePaths, viewer);
 
@@ -478,7 +483,7 @@ const assertNotDuplicateOpen = ({ passManifest, imagePaths, viewer, forceReopen 
 
     if (!forceReopen && duplicate) {
         const openedAt = duplicate.openedAt ?? '未知时间';
-        throw new Error(`拒绝重复打开：同一 PASS 清单和同一组媒体已在 ${openedAt} 打开过。若用户明确说没看到、打开错图或要求重开，请追加 --force-reopen。状态文件: ${OPEN_STATE_PATH}`);
+        throw new Error(`拒绝重复打开：同一 PASS 清单和同一组媒体已在 ${openedAt} 打开过。若用户明确说没看到、打开错图或要求代开重开，请追加 --force-reopen。状态文件: ${OPEN_STATE_PATH}`);
     }
 
     return { fingerprint, mediaFingerprint, payload };

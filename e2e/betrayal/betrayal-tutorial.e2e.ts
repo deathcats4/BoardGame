@@ -41,25 +41,6 @@ const STEP_15A = `${EVIDENCE_DIR}/29-山屋惊魂-教程-兔脚重投动画进�
 const STEP_16 = `${EVIDENCE_DIR}/30-山屋惊魂-教程-兔脚重投后确认新骰面.jpg`;
 const STEP_16A = `${EVIDENCE_DIR}/31-山屋惊魂-教程-伤害分配面板可操作.jpg`;
 const STEP_16B = `${EVIDENCE_DIR}/32-山屋惊魂-教程-伤害分配完成后.jpg`;
-const MAIN_FLOW_34 = `${EVIDENCE_DIR}/main-flow-rebuilt/34-队友一获得指环未触发.jpg`;
-const MAIN_FLOW_35 = `${EVIDENCE_DIR}/main-flow-rebuilt/35-队友一结果说明.jpg`;
-const MAIN_FLOW_36 = `${EVIDENCE_DIR}/main-flow-rebuilt/36-队友二翻出狗未触发.jpg`;
-const MAIN_FLOW_37 = `${EVIDENCE_DIR}/main-flow-rebuilt/37-狗确认后回到当前玩家.jpg`;
-const MAIN_FLOW_38 = `${EVIDENCE_DIR}/main-flow-rebuilt/38-当前玩家到达大阶梯准备切层.jpg`;
-const MAIN_FLOW_39 = `${EVIDENCE_DIR}/main-flow-rebuilt/39-切到上层看见上层平台.jpg`;
-const MAIN_FLOW_40 = `${EVIDENCE_DIR}/main-flow-rebuilt/40-当前玩家移动到上层平台.jpg`;
-const MAIN_FLOW_41 = `${EVIDENCE_DIR}/main-flow-rebuilt/41-当前玩家在上层平台准备结束回合.jpg`;
-const MAIN_FLOW_42 = `${EVIDENCE_DIR}/main-flow-rebuilt/42-队友一翻出面具并等待确认.jpg`;
-const MAIN_FLOW_43 = `${EVIDENCE_DIR}/main-flow-rebuilt/43-英雄开场过场.jpg`;
-const MAIN_FLOW_44 = `${EVIDENCE_DIR}/main-flow-rebuilt/44-过场继续进入英雄剧本书.jpg`;
-const MAIN_FLOW_45 = `${EVIDENCE_DIR}/main-flow-rebuilt/45-英雄剧本书目标页说明图书馆原因.jpg`;
-const MAIN_FLOW_46 = `${EVIDENCE_DIR}/main-flow-rebuilt/46-读完目标关闭剧本书.jpg`;
-const MAIN_FLOW_47 = `${EVIDENCE_DIR}/main-flow-rebuilt/47-读完目标回到上层平台英雄回合.jpg`;
-const MAIN_FLOW_48 = `${EVIDENCE_DIR}/main-flow-rebuilt/48-读完目标后准备打开移动目标.jpg`;
-const MAIN_FLOW_49 = `${EVIDENCE_DIR}/main-flow-rebuilt/49-图书馆成为可点击移动目标.jpg`;
-const MAIN_FLOW_50 = `${EVIDENCE_DIR}/main-flow-rebuilt/50-英雄寻找木乃伊真名入口.jpg`;
-const MAIN_FLOW_51 = `${EVIDENCE_DIR}/main-flow-rebuilt/51-寻找真名知识检定成功.jpg`;
-const MAIN_FLOW_52 = `${EVIDENCE_DIR}/main-flow-rebuilt/52-确认后回到牌桌可结束回合.jpg`;
 const STEP_17 = `${EVIDENCE_DIR}/representative-hero-haunt/01-木乃伊作祟目标改变.jpg`;
 const STEP_18 = `${EVIDENCE_DIR}/representative-hero-haunt/02-打开木乃伊剧本目标页.jpg`;
 const STEP_19 = `${EVIDENCE_DIR}/representative-hero-haunt/03-驱逐木乃伊前因果说明.jpg`;
@@ -86,22 +67,19 @@ const STEP_40 = `${EVIDENCE_DIR}/topic-omen-confirmation/01-预兆牌确认与�
 const STEP_42 = `${EVIDENCE_DIR}/topic-omen-confirmation/02-确认后回牌桌持有区.jpg`;
 const STEP_43 = `${EVIDENCE_DIR}/topic-omen-confirmation/03-确认后预兆进度条.jpg`;
 const STEP_HAUNT_NATURAL_01 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/01-当前玩家结束回合前.jpg`;
-const STEP_HAUNT_NATURAL_02 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/02-等待队友一探索预兆房间.jpg`;
-const STEP_HAUNT_NATURAL_03 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/03-队友一获得指环未触发.jpg`;
-const STEP_HAUNT_NATURAL_04 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/04-队友二翻出狗未触发.jpg`;
-const STEP_HAUNT_NATURAL_05 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/05-狗确认后回到当前玩家.jpg`;
-const STEP_HAUNT_NATURAL_06 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/06-再次结束当前回合.jpg`;
-const STEP_HAUNT_NATURAL_07 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/07-队友一翻出面具并等待确认.jpg`;
-const STEP_HAUNT_NATURAL_08 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/08-当前玩家看到英雄开场过场.jpg`;
-const STEP_HAUNT_NATURAL_09 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/09-开场过场继续进入英雄剧本书.jpg`;
-const STEP_HAUNT_NATURAL_10 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/10-英雄剧本书目标页与图书馆原因.jpg`;
-const STEP_HAUNT_NATURAL_11 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/11-读完剧本书目标准备关闭.jpg`;
-const STEP_HAUNT_NATURAL_12 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/12-读完目标回到上层平台英雄.jpg`;
-const STEP_HAUNT_NATURAL_13 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/13-读完目标后准备打开移动目标.jpg`;
-const STEP_HAUNT_NATURAL_14 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/14-图书馆成为可点击移动目标.jpg`;
-const STEP_HAUNT_NATURAL_15 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/15-轮到英雄寻找木乃伊真名.jpg`;
-const STEP_HAUNT_NATURAL_16 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/16-寻找真名知识检定成功.jpg`;
-const STEP_HAUNT_NATURAL_17 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/17-确认后回到牌桌可结束回合.jpg`;
+const STEP_HAUNT_NATURAL_02 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/02-队友自动行动后回到当前玩家.jpg`;
+const STEP_HAUNT_NATURAL_03 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/03-再次结束当前回合.jpg`;
+const STEP_HAUNT_NATURAL_04 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/04-队友一翻出面具并等待确认.jpg`;
+const STEP_HAUNT_NATURAL_05 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/05-当前玩家看到英雄开场过场.jpg`;
+const STEP_HAUNT_NATURAL_06 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/06-开场过场继续进入英雄剧本书.jpg`;
+const STEP_HAUNT_NATURAL_07 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/07-英雄剧本书目标页与图书馆原因.jpg`;
+const STEP_HAUNT_NATURAL_08 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/08-读完剧本书目标准备关闭.jpg`;
+const STEP_HAUNT_NATURAL_09 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/09-读完目标回到上层平台英雄.jpg`;
+const STEP_HAUNT_NATURAL_10 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/10-读完目标后准备打开移动目标.jpg`;
+const STEP_HAUNT_NATURAL_11 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/11-图书馆成为可点击移动目标.jpg`;
+const STEP_HAUNT_NATURAL_12 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/12-轮到英雄寻找木乃伊真名.jpg`;
+const STEP_HAUNT_NATURAL_13 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/13-寻找真名知识检定成功.jpg`;
+const STEP_HAUNT_NATURAL_14 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/14-确认后回到牌桌可结束回合.jpg`;
 const STEP_TRAITOR_01 = `${EVIDENCE_DIR}/traitor-path/01-叛徒打开木乃伊剧本目标页.jpg`;
 const STEP_TRAITOR_02 = `${EVIDENCE_DIR}/traitor-path/02-木乃伊怪物回合开始前.jpg`;
 const STEP_TRAITOR_03 = `${EVIDENCE_DIR}/traitor-path/03-木乃伊移动骰盘.jpg`;
@@ -3057,8 +3035,9 @@ test.describe("山屋惊魂教程最小真实链路", () => {
             core?.scenarioRuntime?.mummy?.banishmentSpellLearned ?? null,
           recommendedAction: core?.recommendedAction ?? null,
         };
-      });
+    });
     const tutorialOverlayCard = page.getByTestId("tutorial-overlay-card");
+    const discoveryPanel = page.getByTestId("betrayal-discovery-panel");
 
     await page.setViewportSize({ width: 1600, height: 900 });
     await warmBetrayalFrontend(context);
@@ -3087,50 +3066,9 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-action-endTurn")).toBeVisible();
 
     await page.getByTestId("betrayal-action-endTurn").click();
-    await waitForStep(page, "watch-teammate-omen-turns", 10000);
-    await expect(tutorialOverlayCard).toContainText("现在不是你的回合");
-    await expect(tutorialOverlayCard).toContainText("等待队友 1 探索预兆房间");
-    await expect(tutorialOverlayCard).not.toContainText("点“探索”");
     await expect
       .poll(readOmenNamesByPlayer, {
-        message: "队友 1 必须通过正式探索自然获得指环",
-        timeout: 30000,
-      })
-      .toMatchObject({
-        "0": [],
-        "1": ["指环"],
-        "2": [],
-      });
-    await expect
-      .poll(readHauntState, {
-        message: "队友 1 获得第一张预兆后仍应处于作祟前",
-        timeout: 30000,
-      })
-      .toMatchObject({
-        currentPlayer: "2",
-        phase: "preHaunt",
-        hauntTriggered: false,
-      });
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_02);
-
-    await clickNext(page);
-    await waitForStep(page, "teammate-omen-results", 10000);
-    await expect(tutorialOverlayCard).toContainText("队友 1 获得指环");
-    await expect(tutorialOverlayCard).toContainText("1 颗作祟骰低于 5+");
-    await expect(tutorialOverlayCard).toContainText("交给队友 2");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_03);
-
-    await clickNext(page);
-    await waitForStep(page, "watch-teammate-two-omen-turn", 10000);
-    await expect(tutorialOverlayCard).toContainText("队友 2");
-    await expect(tutorialOverlayCard).toContainText("翻出狗");
-    await expect(tutorialOverlayCard).toContainText("按所有玩家持有的预兆总数掷骰");
-    await expect(tutorialOverlayCard).toContainText("狗的公开结果归队友 2 确认");
-    await expect(tutorialOverlayCard).toContainText("点“下一步”");
-    await expect(tutorialOverlayCard).not.toContainText("确认按钮显示等待");
-    await expect
-      .poll(readOmenNamesByPlayer, {
-        message: "队友 2 必须通过正式探索自然翻出狗",
+        message: "队友 1 和队友 2 必须通过隐藏自动桥接完成正式探索",
         timeout: 30000,
       })
       .toMatchObject({
@@ -3140,43 +3078,27 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       });
     await expect
       .poll(readHauntState, {
-        message: "队友 2 翻出狗后仍应处于作祟前",
+        message: "队友自动行动结束后必须回到当前玩家且仍处于作祟前",
         timeout: 30000,
       })
       .toMatchObject({
-        currentPlayer: "2",
+        currentPlayer: "0",
         phase: "preHaunt",
         hauntTriggered: false,
-        recentRollKind: "hauntRoll",
-        recentRollDiceCount: 2,
       });
-    const discoveryPanel = page.getByTestId("betrayal-discovery-panel");
-    await expect(discoveryPanel).toBeVisible({ timeout: 10000 });
-    await expect(discoveryPanel).toContainText("狗");
-    await expect(
-      discoveryPanel.getByTestId("betrayal-recent-roll-panel"),
-    ).toBeVisible();
-    await expect(
-      discoveryPanel.getByTestId("betrayal-house-dice-3d-group"),
-    ).toHaveAttribute("data-dice-count", "2");
-    await expect(
-      discoveryPanel.getByTestId("betrayal-recent-roll-total"),
-    ).toContainText("总点数");
-    await expect(tutorialOverlayCard).toContainText("结果低于 5+");
-    await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
-      "data-tutorial-highlight-target",
-      "betrayal-discovery-continue",
-    );
     await expect(page.getByTestId("betrayal-scenario-reader-dialog")).toHaveCount(
       0,
     );
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_04);
-    await waitForTutorialAiActionsConsumed(page, "watch-teammate-two-omen-turn");
-
-    await clickNext(page);
     await waitForStep(page, "teammate-two-omen-results", 10000);
     await expect(tutorialOverlayCard).toContainText("队友 2 确认狗");
     await expect(tutorialOverlayCard).toContainText("回合回到你");
+    await expect(page.locator("body")).not.toContainText(
+      "队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。",
+    );
+    const visibleNaturalStepIds = await readVisibleTutorialStepIds(page);
+    expect(visibleNaturalStepIds).not.toContain("watch-teammate-omen-turns");
+    expect(visibleNaturalStepIds).not.toContain("teammate-omen-results");
+    expect(visibleNaturalStepIds).not.toContain("watch-teammate-two-omen-turn");
     await expect
       .poll(readOmenNamesByPlayer, {
         message: "狗确认后持有区应保留前两张自然预兆",
@@ -3197,14 +3119,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         phase: "preHaunt",
         hauntTriggered: false,
       });
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_05);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_02);
 
     await clickNext(page);
     await waitForStep(page, "hand-off-to-teammate-second-cycle", 10000);
     await expect(tutorialOverlayCard).toContainText("现在又轮到你");
     await expect(tutorialOverlayCard).toContainText("不会替队友操作");
     await expect(page.getByTestId("betrayal-action-endTurn")).toBeVisible();
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_06);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_03);
 
     await page.getByTestId("betrayal-action-endTurn").click();
     await waitForStep(page, "watch-teammate-haunt-trigger", 10000);
@@ -3262,7 +3184,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-scenario-reader-dialog")).toHaveCount(
       0,
     );
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_07);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_04);
 
     await clickNext(page);
     await waitForStep(page, "haunt-hero-reader", 30000);
@@ -3309,7 +3231,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toContainText("进入剧本书");
     await expect(tutorialOverlayCard).toContainText("英雄开场过场");
     await expectTutorialCardInForeground(page, "英雄开场过场");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_08);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_05);
 
     await clickNext(page);
     await waitForStep(page, "haunt-hero-reader-turn-page", 10000);
@@ -3322,7 +3244,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeVisible();
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeEnabled();
     await expectTutorialCardInForeground(page, "英雄剧本书目标页");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_09);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_06);
 
     await page.getByTestId("betrayal-scenario-reader-next-zone").click();
     await waitForStep(page, "haunt-hero-reader-goal", 10000);
@@ -3351,14 +3273,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       ["betrayal-scenario-book-section-special"],
       "英雄剧本书目标页与图书馆原因",
     );
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_10);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_07);
 
     await clickNext(page);
     await waitForStep(page, "haunt-hero-reader-close", 10000);
     await expect(tutorialOverlayCard).toContainText("点关闭回到牌桌");
     await expect(page.getByTestId("betrayal-scenario-reader-close")).toBeVisible();
     await expectTutorialCardInForeground(page, "点关闭回到牌桌");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_11);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_08);
 
     await page.getByTestId("betrayal-scenario-reader-close").click();
     await expect(scenarioReader).toBeHidden();
@@ -3384,7 +3306,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         mummyTrueNameFound: false,
       });
     await expect(page.getByTestId("betrayal-scenario-reader-dialog")).toBeHidden();
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_12);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_09);
 
     await clickNext(page);
     await waitForStep(page, "open-library-move-after-goal", 10000);
@@ -3398,7 +3320,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       "betrayal-action-move",
     );
     await expectTutorialCardInForeground(page, "先点“移动”");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_13);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_10);
 
     await page.getByTestId("betrayal-action-move").click();
     await expectBetrayalMoveTargetsMatchDiscoveredRooms(
@@ -3420,7 +3342,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       "betrayal-room-upper-west",
     );
     await expectTutorialCardInForeground(page, "图书馆现在是相邻移动目标");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_14);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_11);
 
     await postGoalLibraryRoom.click();
     await expect(
@@ -3451,7 +3373,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         mummyTrueNameFound: false,
       });
     await expectTutorialCardInForeground(page, "寻找木乃伊真名");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_15);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_12);
 
     await page.getByTestId("betrayal-action-use").click();
     await waitForStep(page, "hero-study-name-result", 10000);
@@ -3496,7 +3418,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       "1",
     );
     await expectTutorialCardInForeground(page, "检定成功");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_16);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_13);
 
     await studyNameContinueButton.click();
     await waitForStep(page, "hero-study-name-closeout", 10000);
@@ -3522,7 +3444,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         recommendedAction: "endTurn",
     });
     await expectTutorialCardInForeground(page, "结果已经落到英雄目标进度上");
-    await saveScreenshot(page, STEP_HAUNT_NATURAL_17);
+    await saveScreenshot(page, STEP_HAUNT_NATURAL_14);
 
     assertNoFatalFrontendErrors([
       { label: "betrayal-tutorial-haunt-natural-trigger-flow", diagnostics },
@@ -5319,78 +5241,9 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     );
 
     await page.getByTestId("betrayal-action-endTurn").click();
-    await waitForStep(page, "watch-teammate-one-omen-turn", 10000);
-    await expect(tutorialOverlayCard).toContainText("现在不是你的回合");
-    await expect(tutorialOverlayCard).toContainText("队友 1");
-    await expect(tutorialOverlayCard).toContainText("翻出指环");
-    await expect(tutorialOverlayCard).not.toContainText("你去操作队友");
     await expect
       .poll(() => readBetrayalOmenNamesByPlayer(page), {
-        message: "默认主线中队友 1 必须通过正式探索自然获得指环",
-        timeout: 30000,
-      })
-      .toMatchObject({
-        "0": ["书本"],
-        "1": ["指环"],
-        "2": [],
-      });
-    await expect
-      .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "队友 1 获得指环后仍应处于作祟前",
-        timeout: 30000,
-      })
-      .toMatchObject({
-        currentPlayer: "1",
-        phase: "preHaunt",
-        hauntTriggered: false,
-        recentRollKind: "hauntRoll",
-        recentRollDiceCount: 2,
-      });
-    await expect(discoveryReveal).toBeVisible({ timeout: 10000 });
-    await expect(discoveryReveal).toContainText("指环");
-    await expect(
-      discoveryReveal.getByTestId("betrayal-recent-roll-panel"),
-    ).toBeVisible();
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "watch-teammate-one-omen-turn",
-      mainFlowFullShot(26, "队友一获得指环未触发"),
-    );
-
-    await clickNext(page);
-    await waitForStep(page, "teammate-one-omen-results", 10000);
-    await expect(tutorialOverlayCard).toContainText("队友 1 获得指环");
-    await expect(tutorialOverlayCard).toContainText("作祟仍未开始");
-    await expect(tutorialOverlayCard).toContainText("队友 2");
-    await expect
-      .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "队友 1 公开结果后必须交给队友 2",
-        timeout: 30000,
-      })
-      .toMatchObject({
-        currentPlayer: "2",
-        phase: "preHaunt",
-        hauntTriggered: false,
-      });
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "teammate-one-omen-results",
-      mainFlowFullShot(27, "队友一结果说明"),
-    );
-
-    await clickNext(page);
-    await waitForStep(page, "watch-teammate-two-omen-turn", 10000);
-    await expect(tutorialOverlayCard).toContainText("队友 2");
-    await expect(tutorialOverlayCard).toContainText("翻出狗");
-    await expect(tutorialOverlayCard).toContainText("按所有玩家持有的预兆总数掷骰");
-    await expect(tutorialOverlayCard).toContainText("狗的公开结果归队友 2 确认");
-    await expect(tutorialOverlayCard).toContainText("点“下一步”");
-    await expect(tutorialOverlayCard).not.toContainText("确认按钮显示等待");
-    await expect
-      .poll(() => readBetrayalOmenNamesByPlayer(page), {
-        message: "默认主线中队友 2 必须通过正式探索自然获得狗",
+        message: "默认主线中队友 1 和队友 2 必须通过隐藏自动桥接完成正式探索",
         timeout: 30000,
       })
       .toMatchObject({
@@ -5400,35 +5253,25 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       });
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "队友 2 翻出狗后仍应处于作祟前",
+        message: "队友自动行动结束后必须回到当前玩家，不能停成队友中间教程页",
         timeout: 30000,
       })
       .toMatchObject({
-        currentPlayer: "2",
+        currentPlayer: "0",
         phase: "preHaunt",
         hauntTriggered: false,
-        recentRollKind: "hauntRoll",
-        recentRollDiceCount: 3,
       });
-    await expect(discoveryReveal).toBeVisible({ timeout: 10000 });
-    await expect(discoveryReveal).toContainText("狗");
-    await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
-      "data-tutorial-highlight-target",
-      "betrayal-discovery-continue",
-    );
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "watch-teammate-two-omen-turn",
-      mainFlowFullShot(28, "队友二翻出狗未触发"),
-    );
-    await waitForTutorialAiActionsConsumed(page, "watch-teammate-two-omen-turn");
-
-    await clickNext(page);
     await waitForStep(page, "teammate-two-omen-results", 10000);
     await expect(tutorialOverlayCard).toContainText("已确认狗");
     await expect(tutorialOverlayCard).toContainText("回合回到你");
     await expect(tutorialOverlayCard).toContainText("移动到上层");
+    await expect(page.locator("body")).not.toContainText(
+      "队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。",
+    );
+    const visibleMainFlowStepIds = await readVisibleTutorialStepIds(page);
+    expect(visibleMainFlowStepIds).not.toContain("watch-teammate-one-omen-turn");
+    expect(visibleMainFlowStepIds).not.toContain("teammate-one-omen-results");
+    expect(visibleMainFlowStepIds).not.toContain("watch-teammate-two-omen-turn");
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
         message: "狗确认后必须回到当前玩家，不能进入代操作队友流程",
@@ -5443,7 +5286,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "teammate-two-omen-results",
-      mainFlowFullShot(29, "狗确认后回到当前玩家"),
+      mainFlowFullShot(26, "狗确认后回到当前玩家"),
     );
 
     await clickNext(page);
@@ -5455,7 +5298,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "move-to-grand-staircase",
-      mainFlowFullShot(30, "移动到大阶梯"),
+      mainFlowFullShot(27, "移动到大阶梯"),
     );
     await page.getByTestId("betrayal-action-move").click();
     await expectBetrayalMoveTargetsMatchDiscoveredRooms(
@@ -5492,7 +5335,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "switch-to-upper-floor",
-      mainFlowFullShot(31, "切到上层地图"),
+      mainFlowFullShot(28, "切到上层地图"),
     );
 
     await page.getByTestId("betrayal-room-floor-up").click();
@@ -5517,7 +5360,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "move-to-upper-landing",
-      mainFlowFullShot(32, "上层平台移动目标"),
+      mainFlowFullShot(29, "上层平台移动目标"),
     );
 
     await upperLandingRoom.click();
@@ -5535,8 +5378,6 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       phase: "preHaunt",
       hauntTriggered: false,
     });
-    await saveScreenshot(page, MAIN_FLOW_40);
-
     await expect(tutorialOverlayCard).toContainText("你现在在上层平台");
     await expect(tutorialOverlayCard).toContainText("这次先不继续探索");
     await expect(tutorialOverlayCard).toContainText("结束回合");
@@ -5577,7 +5418,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "end-turn-from-upper-landing",
-      mainFlowFullShot(33, "上层平台结束回合"),
+      mainFlowFullShot(30, "上层平台结束回合"),
     );
     await page.getByTestId("betrayal-action-endTurn").click();
     await waitForStep(page, "watch-teammate-haunt-trigger", 10000);
@@ -5633,7 +5474,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "watch-teammate-haunt-trigger",
-      mainFlowFullShot(34, "队友一翻出面具并等待确认"),
+      mainFlowFullShot(31, "队友一翻出面具并等待确认"),
     );
 
     await clickNext(page);
@@ -5677,7 +5518,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "haunt-hero-reader",
-      mainFlowFullShot(35, "英雄开场过场"),
+      mainFlowFullShot(32, "英雄开场过场"),
     );
 
     await clickNext(page);
@@ -5695,7 +5536,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "haunt-hero-reader-turn-page",
-      mainFlowFullShot(36, "过场继续进入英雄剧本书"),
+      mainFlowFullShot(33, "过场继续进入英雄剧本书"),
     );
 
     await page.getByTestId("betrayal-scenario-reader-next-zone").click();
@@ -5729,7 +5570,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "haunt-hero-reader-goal",
-      mainFlowFullShot(37, "英雄剧本书目标页说明图书馆原因"),
+      mainFlowFullShot(34, "英雄剧本书目标页说明图书馆原因"),
     );
 
     await clickNext(page);
@@ -5741,7 +5582,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "haunt-hero-reader-close",
-      mainFlowFullShot(38, "读完目标关闭剧本书"),
+      mainFlowFullShot(35, "读完目标关闭剧本书"),
     );
 
     await page.getByTestId("betrayal-scenario-reader-close").click();
@@ -5772,7 +5613,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "wait-for-hero-turn-after-haunt",
-      mainFlowFullShot(39, "读完目标回到英雄回合"),
+      mainFlowFullShot(36, "读完目标回到英雄回合"),
     );
 
     await clickNext(page);
@@ -5791,7 +5632,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "open-library-move-after-goal",
-      mainFlowFullShot(40, "读完目标后准备打开移动"),
+      mainFlowFullShot(37, "读完目标后准备打开移动"),
     );
 
     await page.getByTestId("betrayal-action-move").click();
@@ -5819,7 +5660,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "move-to-library-after-goal",
-      mainFlowFullShot(41, "图书馆成为可点击移动目标"),
+      mainFlowFullShot(38, "图书馆成为可点击移动目标"),
     );
 
     await postGoalLibraryRoom.click();
@@ -5844,7 +5685,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "hero-study-name-roll",
-      mainFlowFullShot(42, "英雄寻找木乃伊真名入口"),
+      mainFlowFullShot(39, "英雄寻找木乃伊真名入口"),
     );
 
     await page.getByTestId("betrayal-action-use").click();
@@ -5894,7 +5735,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "hero-study-name-result",
-      mainFlowFullShot(43, "寻找真名知识检定成功"),
+      mainFlowFullShot(40, "寻找真名知识检定成功"),
     );
 
     await studyNameContinueButton.click();
@@ -5925,7 +5766,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       observedMainFlowStepIds,
       "hero-study-name-closeout",
-      mainFlowFullShot(44, "确认后回到牌桌可结束回合"),
+      mainFlowFullShot(41, "确认后回到牌桌可结束回合"),
     );
 
     await expectMainFlowVisibleStepsCovered(page, observedMainFlowStepIds);
