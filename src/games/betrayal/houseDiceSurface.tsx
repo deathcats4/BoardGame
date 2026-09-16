@@ -18,11 +18,16 @@ import {
   BETRAYAL_REROLL_HIGHLIGHT_SELECTED_COLOR,
   BETRAYAL_REROLL_HIGHLIGHT_SELECTED_OPACITY,
   BETRAYAL_REROLL_HIGHLIGHT_SELECTED_SCALE,
+  BETRAYAL_REROLL_TARGET_CANDIDATE_STROKE_WIDTH,
   BETRAYAL_REROLL_TARGET_CENTER_SOURCE,
+  BETRAYAL_REROLL_TARGET_OUTLINE_EXPAND_PX,
   BETRAYAL_REROLL_TARGET_OUTLINE_GAP,
+  BETRAYAL_REROLL_TARGET_OUTLINE_RENDERER,
+  BETRAYAL_REROLL_TARGET_SELECTED_STROKE_WIDTH,
   BETRAYAL_REROLL_VISUAL_CONTRACT,
   createBetrayalHouseDiceSkin,
   getBetrayalRerollTargetHitSize,
+  getBetrayalRerollTargetOutlineGeometry,
   getBetrayalRerollTargetOutlineSize,
   getBetrayalRerollTargetVisualCenter,
   getBetrayalRerollTargetVisualRotation,
@@ -364,6 +369,7 @@ export function BetrayalHouseDice3DGroup({
           data-testid="betrayal-rabbit-foot-dice"
           data-reroll-target-count={selectableDiceTargets.length}
           data-reroll-highlight-renderer={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
+          data-reroll-target-outline-renderer={BETRAYAL_REROLL_TARGET_OUTLINE_RENDERER}
           data-reroll-visual-contract={BETRAYAL_REROLL_VISUAL_CONTRACT}
           data-reroll-highlight-candidate-scale={BETRAYAL_REROLL_HIGHLIGHT_CANDIDATE_SCALE.toFixed(3)}
           data-reroll-highlight-selected-scale={BETRAYAL_REROLL_HIGHLIGHT_SELECTED_SCALE.toFixed(3)}
@@ -378,6 +384,8 @@ export function BetrayalHouseDice3DGroup({
             const targetOutlineSize = getBetrayalRerollTargetOutlineSize(
               target.layout,
             );
+            const targetOutlineGeometry =
+              getBetrayalRerollTargetOutlineGeometry(target.layout);
             const targetHitSize = getBetrayalRerollTargetHitSize(target.layout);
             const targetVisualCenter = getBetrayalRerollTargetVisualCenter(
               target.layout,
@@ -398,6 +406,19 @@ export function BetrayalHouseDice3DGroup({
               targetOutlineSize.width,
               targetOutlineSize.height,
             );
+            const targetOutlineStrokeWidth = isSelectedRerollTarget
+              ? BETRAYAL_REROLL_TARGET_SELECTED_STROKE_WIDTH
+              : BETRAYAL_REROLL_TARGET_CANDIDATE_STROKE_WIDTH;
+            const targetOutlineColor = isSelectedRerollTarget
+              ? "#ff2dfb"
+              : "#00e7ff";
+            const targetOutlineOpacity = isSelectedRerollTarget ? 0.98 : 0.88;
+            const targetOutlineGlow = isSelectedRerollTarget
+              ? "drop-shadow(0 0 7px rgba(255,45,251,0.78))"
+              : "drop-shadow(0 0 5px rgba(0,231,255,0.62))";
+            const targetOutlinePoints = targetOutlineGeometry.absolutePoints
+              .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+              .join(" ");
             return (
               <div
                 key={`${roll.id}-reroll-target-${target.dieIndex}`}
@@ -411,7 +432,7 @@ export function BetrayalHouseDice3DGroup({
                 data-reroll-target-outline-rotate-z={targetVisualRotation.toFixed(4)}
                 data-reroll-target-source={target.source}
                 data-reroll-target-center-source={BETRAYAL_REROLL_TARGET_CENTER_SOURCE}
-                data-reroll-target-shape="die-face"
+                data-reroll-target-shape="projected-rounded-die-face"
                 data-reroll-target-selected={isSelectedRerollTarget ? "true" : "false"}
                 data-reroll-target-box-size={targetMaxSize.toFixed(2)}
                 data-reroll-target-hit-width={targetWidth.toFixed(2)}
@@ -423,12 +444,13 @@ export function BetrayalHouseDice3DGroup({
                 data-reroll-target-outline-width={targetOutlineSize.width.toFixed(2)}
                 data-reroll-target-outline-height={targetOutlineSize.height.toFixed(2)}
                 data-reroll-target-outline-gap={BETRAYAL_REROLL_TARGET_OUTLINE_GAP.toFixed(2)}
-                data-reroll-target-outline-paint={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
-                data-reroll-target-outline-point-count={0}
-                data-reroll-target-outline-points=""
+                data-reroll-target-outline-expand-px={BETRAYAL_REROLL_TARGET_OUTLINE_EXPAND_PX.toFixed(2)}
+                data-reroll-target-outline-paint={BETRAYAL_REROLL_TARGET_OUTLINE_RENDERER}
+                data-reroll-target-outline-point-count={targetOutlineGeometry.absolutePoints.length}
+                data-reroll-target-outline-points={targetOutlinePoints}
                 data-reroll-target-highlight-renderer={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
                 data-reroll-target-visual-contract={BETRAYAL_REROLL_VISUAL_CONTRACT}
-                data-reroll-target-visual-layer="transparent-hitbox-only"
+                data-reroll-target-visual-layer="projected-rounded-outline-plus-transparent-hitbox"
                 className="group pointer-events-auto absolute outline-none"
                 style={{
                   left:
@@ -452,6 +474,33 @@ export function BetrayalHouseDice3DGroup({
                 <span className="sr-only">
                   {rerollSelection.getDieActionLabel(target.dieIndex)}
                 </span>
+                <svg
+                  aria-hidden="true"
+                  data-testid={`betrayal-house-dice-reroll-outline-${target.dieIndex}`}
+                  data-reroll-target-face-outline="true"
+                  data-reroll-target-outline-state={
+                    isSelectedRerollTarget ? "selected" : "candidate"
+                  }
+                  data-reroll-target-outline-renderer={BETRAYAL_REROLL_TARGET_OUTLINE_RENDERER}
+                  className="pointer-events-none absolute inset-0 overflow-visible"
+                  viewBox={`0 0 ${targetOutlineGeometry.width.toFixed(2)} ${targetOutlineGeometry.height.toFixed(2)}`}
+                  style={{
+                    filter: targetOutlineGlow,
+                  }}
+                >
+                  <path
+                    data-reroll-target-outline-stroke="true"
+                    d={targetOutlineGeometry.path}
+                    fill="none"
+                    fillOpacity={0}
+                    stroke={targetOutlineColor}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={targetOutlineStrokeWidth}
+                    opacity={targetOutlineOpacity}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
               </div>
             );
           })}

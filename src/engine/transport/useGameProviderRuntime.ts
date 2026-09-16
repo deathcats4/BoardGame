@@ -9,6 +9,7 @@ import type { MatchState } from '../types';
 import type { EngineSystem } from '../systems/types';
 import { TestHarness, isTestEnvironment } from '../testing';
 import { INTERACTION_COMMANDS, refreshInteractionOptions } from '../systems/InteractionSystem';
+import { UNDO_COMMANDS } from '../systems/UndoSystem';
 import { getTransportBatchCommands, TRANSPORT_BATCH_COMMAND } from '../batchDispatchCommand';
 import type {
     ManualForceEndAiPhaseResult,
@@ -41,6 +42,10 @@ const BUILTIN_PENDING_COMPANION_COMMAND_TYPES = new Set<string>([
     INTERACTION_COMMANDS.STEP,
     INTERACTION_COMMANDS.CONFIRM,
     INTERACTION_COMMANDS.CANCEL,
+    UNDO_COMMANDS.REQUEST_UNDO,
+    UNDO_COMMANDS.APPROVE_UNDO,
+    UNDO_COMMANDS.REJECT_UNDO,
+    UNDO_COMMANDS.CANCEL_UNDO,
 ]);
 const COMMAND_PENDING_TOAST_DEDUPE_KEY = 'game-provider:command-pending';
 
@@ -540,7 +545,7 @@ export function useGameProviderRuntime(args: {
             rollbackOptimisticRenderAndResync();
             return false;
         }
-        if (sent && serialized && !wasPredicted) {
+        if (sent && serialized) {
             inFlightSerializedCommandTypeRef.current = type;
             lastSerializedCommandRef.current = { type, payload };
         }

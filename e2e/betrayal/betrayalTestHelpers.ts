@@ -605,21 +605,28 @@ export const expectEventRollWorkbenchReadable = async (
         const selectedBorder = target.querySelector<Element>(
           '[data-reroll-target-selected-border="true"]',
         );
-        const visibleOutline = domCandidateVisual ?? selectedBorder;
+        const faceOutline = target.querySelector<SVGElement>(
+          '[data-reroll-target-face-outline="true"]',
+        );
+        const visibleOutline = faceOutline ?? domCandidateVisual ?? selectedBorder;
         const outlineStyle = visibleOutline
           ? getComputedStyle(visibleOutline)
           : null;
         const outlineStroke =
+          faceOutline?.querySelector<Element>(
+            '[data-reroll-target-outline-stroke="true"]',
+          ) ??
           visibleOutline?.querySelector<Element>(
             '[data-reroll-target-outline-stroke="true"]',
-          ) ?? visibleOutline;
+          ) ??
+          visibleOutline;
         const outlineStrokeStyle = outlineStroke
           ? getComputedStyle(outlineStroke)
           : null;
         const parsePx = (value: string | undefined) =>
           Number.parseFloat(value ?? "0") || 0;
         const parseAlpha = (value: string | undefined) => {
-          if (!value || value === "transparent") return 0;
+          if (!value || value === "transparent" || value === "none") return 0;
           const parts = value
             .replace(/[^\d.,]/g, "")
             .split(",")
@@ -669,6 +676,8 @@ export const expectEventRollWorkbenchReadable = async (
           outlineRotateZ: Number(target.dataset.rerollTargetOutlineRotateZ),
           outlinePointCount: Number(target.dataset.rerollTargetOutlinePointCount),
           outlinePoints: target.dataset.rerollTargetOutlinePoints ?? "",
+          outlineState:
+            faceOutline?.getAttribute("data-reroll-target-outline-state") ?? "",
           targetTransform: getComputedStyle(target).transform,
           left: rect.left,
           right: rect.right,
@@ -690,10 +699,16 @@ export const expectEventRollWorkbenchReadable = async (
           selectedBorderExists: Boolean(selectedBorder),
           outlineExists: Boolean(visibleOutline),
           outlineWidth: outlineStrokeStyle
-            ? parsePx(outlineStrokeStyle.strokeWidth)
+            ? parsePx(
+                outlineStroke?.getAttribute("stroke-width") ??
+                  outlineStrokeStyle.strokeWidth,
+              )
             : outlineStyle
               ? parsePx(outlineStyle.outlineWidth)
               : 0,
+          outlineOpacity: outlineStroke
+            ? Number(outlineStroke.getAttribute("opacity") ?? "0")
+            : 0,
           outlineOffset: outlineStyle ? parsePx(outlineStyle.outlineOffset) : 0,
           outlineColor:
             outlineStrokeStyle?.stroke ?? outlineStyle?.outlineColor ?? "",
@@ -889,8 +904,8 @@ export const expectEventRollWorkbenchReadable = async (
     ).toBe("threejs-backside-shader-shell");
     expect(
       metrics.rerollVisualContract,
-      `${label}兔脚改骰必须使用 Three.js shader 外壳 + 透明命中区的当前视觉合同：${JSON.stringify(metrics)}`,
-    ).toBe("threejs-shader-shell-plus-transparent-hitbox");
+      `${label}兔脚改骰必须使用贴脸 SVG 描边 + Three.js shader 外壳 + 透明命中区的当前视觉合同：${JSON.stringify(metrics)}`,
+    ).toBe("projected-rounded-face-outline-plus-threejs-shell-plus-transparent-hitbox");
     expect(
       metrics.diceHighlightSourceRenderer,
       `${label}物理骰源必须声明 WebGL 高亮渲染器：${JSON.stringify(metrics)}`,
@@ -936,7 +951,7 @@ export const expectEventRollWorkbenchReadable = async (
     for (const target of metrics.rerollTargets) {
       const evidence = JSON.stringify({ target, metrics });
       expect(target.shape, `${label}改骰方框必须绑定骰子本体：${evidence}`).toBe(
-        "die-face",
+        "projected-rounded-die-face",
       );
       expect(
         target.highlightRenderer,
@@ -944,28 +959,28 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe("threejs-backside-shader-shell");
       expect(
         target.visualContract,
-        `${label}改骰目标必须使用 Three.js shader 外壳 + 透明命中区视觉合同：${evidence}`,
-      ).toBe("threejs-shader-shell-plus-transparent-hitbox");
+        `${label}改骰目标必须使用贴脸 SVG 描边 + Three.js shader 外壳 + 透明命中区视觉合同：${evidence}`,
+      ).toBe("projected-rounded-face-outline-plus-threejs-shell-plus-transparent-hitbox");
       expect(
         target.visualLayer,
-        `${label}DOM 层只能做透明命中区，不得绘制遮挡骰子的可见边框：${evidence}`,
-      ).toBe("transparent-hitbox-only");
+        `${label}DOM 层只能绘制贴脸 SVG 描边和透明命中区，不得回到大框或底线：${evidence}`,
+      ).toBe("projected-rounded-outline-plus-transparent-hitbox");
       expect(
         target.outlinePaint,
-        `${label}玩家可见高亮必须来自 Three.js shader 外壳，而不是 DOM/CSS 可见框：${evidence}`,
-      ).toBe("threejs-backside-shader-shell");
+        `${label}玩家可见方框必须来自骰面投影 SVG 描边，Three.js shell 只作外壳辅助：${evidence}`,
+      ).toBe("svg-projected-rounded-die-face");
       expect(
         Number.isFinite(target.outlineRotateZ),
         `${label}可见方框必须暴露屏幕旋转角，证明不是固定轴对齐框：${evidence}`,
       ).toBe(true);
       expect(
         target.outlinePointCount,
-        `${label}DOM 层不再保存可见方框投影点，避免旧 SVG 框回归：${evidence}`,
-      ).toBe(0);
+        `${label}SVG 描边必须保存投影骰面点，不能退回固定轴对齐大框：${evidence}`,
+      ).toBeGreaterThanOrEqual(4);
       expect(
         target.outlinePoints,
-        `${label}DOM 层不再保存可见方框投影点，避免旧 SVG 框回归：${evidence}`,
-      ).toBe("");
+        `${label}SVG 描边必须绑定当前骰面投影点：${evidence}`,
+      ).not.toBe("");
       expect(
         target.targetTransform,
         `${label}可见方框必须应用投影旋转 transform：${evidence}`,
@@ -984,8 +999,8 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBeGreaterThan(0);
       expect(
         target.outlineGap,
-        `${label}改骰描边不能在 DOM 层制造离体空隙：${evidence}`,
-      ).toBe(0);
+        `${label}改骰描边不能制造离体空隙：${evidence}`,
+      ).toBeLessThanOrEqual(0.25);
       expect(
         target.hitBoxPadding,
         `${label}可点透明区可以比骰子本体略大，但不能把可见方框撑出大间隙：${evidence}`,
@@ -1004,24 +1019,28 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe(false);
       expect(
         target.outlineExists,
-        `${label}DOM 层不得绘制玩家可见外描边，玩家可见边界由 shader 外壳承担：${evidence}`,
-      ).toBe(false);
+        `${label}必须有玩家可见的贴脸 SVG 描边：${evidence}`,
+      ).toBe(true);
       expect(
         target.outlineOffset,
         `${label}外描边必须贴边，不能产生离体空隙：${evidence}`,
       ).toBe(0);
       expect(
-        target.outlineBorderMaxPx,
-        `${label}外描边不得用 border 向内盖住骰面：${evidence}`,
-      ).toBe(0);
+        target.outlineWidth,
+        `${label}SVG 描边要清楚可见：${evidence}`,
+      ).toBeGreaterThanOrEqual(target.selected ? 3 : 2);
+      expect(
+        target.outlineOpacity,
+        `${label}SVG 描边透明度要清楚可见：${evidence}`,
+      ).toBeGreaterThanOrEqual(target.selected ? 0.95 : 0.85);
       expect(
         target.outlineBackgroundAlpha,
         `${label}外描边内部必须透明，不得盖住骰子：${evidence}`,
       ).toBe(0);
       expect(
         target.outlineBoxShadow,
-        `${label}DOM 层不得使用 box-shadow 画第二层方框：${evidence}`,
-      ).toBe("");
+        `${label}SVG 描边只能用贴边发光辅助，不能变成大面积遮罩：${evidence}`,
+      ).toMatch(/drop-shadow|^$/);
       expect(
         target.webglHighlight,
         `${label}必须能从 Three.js 快照读到当前骰子的高亮状态：${evidence}`,
@@ -1080,9 +1099,9 @@ export const expectEventRollWorkbenchReadable = async (
           `${label}选中描边不能外扩成离体大框：${evidence}`,
         ).toBeLessThanOrEqual(1.075);
         expect(
-          target.webglShell?.opacity,
-          `${label}选中描边必须清晰可见：${evidence}`,
-        ).toBeGreaterThanOrEqual(0.9);
+        target.webglShell?.opacity,
+          `${label}选中 Three.js 外壳要可见，但主要清晰度由贴脸 SVG 描边承担：${evidence}`,
+        ).toBeGreaterThanOrEqual(0.8);
         expect(
           target.webglShell?.shaderIntensity,
           `${label}选中 shader 必须明显强于候选态：${evidence}`,
@@ -1113,9 +1132,13 @@ export const expectEventRollWorkbenchReadable = async (
           `${label}候选描边不能外扩成离体大框：${evidence}`,
         ).toBeLessThanOrEqual(1.055);
         expect(
+        target.webglShell?.opacity,
+          `${label}候选 Three.js 外壳必须低透明，避免盖住骰面：${evidence}`,
+        ).toBeGreaterThanOrEqual(0.65);
+        expect(
           target.webglShell?.opacity,
-          `${label}候选描边不能弱到看不清：${evidence}`,
-        ).toBeGreaterThanOrEqual(0.9);
+          `${label}候选 Three.js 外壳不能过亮到遮住骰面：${evidence}`,
+        ).toBeLessThanOrEqual(0.78);
         expect(
           target.webglShell?.shaderIntensity,
           `${label}候选 shader 必须比选中态弱，避免误认已选中：${evidence}`,

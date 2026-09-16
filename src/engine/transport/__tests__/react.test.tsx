@@ -171,6 +171,37 @@ function DoubleAdvanceProbe(): JSX.Element {
     );
 }
 
+function SingleAdvanceProbe(): JSX.Element {
+    const { dispatch } = useGameClient();
+
+    return (
+        <button
+            data-testid="dispatch-single-advance"
+            onClick={() => {
+                dispatch('ADVANCE_PHASE', { step: 1 });
+            }}
+        >
+            single advance
+        </button>
+    );
+}
+
+function AdvanceThenUndoRequestProbe(): JSX.Element {
+    const { dispatch } = useGameClient();
+
+    return (
+        <button
+            data-testid="dispatch-advance-then-undo-request"
+            onClick={() => {
+                dispatch('ADVANCE_PHASE', { step: 1 });
+                dispatch('SYS_REQUEST_UNDO', {});
+            }}
+        >
+            advance then undo request
+        </button>
+    );
+}
+
 function BurstAdvanceProbe({ count }: { count: number }): JSX.Element {
     const { dispatch } = useGameClient();
 
@@ -1099,7 +1130,7 @@ describe('GameProvider transport baseline', () => {
         });
     });
 
-    it('allows a second optimistic phase advance to build on the latest predicted state', () => {
+    it('queues repeated serialized commands even when the first command is optimistically predicted', () => {
         let hasPending = false;
         const predictedState = {
             core: { marker: 'predicted-ai-turn' },
@@ -1114,6 +1145,7 @@ describe('GameProvider transport baseline', () => {
         };
         const mockEngine = {
             hasPendingCommands: vi.fn(() => hasPending),
+            getPendingCommandCount: vi.fn(() => (hasPending ? 1 : 0)),
             reconcile: vi.fn((state: unknown) => {
                 hasPending = false;
                 return {
@@ -1179,10 +1211,10 @@ describe('GameProvider transport baseline', () => {
         });
 
         expect(screen.getByTestId('state').textContent).toContain('predicted-ai-turn');
-        expect(client.sendCommand).toHaveBeenCalledTimes(2);
-        expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
-        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 });
-        expect(screen.getByTestId('toasts').textContent).not.toContain('toast.commandQueuedAfterPreviousStep');
+        expect(client.sendCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(1);
+        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 1 });
+        expect(screen.getByTestId('toasts').textContent).toContain('toast.commandQueuedAfterPreviousStep');
 
         act(() => {
             client.emitStateUpdate({
@@ -1201,7 +1233,7 @@ describe('GameProvider transport baseline', () => {
         expect(client.sendCommand).toHaveBeenCalledTimes(2);
         expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
         expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 });
-        expect(screen.getByTestId('state').textContent).toContain('authoritative-confirmed');
+        expect(screen.getByTestId('state').textContent).toContain('predicted-ai-turn');
 
         mockEngine.processCommand.mockClear();
         client.sendCommand.mockClear();
@@ -1221,14 +1253,8 @@ describe('GameProvider transport baseline', () => {
         });
 
         expect(screen.getByTestId('state').textContent).toContain('authoritative-queued-confirmed');
-
-        act(() => {
-            screen.getByTestId('dispatch-double-advance').click();
-        });
-        expect(client.sendCommand).toHaveBeenCalledTimes(2);
-        expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
-        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 });
     });
+
 
     it('flushes queued optimistic commands before sending an interaction-id companion command', () => {
         let hasPending = false;
@@ -1343,6 +1369,106 @@ describe('GameProvider transport baseline', () => {
         }, { expectedStateID: 2 });
     });
 
+    it('sends undo requests as command companions while an optimistic command is pending', () => {
+        let hasPending = false;
+        const predictedNextTurnState = {
+            core: { marker: 'predicted-next-turn' },
+            sys: {
+                interaction: {
+                    current: undefined,
+                    queue: [],
+                    isBlocked: false,
+                },
+                eventStream: { entries: [], nextId: 1 },
+                undo: { snapshots: [{ core: { marker: 'previous-turn' }, sys: {} }], maxSnapshots: 1 },
+            },
+        };
+        const mockEngine = {
+            hasPendingCommands: vi.fn(() => hasPending),
+            getPendingCommandCount: vi.fn(() => (hasPending ? 1 : 0)),
+            reconcile: vi.fn((state: unknown) => {
+                hasPending = false;
+                return {
+                    stateToRender: state,
+                    didRollback: false,
+                    optimisticEventWatermark: null,
+                };
+            }),
+            setPlayerIds: vi.fn(),
+            syncRandom: vi.fn(),
+            reset: vi.fn(() => {
+                hasPending = false;
+            }),
+            processCommand: vi.fn((type: string) => {
+                if (type === 'ADVANCE_PHASE') {
+                    hasPending = true;
+                    return {
+                        stateToRender: predictedNextTurnState,
+                        shouldSend: true,
+                        animationMode: 'wait-confirm',
+                    };
+                }
+                return {
+                    stateToRender: null,
+                    shouldSend: true,
+                    animationMode: 'wait-confirm',
+                };
+            }),
+        };
+        optimisticEngineControls.engine = mockEngine;
+
+        render(
+            <ToastProvider>
+                <GameProvider
+                    server="http://127.0.0.1:3000"
+                    matchId="match-react-optimistic-undo-companion"
+                    playerId="0"
+                    engineConfig={{ domain: {} as any, systems: [] as any[] } as any}
+                    latencyConfig={{
+                        optimistic: { enabled: true },
+                    } as any}
+                >
+                    <StateProbe />
+                    <AdvanceThenUndoRequestProbe />
+                </GameProvider>
+                <ToastProbe />
+            </ToastProvider>,
+        );
+
+        const client = mockClientInstances[0]!;
+        act(() => {
+            client.emitStateUpdate({
+                core: { marker: 'authoritative-before-advance' },
+                sys: {
+                    interaction: {
+                        current: undefined,
+                        queue: [],
+                        isBlocked: false,
+                    },
+                    eventStream: { entries: [], nextId: 1 },
+                    undo: { snapshots: [], maxSnapshots: 1 },
+                },
+            }, [], { stateID: 1, randomCursor: 0 });
+        });
+        client.lastReceivedStateID = 1;
+
+        mockEngine.processCommand.mockClear();
+        client.sendCommand.mockClear();
+
+        act(() => {
+            screen.getByTestId('dispatch-advance-then-undo-request').click();
+        });
+
+        expect(screen.getByTestId('state').textContent).toContain('predicted-next-turn');
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenCalledWith('ADVANCE_PHASE', { step: 1 }, '0');
+        expect(client.sendCommand).toHaveBeenCalledTimes(2);
+        expect(client.sendCommand).toHaveBeenNthCalledWith(1, 'ADVANCE_PHASE', { step: 1 }, { expectedStateID: 1 });
+        expect(client.sendCommand).toHaveBeenNthCalledWith(2, 'SYS_REQUEST_UNDO', {}, { expectedStateID: 2 });
+        expect(screen.getByTestId('toasts').textContent).not.toContain('toast.commandWaitingForPreviousStep');
+        expect(screen.getByTestId('toasts').textContent).not.toContain('toast.commandQueuedAfterPreviousStep');
+    });
+
     it('does not treat any interactionId payload as an optimistic companion command', () => {
         let hasPending = false;
         const predictedCardInteractionState = {
@@ -1440,7 +1566,7 @@ describe('GameProvider transport baseline', () => {
         expect(client.sendCommand).toHaveBeenLastCalledWith('PLAY_CARD', { cardId: 'card-get-away' });
     });
 
-    it('sends each rapid phase advance that remains valid in the predicted chain', () => {
+    it('keeps only one retry for rapid serialized phase advances', () => {
         let hasPending = false;
         const mockEngine = {
             hasPendingCommands: vi.fn(() => hasPending),
@@ -1518,10 +1644,12 @@ describe('GameProvider transport baseline', () => {
             screen.getByTestId('dispatch-burst-advance').click();
         });
 
-        expect(client.sendCommand).toHaveBeenCalledTimes(20);
-        expect(mockEngine.processCommand).toHaveBeenCalledTimes(20);
-        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 20 });
-        expect(screen.getByTestId('toasts').textContent).not.toContain('toast.commandQueuedAfterPreviousStep');
+        expect(client.sendCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(1);
+        expect(mockEngine.processCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 1 }, '0');
+        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 1 });
+        expect(screen.getByTestId('state').textContent).toContain('predicted-step-1');
+        expect(screen.getByTestId('toasts').textContent).toContain('toast.commandQueuedAfterPreviousStep');
 
         act(() => {
             client.emitStateUpdate({
@@ -1537,9 +1665,10 @@ describe('GameProvider transport baseline', () => {
             }, [], { stateID: 2, randomCursor: 0 });
         });
 
-        expect(client.sendCommand).toHaveBeenCalledTimes(20);
-        expect(mockEngine.processCommand).toHaveBeenCalledTimes(20);
-        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 20 });
+        expect(client.sendCommand).toHaveBeenCalledTimes(2);
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
+        expect(mockEngine.processCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 }, '0');
+        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 2 });
 
         act(() => {
             client.emitStateUpdate({
@@ -1555,8 +1684,8 @@ describe('GameProvider transport baseline', () => {
             }, [], { stateID: 3, randomCursor: 0 });
         });
 
-        expect(client.sendCommand).toHaveBeenCalledTimes(20);
-        expect(mockEngine.processCommand).toHaveBeenCalledTimes(20);
+        expect(client.sendCommand).toHaveBeenCalledTimes(2);
+        expect(mockEngine.processCommand).toHaveBeenCalledTimes(2);
     });
 
     it('drops a deferred serialized command when connection resets before confirmation', () => {
@@ -1748,7 +1877,7 @@ describe('GameProvider transport baseline', () => {
         );
     });
 
-    it('rolls back optimistic render and resyncs when the predicted command is not sent', () => {
+    it('rolls back optimistic render and resyncs when a predicted command is not sent', () => {
         let hasPending = false;
         const authoritativeState = {
             core: { marker: 'authoritative-second-phase' },
@@ -1815,7 +1944,7 @@ describe('GameProvider transport baseline', () => {
                 } as any}
             >
                 <StateProbe />
-                <DoubleAdvanceProbe />
+                <SingleAdvanceProbe />
             </GameProvider>,
         );
 
@@ -1831,7 +1960,7 @@ describe('GameProvider transport baseline', () => {
         client.sendCommand.mockReturnValue(false);
 
         act(() => {
-            screen.getByTestId('dispatch-double-advance').click();
+            screen.getByTestId('dispatch-single-advance').click();
         });
 
         expect(client.sendCommand).toHaveBeenCalledTimes(1);
@@ -1849,10 +1978,11 @@ describe('GameProvider transport baseline', () => {
         });
 
         act(() => {
-            screen.getByTestId('dispatch-double-advance').click();
+            screen.getByTestId('dispatch-single-advance').click();
         });
 
-        expect(client.sendCommand).toHaveBeenCalledTimes(2);
+        expect(client.sendCommand).toHaveBeenCalledTimes(1);
+        expect(client.sendCommand).toHaveBeenLastCalledWith('ADVANCE_PHASE', { step: 1 });
     });
 
     it('blocks repeated serialized commands even when the first command is not optimistically predicted', () => {

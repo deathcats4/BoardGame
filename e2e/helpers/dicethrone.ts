@@ -1675,6 +1675,93 @@ export const setDiceThroneBonusDiceValues = async (page: Page, values: number[])
     await setDiceThroneRandomQueue(page, values.map(toDiceRandomValue));
 };
 
+/**
+ * 在线 E2E 中，奖励骰/临时骰必须写服务器权威状态。
+ * 随机队列只能影响浏览器测试 harness，不能证明服务端最终确认的骰面。
+ */
+export const applyPendingBonusDiceValues = async (page: Page, values: number[]) => {
+    const onlineMatchId = await readOnlineMatchId(page);
+    if (!onlineMatchId) {
+        await applyDiceValues(page, values);
+        return;
+    }
+
+    const currentState = await getMatchState(onlineMatchId, page) as Record<string, unknown>;
+    const nextState = structuredClone(currentState) as Record<string, unknown>;
+    const root = getMatchRoot(nextState);
+    const core = isRecord(root.core) ? root.core : undefined;
+    if (!core || !isRecord(core.pendingBonusDiceSettlement)) {
+        throw new Error('Online DiceThrone match has no pending bonus dice settlement to patch');
+    }
+
+    const settlement = core.pendingBonusDiceSettlement;
+    const dice = Array.isArray(settlement.dice) ? settlement.dice : [];
+    if (dice.length !== values.length) {
+        throw new Error(`Pending bonus dice has ${dice.length} dice, expected ${values.length}`);
+    }
+
+    const players = isRecord(core.players) ? core.players : {};
+    const attackerId = typeof settlement.attackerId === 'string' ? settlement.attackerId : undefined;
+    const attacker = attackerId && isRecord(players[attackerId]) ? players[attackerId] : undefined;
+    const selectedCharacters = isRecord(core.selectedCharacters) ? core.selectedCharacters : {};
+    const characterId = typeof attacker?.characterId === 'string'
+        ? attacker.characterId
+        : attackerId && typeof selectedCharacters[attackerId] === 'string'
+            ? selectedCharacters[attackerId] as string
+            : undefined;
+
+    const nextDice = dice.map((die, index) => {
+        if (!isRecord(die)) {
+            throw new Error(`Pending bonus die ${index} is not an object`);
+        }
+        const value = values[index];
+        const definitionId = typeof die.definitionId === 'string' ? die.definitionId : undefined;
+        const face = definitionId
+            ? getDieFaceByDefinition(definitionId, value)
+            : characterId
+                ? getHeroDieFace(characterId as SelectableCharacterId, value)
+                : null;
+        if (!face) {
+            throw new Error(`Pending bonus die ${index} has no face for value ${value}`);
+        }
+        return {
+            ...die,
+            value,
+            face,
+            symbol: face,
+            symbols: [face],
+            effectParams: isRecord(die.effectParams)
+                ? { ...die.effectParams, value, index }
+                : { value, index },
+        };
+    });
+
+    const currentRollContext = isRecord(core.currentRollContext) ? core.currentRollContext : undefined;
+    root.core = {
+        ...core,
+        pendingBonusDiceSettlement: {
+            ...settlement,
+            dice: nextDice,
+        },
+        ...(currentRollContext?.id === `bonus:${settlement.id}` && Array.isArray(currentRollContext.dice) ? {
+            currentRollContext: {
+                ...currentRollContext,
+                dice: nextDice,
+            },
+        } : {}),
+    };
+
+    await injectMatchState(onlineMatchId, root as never, page);
+    await page.waitForFunction((expectedValues) => {
+        const state = (window as Window).__BG_TEST_HARNESS__?.state?.get?.();
+        const settlement = state?.core?.pendingBonusDiceSettlement;
+        const dice = settlement?.dice;
+        return Array.isArray(dice)
+            && dice.length === expectedValues.length
+            && dice.every((die, index) => die?.value === expectedValues[index]);
+    }, values, { timeout: 10000, polling: 100 });
+};
+
 export const waitForDiceThronePhase = async (page: Page, phase: string, timeout = 10000) => {
     await page.waitForFunction(
         (expectedPhase) => (window as Window).__BG_TEST_HARNESS__?.state?.get?.()?.sys?.phase === expectedPhase,

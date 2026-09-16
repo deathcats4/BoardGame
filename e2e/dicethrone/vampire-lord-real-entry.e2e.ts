@@ -8,6 +8,8 @@ import {
     cleanupDTMatch,
     closeDebugPanelIfOpen,
     dispatchDiceThroneCommand,
+    applyPendingBonusDiceValues,
+    applyDiceValues,
     readyAndStartGame,
     selectCharacter,
     setDiceThroneBonusDiceValues,
@@ -87,6 +89,15 @@ const closeDebugPanelIfVisible = async (page: any): Promise<void> => {
 
     await page.getByTestId('debug-toggle').click();
     await expect(panel).toBeHidden({ timeout: 5000 });
+};
+
+const ensureManualResponseWindowEnabled = async (page: Page): Promise<void> => {
+    const toggle = page.getByTestId('auto-response-toggle');
+    await expect(toggle).toBeVisible({ timeout: 10000 });
+    if (await toggle.getAttribute('aria-pressed') !== 'true') {
+        await toggle.click();
+    }
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 };
 
 const getLastEventTypes = (state: any): string[] => (
@@ -327,6 +338,102 @@ const openMagnifiedHandCardPreview = async (
         async () => atlasImage.getAttribute('src'),
         { timeout: 15000 },
     ).toMatch(expectedSrcPattern);
+};
+
+const injectVampireLordMesmerizeNaturalDefenseStart = async (matchId: string, page: Page): Promise<void> => {
+    const current = await getMatchState(matchId, page) as JsonRecord;
+    const root = asRecord(current.G ?? current);
+    const core = asRecord(root.core);
+    const sys = asRecord(root.sys);
+    const players = asRecordMap(core.players);
+    const host = asRecord(players['0']);
+    const guest = asRecord(players['1']);
+    const turnOrder = Array.isArray(sys.turnOrder)
+        ? sys.turnOrder
+        : Array.isArray(core.turnOrder)
+            ? core.turnOrder
+            : Object.keys(players);
+    const vampireBase = initHeroState('0', VAMPIRE_LORD_HERO_ID, FIXED_E2E_RANDOM);
+    const defenderBase = initHeroState('1', VISIBLE_GUEST_HERO_ID, FIXED_E2E_RANDOM);
+    const next = structuredClone(current) as JsonRecord;
+    const nextRoot = asRecord(next.G ?? next);
+
+    nextRoot.core = {
+        ...core,
+        phase: 'offensiveRoll',
+        activePlayerId: '0',
+        selectedCharacters: {
+            ...asRecord(core.selectedCharacters),
+            '0': VAMPIRE_LORD_HERO_ID,
+            '1': VISIBLE_GUEST_HERO_ID,
+        },
+        hostStarted: true,
+        rollCount: 0,
+        rollLimit: 3,
+        rollDiceCount: 5,
+        rollConfirmed: false,
+        dice: buildVampireLordDiceForValues([1, 1, 1, 1, 1]),
+        currentRollContext: undefined,
+        pendingAttack: null,
+        pendingDamage: undefined,
+        pendingBonusDiceSettlement: undefined,
+        passiveActionUsedThisTurn: {
+            ...asRecord(core.passiveActionUsedThisTurn),
+            '0': {},
+        },
+        players: {
+            ...players,
+            '0': {
+                ...vampireBase,
+                id: typeof host.id === 'string' ? host.id : vampireBase.id,
+                characterId: VAMPIRE_LORD_HERO_ID,
+                hand: [],
+                deck: [],
+                discard: [],
+                resources: {
+                    ...vampireBase.resources,
+                    [RESOURCE_IDS.HP]: 50,
+                    [RESOURCE_IDS.CP]: 2,
+                },
+                tokens: {
+                    ...vampireBase.tokens,
+                    [TOKEN_IDS.BLOOD_POWER]: 0,
+                    [TOKEN_IDS.MESMERIZE]: 1,
+                },
+            },
+            '1': {
+                ...defenderBase,
+                id: typeof guest.id === 'string' ? guest.id : defenderBase.id,
+                characterId: VISIBLE_GUEST_HERO_ID,
+                hand: [],
+                deck: [],
+                discard: [],
+                resources: {
+                    ...defenderBase.resources,
+                    [RESOURCE_IDS.HP]: 50,
+                    [RESOURCE_IDS.CP]: 2,
+                },
+            },
+        },
+    };
+    nextRoot.sys = {
+        ...sys,
+        phase: 'offensiveRoll',
+        turnOrder,
+        currentPlayerIndex: Math.max(0, turnOrder.indexOf('0')),
+        interaction: {
+            ...asRecord(sys.interaction),
+            current: null,
+            queue: [],
+        },
+        responseWindow: {
+            ...asRecord(sys.responseWindow),
+            current: null,
+            queue: [],
+        },
+    };
+
+    await injectMatchState(matchId, next as never, page);
 };
 
 const closeMagnifiedCardPreview = async (page: Page): Promise<void> => {
@@ -1431,6 +1538,321 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
         }, { timeout: 10000 }).toBeNull();
         await waitForDiceThroneVisualIdle(page);
         await game.screenshot('吸血鬼领主-催眠响应窗口-重掷后收口', testInfo);
+    });
+
+    test('催眠从真实防御确认按钮后应打开响应窗口，临时骰后攻击不能被跳过', async ({ browser }, testInfo) => {
+        test.setTimeout(300000);
+        await clearEvidenceScreenshotsForTest(testInfo);
+        const baseURL = testInfo.project.use.baseURL as string | undefined ?? getGameServerBaseURL();
+        const match = await setupInProgressMatchWithVampireLord(browser, baseURL);
+        const hostPage = match.hostPage;
+        const guestPage = match.guestPage;
+        const readRootState = async (): Promise<JsonRecord> => {
+            const current = await getMatchState(match.matchId, hostPage) as JsonRecord;
+            return asRecord(current.G ?? current);
+        };
+
+        try {
+            await readyAndStartGame(hostPage, guestPage);
+            await waitForGameBoard(hostPage);
+            await waitForGameBoard(guestPage);
+            await waitForDiceThroneHarness(hostPage);
+            await waitForDiceThroneHarness(guestPage);
+            await hostPage.setViewportSize({ width: 1280, height: 720 });
+            await guestPage.setViewportSize({ width: 1280, height: 720 });
+            await closeDebugPanelIfOpen(hostPage);
+            await closeDebugPanelIfOpen(guestPage);
+            await ensureManualResponseWindowEnabled(hostPage);
+
+            await injectVampireLordMesmerizeNaturalDefenseStart(match.matchId, hostPage);
+            await guestPage.waitForTimeout(500);
+
+            const hostRollButton = hostPage.locator('[data-tutorial-id="dice-roll-button"]').first();
+            const hostConfirmButton = hostPage.locator('[data-tutorial-id="dice-confirm-button"]').first();
+            await expect(hostPage.getByTestId('player-board-surface'))
+                .toHaveAttribute('data-character-id', VAMPIRE_LORD_HERO_ID, { timeout: 10000 });
+            await expect(hostRollButton).toBeVisible({ timeout: 10000 });
+            await expect(hostRollButton).toBeEnabled();
+            await hostRollButton.click();
+            await applyDiceValues(hostPage, [1, 1, 1, 4, 5]);
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                const currentRollContext = asRecord(core.currentRollContext);
+                return {
+                    rollCount: core.rollCount ?? null,
+                    rollConfirmed: core.rollConfirmed ?? null,
+                    dice: Array.isArray(currentRollContext.dice)
+                        ? currentRollContext.dice.slice(0, 5).map((die: any) => die?.value ?? null)
+                        : Array.isArray(core.dice)
+                            ? core.dice.slice(0, 5).map((die: any) => die?.value ?? null)
+                            : [],
+                };
+            }, { timeout: 10000 }).toEqual({
+                rollCount: 1,
+                rollConfirmed: false,
+                dice: [1, 1, 1, 4, 5],
+            });
+            await expectVampireLordDiceSpritesForValues(hostPage, [1, 1, 1, 4, 5]);
+            await expect(hostConfirmButton).toBeEnabled({ timeout: 5000 });
+            await hostConfirmButton.click();
+
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                return {
+                    phase: asRecord(root.sys).phase ?? core.phase ?? null,
+                    rollConfirmed: core.rollConfirmed ?? null,
+                    responseWindow: asRecord(asRecord(root.sys).responseWindow).current ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                phase: 'offensiveRoll',
+                rollConfirmed: true,
+                responseWindow: null,
+            });
+
+            await clickResolvedAbilitySlot(hostPage, 'fist', 'bloodthirsty-claws', 'bloodthirsty-claws-3');
+
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                const pendingAttack = asRecord(core.pendingAttack);
+                return {
+                    sourceAbilityId: pendingAttack.sourceAbilityId ?? null,
+                    defenderId: pendingAttack.defenderId ?? null,
+                    isDefendable: pendingAttack.isDefendable ?? null,
+                    damageResolved: pendingAttack.damageResolved ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                sourceAbilityId: 'bloodthirsty-claws-3',
+                defenderId: '1',
+                isDefendable: true,
+                damageResolved: false,
+            });
+
+            const settleAttackButton = hostPage.getByRole('button', { name: /^(Resolve Attack|结算攻击)$/i }).first();
+            await expect(settleAttackButton).toBeVisible({ timeout: 10000 });
+            await expect(settleAttackButton).toBeEnabled({ timeout: 10000 });
+            await settleAttackButton.click();
+            await dismissAttackShowcaseIfVisible(guestPage);
+
+            await expect.poll(async () => {
+                const current = await getMatchState(match.matchId, guestPage) as JsonRecord;
+                const root = asRecord(current.G ?? current);
+                const core = asRecord(root.core);
+                const pendingAttack = asRecord(core.pendingAttack);
+                return {
+                    phase: asRecord(root.sys).phase ?? core.phase ?? null,
+                    defenseAbilityId: pendingAttack.defenseAbilityId ?? null,
+                    rollDiceCount: core.rollDiceCount ?? null,
+                    rollCount: core.rollCount ?? null,
+                    rollConfirmed: core.rollConfirmed ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                phase: 'defensiveRoll',
+                defenseAbilityId: 'thick-skin',
+                rollDiceCount: 3,
+                rollCount: 0,
+                rollConfirmed: false,
+            });
+
+            const guestRollButton = guestPage.locator('[data-tutorial-id="dice-roll-button"]').first();
+            const guestConfirmButton = guestPage.locator('[data-tutorial-id="dice-confirm-button"]').first();
+            await expect(guestRollButton).toBeVisible({ timeout: 10000 });
+            await expect(guestRollButton).toBeEnabled();
+            await guestRollButton.click();
+            await applyDiceValues(guestPage, [1, 2, 3]);
+            await expect.poll(async () => {
+                const current = await getMatchState(match.matchId, guestPage) as JsonRecord;
+                const root = asRecord(current.G ?? current);
+                const core = asRecord(root.core);
+                const currentRollContext = asRecord(core.currentRollContext);
+                return {
+                    rollCount: core.rollCount ?? null,
+                    rollConfirmed: core.rollConfirmed ?? null,
+                    dice: Array.isArray(currentRollContext.dice)
+                        ? currentRollContext.dice.slice(0, 3).map((die: any) => die?.value ?? null)
+                        : Array.isArray(core.dice)
+                            ? core.dice.slice(0, 3).map((die: any) => die?.value ?? null)
+                            : [],
+                };
+            }, { timeout: 10000 }).toEqual({
+                rollCount: 1,
+                rollConfirmed: false,
+                dice: [1, 2, 3],
+            });
+            await expect(guestConfirmButton).toBeEnabled({ timeout: 5000 });
+            await guestConfirmButton.click();
+
+            const mesmerizeToken = hostPage.getByTestId(`dt-player-0-token-${TOKEN_IDS.MESMERIZE}`);
+            const mesmerizeTokenHitTarget = hostPage.getByTestId(`dt-player-0-token-${TOKEN_IDS.MESMERIZE}-hit-target`);
+            const diceTray = getRightTrayDiceTray(hostPage);
+            const firstOpponentDie = diceTray.getByTestId('die-button-0').first();
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                const responseWindow = asRecord(asRecord(root.sys).responseWindow).current;
+                const windowRecord = asRecord(responseWindow);
+                const currentRollContext = asRecord(core.currentRollContext);
+                return {
+                    phase: asRecord(root.sys).phase ?? core.phase ?? null,
+                    rollConfirmed: core.rollConfirmed ?? null,
+                    windowType: windowRecord.windowType ?? null,
+                    currentResponderId: Array.isArray(windowRecord.responderQueue)
+                        ? windowRecord.responderQueue[Number(windowRecord.currentResponderIndex ?? 0)]
+                        : null,
+                    currentRollOwner: currentRollContext.ownerPlayerId ?? null,
+                    currentDiceValues: Array.isArray(currentRollContext.dice)
+                        ? currentRollContext.dice.map((die: any) => die.value)
+                        : [],
+                };
+            }, { timeout: 10000 }).toEqual({
+                phase: 'defensiveRoll',
+                rollConfirmed: true,
+                windowType: 'afterRollConfirmed',
+                currentResponderId: '0',
+                currentRollOwner: '1',
+                currentDiceValues: [1, 2, 3],
+            });
+            await expect(hostPage.getByTestId('dicethrone-response-window-hint')).toBeVisible({ timeout: 10000 });
+            await expectVisibleUsableTokenAction(mesmerizeToken, mesmerizeTokenHitTarget);
+            await saveEvidenceScreenshot(hostPage, testInfo, '吸血鬼领主-催眠真实防御确认后响应窗口-token本体高亮');
+
+            await setDiceThroneBonusDiceValues(hostPage, [6]);
+            await mesmerizeTokenHitTarget.click();
+            await applyPendingBonusDiceValues(hostPage, [6]);
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const settlement = asRecord(asRecord(root.core).pendingBonusDiceSettlement);
+                const die = Array.isArray(settlement.dice) ? asRecord(settlement.dice[0]) : {};
+                return {
+                    sourceAbilityId: settlement.sourceAbilityId ?? null,
+                    bonusValue: die.value ?? null,
+                    bonusFace: die.face ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                sourceAbilityId: TOKEN_IDS.MESMERIZE,
+                bonusValue: 6,
+                bonusFace: VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            });
+            await expectRightTrayBonusDiceConfirmation(hostPage, readRootState, {
+                sourceAbilityId: TOKEN_IDS.MESMERIZE,
+                ...VAMPIRE_LORD_BONUS_DICE_OWNER,
+            });
+            await saveEvidenceScreenshot(hostPage, testInfo, '吸血鬼领主-催眠真实防御确认后临时骰确认前');
+            await settleCurrentBonusDice(hostPage, readRootState, {
+                sourceAbilityId: TOKEN_IDS.MESMERIZE,
+            });
+
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const current = asRecord(asRecord(root.sys).interaction).current;
+                const meta = asRecord(asRecord(current).data).meta;
+                return {
+                    kind: asRecord(current).kind ?? null,
+                    playerId: asRecord(current).playerId ?? null,
+                    dtType: asRecord(meta).dtType ?? null,
+                    targetOpponentDice: asRecord(meta).targetOpponentDice ?? null,
+                    diceOwnerId: asRecord(meta).diceOwnerId ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                kind: 'multistep-choice',
+                playerId: '0',
+                dtType: 'selectDie',
+                targetOpponentDice: true,
+                diceOwnerId: '1',
+            });
+            await expect(firstOpponentDie).toHaveAttribute('data-clickable', 'true', { timeout: 10000 });
+            await saveEvidenceScreenshot(hostPage, testInfo, '吸血鬼领主-催眠真实防御确认后选择对手骰');
+
+            await firstOpponentDie.click();
+            await expect(firstOpponentDie).toHaveAttribute('data-selected', 'true', { timeout: 5000 });
+            const confirmRerollButton = hostPage.getByTestId('dice-interaction-confirm-button');
+            await expect(confirmRerollButton).toBeVisible({ timeout: 5000 });
+            await expect(confirmRerollButton).toBeEnabled({ timeout: 5000 });
+            await confirmRerollButton.click();
+
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                const currentRollContext = asRecord(core.currentRollContext);
+                const firstDie = Array.isArray(currentRollContext.dice)
+                    ? currentRollContext.dice.find((die: any) => die.id === 0)
+                    : null;
+                const eventTypes = getLastEventTypes(root);
+                return {
+                    phase: asRecord(root.sys).phase ?? core.phase ?? null,
+                    firstDieValueIsValid: typeof firstDie?.value === 'number' && firstDie.value >= 1 && firstDie.value <= 6,
+                    firstDieOwner: firstDie?.ownerId ?? null,
+                    mesmerize: asRecord(asRecord(core.players)['0']).tokens
+                        ? asRecord(asRecord(asRecord(core.players)['0']).tokens)[TOKEN_IDS.MESMERIZE] ?? null
+                        : null,
+                    responseWindow: asRecord(asRecord(root.sys).responseWindow).current ?? null,
+                    interactionKind: asRecord(asRecord(root.sys).interaction).current
+                        ? asRecord(asRecord(asRecord(root.sys).interaction).current).kind ?? null
+                        : null,
+                    pendingAttackSource: asRecord(core.pendingAttack).sourceAbilityId ?? null,
+                    damageResolved: asRecord(core.pendingAttack).damageResolved ?? null,
+                    attackResolved: eventTypes.includes('ATTACK_RESOLVED'),
+                    dieRerolled: eventTypes.includes('DIE_REROLLED'),
+                    defenderHp: asRecord(asRecord(asRecord(core.players)['1']).resources)[RESOURCE_IDS.HP] ?? null,
+                };
+            }, { timeout: 10000 }).toEqual({
+                phase: 'defensiveRoll',
+                firstDieValueIsValid: true,
+                firstDieOwner: '1',
+                mesmerize: 0,
+                responseWindow: null,
+                interactionKind: null,
+                pendingAttackSource: 'bloodthirsty-claws-3',
+                damageResolved: false,
+                attackResolved: false,
+                dieRerolled: true,
+                defenderHp: 50,
+            });
+            await expect.poll(async () => {
+                const displayValue = await firstOpponentDie.getAttribute('data-display-value');
+                const numericValue = Number(displayValue);
+                return Number.isInteger(numericValue) && numericValue >= 1 && numericValue <= 6;
+            }, { timeout: 10000 }).toBe(true);
+            await saveEvidenceScreenshot(hostPage, testInfo, '吸血鬼领主-催眠真实防御确认后重掷未跳过攻击');
+
+            const endDefenseButton = guestPage.getByRole('button', { name: /结束防御|End Defense/i }).first();
+            await expect(endDefenseButton).toBeEnabled({ timeout: 10000 });
+            await endDefenseButton.click();
+
+            await expect.poll(async () => {
+                const root = await readRootState();
+                const core = asRecord(root.core);
+                const events = (asRecord(asRecord(root.sys).eventStream).entries as any[] | undefined ?? [])
+                    .map((entry: any) => entry?.event)
+                    .filter(Boolean)
+                    .reverse();
+                const attackDamage = events.find((event: any) => (
+                    event.type === 'DAMAGE_DEALT'
+                    && event.payload?.targetId === '1'
+                    && event.payload?.sourceAbilityId === 'bloodthirsty-claws-3'
+                ));
+                return {
+                    phase: asRecord(root.sys).phase ?? core.phase ?? null,
+                    pendingAttack: core.pendingAttack ?? null,
+                    attackPayload: attackDamage?.payload ?? null,
+                    events: getLastEventTypes(root),
+                };
+            }, { timeout: 10000 }).toEqual({
+                phase: 'main2',
+                pendingAttack: null,
+                attackPayload: expect.objectContaining({
+                    targetId: '1',
+                    sourceAbilityId: 'bloodthirsty-claws-3',
+                    damageScope: 'attack',
+                }),
+                events: expect.arrayContaining(['DIE_REROLLED', 'DAMAGE_DEALT', 'ATTACK_RESOLVED']),
+            });
+            await saveEvidenceScreenshot(hostPage, testInfo, '吸血鬼领主-催眠真实防御确认后结束防御才结算攻击');
+        } finally {
+            await cleanupDTMatch(match);
+        }
     });
 
     test('起开！应显示吸血鬼卡图，并在对手打出后清楚记录移除的是催眠', async ({ browser }, testInfo) => {

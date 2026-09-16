@@ -61,6 +61,7 @@ const usage = () => {
 选项:
   --dir <目录>       要查看的证据目录，必须在当前仓库内
   --focus <文件>     打开后定位到目录内的指定图片 / 视频
+  --files <文件...>  只展示这些目录内的图片 / 视频；用于 PASS 后精确交付
   --port <端口>      本地查看器端口，默认 ${DEFAULT_PORT}
   --no-open          只启动 / 注册目录，不打开浏览器
   --reopen           即使该目录已打开过，也重新打开浏览器
@@ -76,6 +77,7 @@ const parseArgs = (argv) => {
     noOpen: false,
     reopen: false,
     focus: null,
+    files: [],
     serve: false,
     help: false,
   };
@@ -110,6 +112,14 @@ const parseArgs = (argv) => {
       if (!value) throw new Error("--focus 缺少取值");
       parsed.focus = value;
       index += 1;
+      continue;
+    }
+    if (current === "--files") {
+      while (argv[index + 1] && !argv[index + 1].startsWith("--")) {
+        parsed.files.push(argv[index + 1]);
+        index += 1;
+      }
+      if (parsed.files.length === 0) throw new Error("--files 缺少取值");
       continue;
     }
     if (current === "--port") {
@@ -259,6 +269,19 @@ const resolveFocusFile = (dirPath, focus) => {
   return relative;
 };
 
+const resolveMediaSelection = (dirPath, files) => {
+  if (!Array.isArray(files) || files.length === 0) return [];
+  const selection = [];
+  const seen = new Set();
+  for (const file of files) {
+    const relative = resolveFocusFile(dirPath, file);
+    if (!relative || seen.has(relative)) continue;
+    selection.push(relative);
+    seen.add(relative);
+  }
+  return selection;
+};
+
 const resolveDirectoryFromKey = (key) => {
   if (!key || typeof key !== "string") {
     throw new Error("缺少目录 key");
@@ -275,6 +298,28 @@ const resolveDirectoryFromUrl = (url) => {
   const key = url.searchParams.get("key");
   if (key) return resolveDirectoryFromKey(key);
   return resolveDirectory(url.searchParams.get("dir"));
+};
+
+const registeredFocusForDirectory = (dirPath) => {
+  const state = readState();
+  const focus = state.directories?.[directoryKey(dirPath)]?.lastFocus?.relativePath;
+  if (!focus || typeof focus !== "string") return null;
+  try {
+    return resolveFocusFile(dirPath, focus);
+  } catch {
+    return null;
+  }
+};
+
+const registeredMediaSelectionForDirectory = (dirPath) => {
+  const state = readState();
+  const files = state.directories?.[directoryKey(dirPath)]?.lastMediaSelection?.relativePaths;
+  if (!Array.isArray(files) || files.length === 0) return [];
+  try {
+    return resolveMediaSelection(dirPath, files);
+  } catch {
+    return [];
+  }
 };
 
 const isInsideEvidenceRoot = (dirPath) => existsSync(EVIDENCE_ROOT) && isPathInside(realpathSync.native(EVIDENCE_ROOT), dirPath);
@@ -326,8 +371,28 @@ const findLatestMediaDirectory = (dirPath, { includeStartDirectory = true } = {}
   return latest;
 };
 
-const resolveListingDirectory = (input) => {
+const resolveListingDirectory = (input, { focus = null } = {}) => {
   const requestedDirectory = resolveDirectory(input);
+  const requestedFocus = resolveFocusFile(requestedDirectory, focus);
+  if (requestedFocus) {
+    return {
+      requestedDirectory,
+      directory: requestedDirectory,
+      autoSelected: false,
+      selectedBy: "requested-focus",
+    };
+  }
+
+  const registeredFocus = registeredFocusForDirectory(requestedDirectory);
+  if (registeredFocus) {
+    return {
+      requestedDirectory,
+      directory: requestedDirectory,
+      autoSelected: false,
+      selectedBy: "registered-focus",
+    };
+  }
+
   if (!isInsideEvidenceRoot(requestedDirectory)) {
     return {
       requestedDirectory,
@@ -525,10 +590,13 @@ const mediaIndexEntryFor = (mediaIndex, relativePath) => {
   return mediaIndex.exact.get(fileName) ?? mediaIndex.byPrefix.get(sequencePrefix(fileName)) ?? null;
 };
 
-const buildViewerUrl = (port, dirPath, focus = null) => {
+const buildViewerUrl = (port, dirPath, focus = null, files = []) => {
   const url = new URL(`http://127.0.0.1:${port}/`);
   url.searchParams.set("key", directoryId(dirPath));
   if (focus) url.searchParams.set("focus", focus);
+  for (const file of files) {
+    url.searchParams.append("show", file);
+  }
   return url.toString();
 };
 
@@ -706,9 +774,10 @@ const ensureDirectoryState = (dirPath, port) => {
 
 const mediaKind = (filePath) => VIDEO_EXTENSIONS.has(path.extname(filePath).toLowerCase()) ? "video" : "image";
 
-const collectMedia = (dirPath, mediaIndex) => {
+const collectMedia = (dirPath, mediaIndex, selectedFiles = []) => {
   const results = [];
   const dirId = directoryId(dirPath);
+  const selectedOrder = new Map(selectedFiles.map((file, index) => [file, index]));
   const entries = readdirSync(dirPath, { withFileTypes: true })
     .sort((left, right) => left.name.localeCompare(right.name, "zh-CN", { numeric: true }));
 
@@ -720,6 +789,7 @@ const collectMedia = (dirPath, mediaIndex) => {
     if (!MEDIA_EXTENSIONS.has(extension)) continue;
     const stats = statSync(fullPath);
     const relativePath = entry.name;
+    if (selectedOrder.size > 0 && !selectedOrder.has(relativePath)) continue;
     const indexEntry = mediaIndexEntryFor(mediaIndex, relativePath);
     results.push({
       relativePath,
@@ -731,6 +801,9 @@ const collectMedia = (dirPath, mediaIndex) => {
       modifiedAt: new Date(stats.mtimeMs).toISOString(),
       url: `/media?key=${encodeURIComponent(dirId)}&file=${encodeURIComponent(relativePath)}&v=${encodeURIComponent(`${stats.size}-${Math.trunc(stats.mtimeMs)}`)}`,
     });
+  }
+  if (selectedOrder.size > 0) {
+    results.sort((left, right) => selectedOrder.get(left.relativePath) - selectedOrder.get(right.relativePath));
   }
   return results;
 };
@@ -787,8 +860,10 @@ const createViewerServer = (port) => createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const dirPath = resolveDirectory(body.dir);
       const focus = resolveFocusFile(dirPath, body.focus);
+      const files = resolveMediaSelection(dirPath, body.files);
       const entry = updateDirectoryState(dirPath, port, {
         lastFocus: focus ? { relativePath: focus, updatedAt: new Date().toISOString() } : null,
+        lastMediaSelection: files.length > 0 ? { relativePaths: files, updatedAt: new Date().toISOString() } : null,
       });
       jsonResponse(res, 200, { ok: true, ...entry });
       return;
@@ -801,10 +876,12 @@ const createViewerServer = (port) => createServer(async (req, res) => {
       return;
     }
     if (req.method === "GET" && url.pathname === "/api/list") {
-      const listing = resolveListingDirectory(resolveDirectoryFromUrl(url));
+      const listing = resolveListingDirectory(resolveDirectoryFromUrl(url), { focus: url.searchParams.get("focus") });
       const directoryState = ensureDirectoryState(listing.directory, port);
       const mediaIndex = readMediaIndex(listing.directory);
-      const items = collectMedia(listing.directory, mediaIndex);
+      const requestedSelection = resolveMediaSelection(listing.directory, url.searchParams.getAll("show"));
+      const selectedFiles = requestedSelection.length > 0 ? requestedSelection : registeredMediaSelectionForDirectory(listing.directory);
+      const items = collectMedia(listing.directory, mediaIndex, selectedFiles);
       jsonResponse(res, 200, {
         ok: true,
         requestedDirectory: listing.requestedDirectory,
@@ -814,6 +891,7 @@ const createViewerServer = (port) => createServer(async (req, res) => {
         autoSelectedDirectory: listing.autoSelected,
         selectedBy: listing.selectedBy,
         focus: directoryState?.lastFocus ?? null,
+        selectedFiles,
         maxFiles: MAX_MEDIA_FILES,
         truncated: items.length >= MAX_MEDIA_FILES,
         items,
@@ -853,6 +931,7 @@ const serve = async (port) => {
 const launch = async (args) => {
   const dirPath = resolveDirectory(args.dir);
   const focus = resolveFocusFile(dirPath, args.focus);
+  const files = resolveMediaSelection(dirPath, args.files);
   const key = directoryKey(dirPath);
   const stateBefore = readState();
   const selected = await choosePort(args.port);
@@ -862,8 +941,8 @@ const launch = async (args) => {
     health = await waitForViewer(selected.port);
   }
 
-  const url = buildViewerUrl(selected.port, dirPath, focus);
-  await httpJson(selected.port, "/api/register", { method: "POST", body: { dir: dirPath, focus } });
+  const url = buildViewerUrl(selected.port, dirPath, focus, files);
+  await httpJson(selected.port, "/api/register", { method: "POST", body: { dir: dirPath, focus, files } });
 
   const previousEntry = stateBefore.directories?.[key];
   const alreadyOpen = Boolean(

@@ -397,6 +397,22 @@ function EntityStatusTokenRail({
     if (!hasTokenRail) return null;
 
     const tokenSizeClass = compact ? 'h-6 w-6' : 'h-7 w-7';
+    const tokenRailItemCount = Number(hasActionToken)
+        + Number(hasQuickcastToken)
+        + Number(guarding)
+        + (visibleStatusTokens.length > 0 ? 1 : 0);
+    const splitAroundLifeReadout = tokenRailItemCount === 2;
+    const tokenRailStyle: CSSProperties = splitAroundLifeReadout
+        ? {
+            top: '50%',
+            transform: compact ? 'translateY(-50%) scale(0.86)' : 'translateY(-50%)',
+            transformOrigin: 'left center',
+        }
+        : {
+            top: '0.25rem',
+            transform: compact ? 'scale(0.86)' : undefined,
+            transformOrigin: 'left top',
+        };
     const renderActionToken = (position: string) => (hasActionToken ? (
         <span
             className={cx(
@@ -466,9 +482,10 @@ function EntityStatusTokenRail({
 
     return (
         <div className={cx(
-            'pointer-events-none absolute left-1 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center justify-start gap-0.5',
-            compact && 'origin-left scale-[0.86]',
+            'pointer-events-none absolute left-1 z-40 flex flex-col items-center justify-start',
+            splitAroundLifeReadout ? 'gap-[1.35rem]' : 'gap-0.5',
         )}
+            style={tokenRailStyle}
             data-testid="mage-wars-entity-status-token-rail"
             data-token-rail-position="entity-left-inside-midline"
             data-token-rail-axis="vertical"
@@ -634,24 +651,25 @@ function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
 
     return (
         <aside
-            className="pointer-events-none absolute z-20 rounded-[0.42rem] border border-amber-100/18 bg-stone-950/48 px-2.5 py-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
+            className="pointer-events-none absolute z-20 w-[clamp(8.75rem,8.5vw,10.75rem)] rounded-[0.42rem] border border-amber-100/18 bg-stone-950/50 px-2 py-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
             style={{
                 left: 'var(--mage-wars-desktop-side-inset, 1rem)',
-                right: 'calc(var(--mage-wars-desktop-side-inset, 1rem) + var(--mage-wars-desktop-hud-width, 23.25rem) + var(--mage-wars-opponent-plan-mirror-width, 10.75rem) + 0.75rem)',
-                top: 'calc(var(--mage-wars-desktop-top-inset, 0.875rem) + 3.4rem)',
+                top: 'calc(var(--mage-wars-desktop-top-inset, 0.875rem) + 3.25rem)',
             }}
             data-testid="mage-wars-phase-progress-indicator"
             data-tutorial-id="mw-phase-progress"
-            data-mage-ui-role="phase-progress-main-strip"
+            data-mage-ui-role="phase-progress-reference-rail"
+            data-phase-progress-axis="vertical"
+            data-phase-progress-placement="left-reference-rail"
             data-current-phase={phase}
             data-current-phase-index={currentIndex}
             aria-label={t('ui.phaseProgressTitle')}
         >
-            <div className="flex min-w-0 items-center gap-2.5">
-                <div className="shrink-0 text-[0.72rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/78">
+            <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="truncate pl-0.5 text-[0.68rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/78">
                     {t('ui.phaseProgressTitle')}
                 </div>
-                <ol className="grid min-w-0 flex-1 grid-cols-8 gap-1">
+                <ol className="flex min-w-0 flex-col gap-1">
                     {MAGE_WARS_PHASE_ORDER.map((phaseId, index) => {
                         const active = phaseId === phase;
                         const complete = index < currentIndex;
@@ -659,12 +677,12 @@ function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
                             <li
                                 key={phaseId}
                                 className={cx(
-                                    'flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-[0.26rem] px-1.5 py-1 text-center text-[0.74rem] font-bold leading-tight transition-colors',
+                                    'flex min-h-[1.68rem] min-w-0 items-center justify-start gap-1.5 rounded-r-[0.32rem] border-l-[0.18rem] px-1.5 py-0.5 text-left text-[0.72rem] font-bold leading-tight transition-[background-color,color,border-color,transform]',
                                     active
-                                        ? 'bg-amber-200/88 text-stone-950 shadow-[0_0_12px_rgba(251,191,36,0.24)]'
+                                        ? 'translate-x-1 border-amber-300 bg-amber-200/88 text-stone-950 shadow-[0_0_12px_rgba(251,191,36,0.24)]'
                                         : complete
-                                            ? 'bg-amber-100/8 text-amber-100/82'
-                                            : 'bg-black/12 text-stone-300/70',
+                                            ? 'border-amber-200/50 bg-amber-100/8 text-amber-100/82'
+                                            : 'border-stone-600/55 bg-black/12 text-stone-300/70',
                                 )}
                                 data-testid="mage-wars-phase-progress-item"
                                 data-phase-id={phaseId}
@@ -4854,8 +4872,8 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             '--mage-wars-hud-icon-gap': 'clamp(0.16rem, 0.22vh, 0.3rem)',
             '--mage-wars-desktop-hud-hint-card-height': 'calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem))',
             '--mage-wars-hud-icon-rail-gap': 'clamp(0.35rem, 0.48vw, 0.6rem)',
-            '--mage-wars-desktop-prepared-width': 'clamp(19.125rem, 19vw, 31rem)',
-            '--mage-wars-desktop-prepared-card-height': 'clamp(13.5rem, 20.75vh, 17rem)',
+            '--mage-wars-desktop-prepared-width': 'clamp(20.5rem, calc(25.9vw - 4.625rem), 39rem)',
+            '--mage-wars-desktop-prepared-card-height': 'var(--mage-wars-desktop-spellbook-card-height, clamp(13.75rem, min(29vh, 14.85vw), 24rem))',
             '--mage-wars-desktop-card-height': 'var(--mage-wars-desktop-prepared-card-height, 14rem)',
             '--mage-wars-desktop-spellbook-card-height': 'clamp(13.75rem, min(29vh, 14.85vw), 24rem)',
             '--mage-wars-desktop-top-inset': 'clamp(0.625rem, 1vw, 0.875rem)',
@@ -4869,8 +4887,8 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             '--mage-wars-spellbook-page-rail-width': 'clamp(2.25rem, 2.5vw, 3rem)',
             '--mage-wars-spellbook-page-button-size': 'clamp(2.25rem, 2.1vw, 2.5rem)',
             '--mage-wars-prepared-card-gap': 'clamp(0.25rem, calc(1.083vw - 0.8rem), 0.875rem)',
-            '--mage-wars-prepared-row-padding-left': 'clamp(0rem, calc(4.333vw - 3.7rem), 1.5rem)',
-            '--mage-wars-prepared-row-padding-right': 'clamp(0rem, calc(1.083vw - 0.925rem), 0.375rem)',
+            '--mage-wars-prepared-row-padding-left': 'clamp(0rem, calc(4.333vw - 5rem), 1.5rem)',
+            '--mage-wars-prepared-row-padding-right': 'clamp(0rem, calc(1.083vw - 1.3rem), 0.375rem)',
         } as CSSProperties;
     const spellbookVisibleCardCount = MAGE_WARS_SPELLBOOK_VISIBLE_CARD_COUNT;
     return (

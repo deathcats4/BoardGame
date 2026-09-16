@@ -34,7 +34,8 @@ const REROLL_RESULT_CONFIRM_SCREENSHOT = `${EVIDENCE_DIR}/06-兔脚重掷后确�
 const REROLL_FINALIZED_SCREENSHOT = `${EVIDENCE_DIR}/07-确认骰面后结算返回牌桌.jpg`;
 const REROLL_HIGHLIGHT_RENDERER = "threejs-backside-shader-shell";
 const REROLL_VISUAL_CONTRACT =
-  "threejs-shader-shell-plus-transparent-hitbox";
+  "projected-rounded-face-outline-plus-threejs-shell-plus-transparent-hitbox";
+const REROLL_TARGET_OUTLINE_RENDERER = "svg-projected-rounded-die-face";
 const REROLL_CANDIDATE_COLOR = 0x00e7ff;
 const REROLL_SELECTED_COLOR = 0xff2dfb;
 
@@ -173,6 +174,12 @@ async function expectRabbitFootRerollHighlightState(
           const hitHeight = Number(target.dataset.rerollTargetHitHeight);
           const visibleWidth = Number(target.dataset.rerollTargetVisualWidth);
           const visibleHeight = Number(target.dataset.rerollTargetVisualHeight);
+          const faceOutline = target.querySelector<SVGElement>(
+            '[data-reroll-target-face-outline="true"]',
+          );
+          const outlineStroke = target.querySelector<SVGPathElement>(
+            '[data-reroll-target-outline-stroke="true"]',
+          );
           return {
             dieIndex,
             selected: target.dataset.rerollTargetSelected === "true",
@@ -184,6 +191,11 @@ async function expectRabbitFootRerollHighlightState(
             outlineRotateZ: Number(target.dataset.rerollTargetOutlineRotateZ),
             outlinePointCount: Number(target.dataset.rerollTargetOutlinePointCount),
             outlinePoints: target.dataset.rerollTargetOutlinePoints ?? "",
+            outlineExists: Boolean(faceOutline),
+            outlineState:
+              faceOutline?.getAttribute("data-reroll-target-outline-state") ?? "",
+            outlineStrokeWidth: Number(outlineStroke?.getAttribute("stroke-width") ?? "0"),
+            outlineStrokeOpacity: Number(outlineStroke?.getAttribute("opacity") ?? "0"),
             targetTransform: getComputedStyle(target).transform,
             left: rect.left,
             right: rect.right,
@@ -295,23 +307,35 @@ async function expectRabbitFootRerollHighlightState(
   for (const target of metrics.targets) {
     const evidence = JSON.stringify({ target, metrics });
     const isSelected = target.dieIndex === selectedDieIndex;
-    expect(target.shape, `选骰热区必须绑定骰子本体：${evidence}`).toBe("die-face");
+    expect(target.shape, `选骰热区必须绑定骰子本体：${evidence}`).toBe(
+      "projected-rounded-die-face",
+    );
     expect(
       target.highlightRenderer,
       `WebGL 辅助高亮必须继续来自 Three.js 骰体描边：${evidence}`,
     ).toBe(REROLL_HIGHLIGHT_RENDERER);
     expect(target.visualContract).toBe(REROLL_VISUAL_CONTRACT);
-    expect(target.visualLayer).toBe("transparent-hitbox-only");
-    expect(target.outlinePaint).toBe(REROLL_HIGHLIGHT_RENDERER);
+    expect(target.visualLayer).toBe("projected-rounded-outline-plus-transparent-hitbox");
+    expect(target.outlinePaint).toBe(REROLL_TARGET_OUTLINE_RENDERER);
     expect(Number.isFinite(target.outlineRotateZ)).toBe(true);
     expect(
       target.outlinePointCount,
-      `DOM 层不再绘制可见方框，方框必须由 Three.js shader 外壳承担：${evidence}`,
-    ).toBe(0);
+      `选骰可见框必须绑定当前骰面投影点，不能退回轴对齐大框：${evidence}`,
+    ).toBeGreaterThanOrEqual(4);
     expect(
       target.outlinePoints,
-      `DOM 层不再保存可见方框投影点，避免和 shader 外壳形成双框：${evidence}`,
-    ).toBe("");
+      `选骰可见框必须保存当前骰面投影点：${evidence}`,
+    ).not.toBe("");
+    expect(target.outlineExists, `必须有贴脸 SVG 可见框：${evidence}`).toBe(true);
+    expect(target.outlineState).toBe(isSelected ? "selected" : "candidate");
+    expect(
+      target.outlineStrokeWidth,
+      `贴脸 SVG 描边要清楚，但不能用大框遮骰子：${evidence}`,
+    ).toBeGreaterThanOrEqual(isSelected ? 3 : 2);
+    expect(
+      target.outlineStrokeOpacity,
+      `贴脸 SVG 描边透明度要清晰可见：${evidence}`,
+    ).toBeGreaterThanOrEqual(isSelected ? 0.95 : 0.85);
     expect(target.targetTransform).not.toBe("none");
     expect(Math.abs(target.targetWidth - target.visibleWidth)).toBeLessThanOrEqual(1.5);
     expect(Math.abs(target.targetHeight - target.visibleHeight)).toBeLessThanOrEqual(1.5);
@@ -343,9 +367,9 @@ async function expectRabbitFootRerollHighlightState(
         "选中骰子的高亮色必须和黄色骰子本体强对比，不能退回黄色外壳",
       ).toBe(REROLL_SELECTED_COLOR);
       expect(target.shell?.variant).toBe("selected");
-      expect(target.shell?.scale).toBeGreaterThanOrEqual(1.07);
-      expect(target.shell?.scale).toBeLessThanOrEqual(1.08);
-      expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.95);
+      expect(target.shell?.scale).toBeGreaterThanOrEqual(1.06);
+      expect(target.shell?.scale).toBeLessThanOrEqual(1.075);
+      expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.8);
       expect(target.shell?.shaderIntensity).toBeGreaterThanOrEqual(1.5);
       expect(target.shell?.shaderOutlineOffset).toBeGreaterThanOrEqual(0.024);
     } else {
@@ -354,10 +378,9 @@ async function expectRabbitFootRerollHighlightState(
       expect(target.shell?.variant).toBe("candidate");
       expect(target.shell?.scale).toBeGreaterThanOrEqual(1.04);
       expect(target.shell?.scale).toBeLessThanOrEqual(1.055);
-      expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.95);
-      expect(target.shell?.shaderIntensity).toBeGreaterThanOrEqual(1.05);
+      expect(target.shell?.opacity).toBeGreaterThanOrEqual(0.65);
+      expect(target.shell?.opacity).toBeLessThanOrEqual(0.78);
       expect(target.shell?.shaderIntensity).toBeLessThan(1.3);
-      expect(target.shell?.shaderOutlineOffset).toBeGreaterThanOrEqual(0.012);
       expect(target.shell?.shaderOutlineOffset).toBeLessThan(0.02);
     }
   }
@@ -524,7 +547,7 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
     await expect(rerollTargetDie).toHaveAttribute("role", "button");
     await expect(rerollTargetDie).toHaveAttribute(
       "data-reroll-target-shape",
-      "die-face",
+      "projected-rounded-die-face",
     );
     const targetBox = await rerollTargetDie.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -541,8 +564,8 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
     });
     expect(
       targetBox.outlinePaint,
-      "选骰高亮必须来自 Three.js 骰体 shader 外壳，DOM 层只做透明命中区",
-    ).toBe(REROLL_HIGHLIGHT_RENDERER);
+      "选骰可见框必须来自骰面投影 SVG 描边，Three.js shell 只做低透明外壳辅助",
+    ).toBe(REROLL_TARGET_OUTLINE_RENDERER);
     expect(
       Number.isFinite(targetBox.outlineRotateZ),
       "选骰方框必须暴露当前屏幕旋转角，不能退回轴对齐大框",
@@ -575,6 +598,26 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
       selectedDieIndex: 1,
     });
     await saveScreenshot(page, REROLL_SELECTED_SCREENSHOT);
+    const rerollStartLayout = await rollPanel.evaluate((node) => {
+      const panel = node as HTMLElement;
+      const group = panel.querySelector<HTMLElement>(
+        '[data-testid="betrayal-house-dice-3d-group"]',
+      );
+      const canvas =
+        Array.from(panel.querySelectorAll("canvas"))
+          .filter((candidate): candidate is HTMLCanvasElement =>
+            candidate instanceof HTMLCanvasElement,
+          )
+          .find((candidate) => Boolean(candidate.dataset.testid)) ?? null;
+      const debugKey = canvas?.dataset.testid ?? group?.dataset.diceDebugKey;
+      const debugRegistry =
+        (window as typeof window & {
+          __diceBoxThreeDebug?: Record<string, () => {
+            dice?: Array<{ layout?: { x: number; y: number } | null }>;
+          } | null>;
+        }).__diceBoxThreeDebug ?? {};
+      return debugKey ? debugRegistry[debugKey]?.()?.dice?.[1]?.layout ?? null : null;
+    });
 
     const rerollMotionCapture = await armPhysicalDiceRerollMotionCapture(rollPanel, {
       dieIndex: 1,
@@ -692,6 +735,36 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
       rollPanel.getByTestId("betrayal-house-dice-3d-group"),
       "兔脚重掷停稳后必须展示新骰面，再进入确认骰面",
     ).toHaveAttribute("data-dice-visible-rule-values", "2,2,0");
+    const rerollFinalLayout = await rollPanel.evaluate((node) => {
+      const panel = node as HTMLElement;
+      const group = panel.querySelector<HTMLElement>(
+        '[data-testid="betrayal-house-dice-3d-group"]',
+      );
+      const canvas =
+        Array.from(panel.querySelectorAll("canvas"))
+          .filter((candidate): candidate is HTMLCanvasElement =>
+            candidate instanceof HTMLCanvasElement,
+          )
+          .find((candidate) => Boolean(candidate.dataset.testid)) ?? null;
+      const debugKey = canvas?.dataset.testid ?? group?.dataset.diceDebugKey;
+      const debugRegistry =
+        (window as typeof window & {
+          __diceBoxThreeDebug?: Record<string, () => {
+            dice?: Array<{ layout?: { x: number; y: number } | null }>;
+          } | null>;
+        }).__diceBoxThreeDebug ?? {};
+      return debugKey ? debugRegistry[debugKey]?.()?.dice?.[1]?.layout ?? null : null;
+    });
+    if (rerollStartLayout && rerollFinalLayout) {
+      const finalShift = Math.hypot(
+        rerollFinalLayout.x - rerollStartLayout.x,
+        rerollFinalLayout.y - rerollStartLayout.y,
+      );
+      expect(
+        finalShift,
+        `兔脚重掷后目标骰子不能回到完全相同屏幕位置，否则看起来像原地打转：${JSON.stringify({ rerollStartLayout, rerollFinalLayout })}`,
+      ).toBeGreaterThanOrEqual(12);
+    }
     await expect
       .poll(async () => {
         const state = await page.evaluate(() => {

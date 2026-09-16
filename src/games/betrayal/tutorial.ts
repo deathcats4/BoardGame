@@ -356,7 +356,9 @@ const BETRAYAL_OMEN_CONFIRMATION_AND_HAUNT_RISK: TutorialManifest = {
     ],
 };
 
-const BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS: TutorialManifest['steps'] = [
+const createBetrayalHeroReaderAndFirstObjectiveSteps = (
+    heroTurnWaitEquivalentStepIds: string[],
+): TutorialManifest['steps'] => [
     {
         id: 'haunt-hero-reader',
         content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroReaderOpened',
@@ -393,16 +395,18 @@ const BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS: TutorialManifest['steps'] 
     {
         id: 'wait-for-hero-turn-after-haunt',
         content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.waitForHeroTurnAfterHaunt',
-        position: 'top',
-        infoStep: true,
         viewAs: '0',
+        aiDelayMs: 0,
         aiActions: [
             {
                 commandType: BETRAYAL_COMMANDS.END_TURN,
                 playerId: '2',
             },
         ],
-        autoAdvanceAfterAi: false,
+        hiddenAutomation: compressedRepeat(
+            heroTurnWaitEquivalentStepIds,
+            'Teammate 2 repeats the formal turn handoff after the hero reader; player 0 has no input until the turn returns.',
+        ),
     },
     {
         id: 'open-library-move-after-goal',
@@ -542,14 +546,6 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
             ),
         },
         {
-            id: 'teammate-two-omen-results',
-            content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.teammateTwoOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
-        },
-        {
             id: 'hand-off-to-teammate-second-cycle',
             content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.handOffToTeammateSecondCycle',
             highlightTarget: 'betrayal-action-endTurn',
@@ -562,36 +558,25 @@ const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
         {
             id: 'watch-teammate-haunt-trigger',
             content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.watchTeammateHauntTrigger',
-            highlightTarget: 'betrayal-discovery-continue',
-            position: 'right',
-            infoStep: true,
             viewAs: '0',
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.EXPLORE_ROOM,
                     playerId: '1',
                     payload: { roomId: 'frontier-ground-east-south' },
                 },
-            ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-confirm-haunt-trigger',
-            content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.teammateConfirmHauntTrigger',
-            viewAs: '0',
-            aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
             ],
-            aiDelayMs: 0,
             hiddenAutomation: compressedRepeat(
-                ['watch-teammate-haunt-trigger'],
-                'The previous visible step explains teammate 1 owns the Mask confirmation; this applies that waiting handoff before showing the hero reader.',
+                ['hand-off-to-teammate-second-cycle'],
+                'Teammate 1 repeats formal exploration and acknowledgement after player 0 ended the turn; the next visible step is the hero reader.',
             ),
         },
-        ...BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS,
+        ...createBetrayalHeroReaderAndFirstObjectiveSteps(['hand-off-to-teammate-one']),
     ],
 };
 
@@ -816,14 +801,6 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
             ),
         },
         {
-            id: 'teammate-two-omen-results',
-            content: 'game-betrayal:tutorial.mainPath.steps.teammateTwoOmenResults',
-            highlightTarget: 'betrayal-haunt-risk-status',
-            position: 'top',
-            infoStep: true,
-            viewAs: '0',
-        },
-        {
             id: 'move-to-grand-staircase',
             content: 'game-betrayal:tutorial.mainPath.steps.moveToGrandStaircase',
             highlightTarget: 'betrayal-action-move',
@@ -867,37 +844,26 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
         {
             id: 'watch-teammate-haunt-trigger',
             content: 'game-betrayal:tutorial.mainPath.steps.watchTeammateHauntTrigger',
-            highlightTarget: 'betrayal-discovery-continue',
-            position: 'right',
-            infoStep: true,
             viewAs: '0',
             randomPolicy: { mode: 'fixed', values: [3] },
+            aiDelayMs: 0,
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.EXPLORE_ROOM,
                     playerId: '1',
                     payload: { roomId: 'frontier-ground-east-south' },
                 },
-            ],
-            autoAdvanceAfterAi: false,
-        },
-        {
-            id: 'teammate-confirm-haunt-trigger',
-            content: 'game-betrayal:tutorial.mainPath.steps.teammateConfirmHauntTrigger',
-            viewAs: '0',
-            aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.ACKNOWLEDGE_CARD_RESOLUTION,
                     playerId: '1',
                 },
             ],
-            aiDelayMs: 0,
             hiddenAutomation: compressedRepeat(
-                ['watch-teammate-haunt-trigger'],
-                'The previous visible step explains teammate 1 owns the Mask confirmation; this applies that waiting handoff before showing the hero reader.',
+                ['end-turn-from-upper-landing'],
+                'Teammate 1 repeats formal exploration and acknowledgement after player 0 ended the turn; the next visible step is the hero reader.',
             ),
         },
-        ...BETRAYAL_HERO_READER_AND_FIRST_OBJECTIVE_STEPS,
+        ...createBetrayalHeroReaderAndFirstObjectiveSteps(['end-turn-from-upper-landing']),
     ],
 };
 

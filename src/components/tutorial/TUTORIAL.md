@@ -76,7 +76,7 @@ export interface TutorialStep {
 ## ⚠️ 最佳实践与注意事项
 
 1. **自动步骤处理**：
-   `aiActions` 本身不再代表“可以隐藏 / 可以自动跳过”。只有同时声明 `hiddenAutomation` 的步骤才会被 `TutorialOverlay` 隐藏，并在 AI 动作消费后由教程系统自动推进；未声明 `hiddenAutomation` 的 `aiActions` 步骤必须作为玩家可见步骤保留。`hiddenAutomation.kind = "setup-precondition"` 只允许在首张玩家可见教程卡之前建立合法教程起点，进入教程后不能再隐藏中途预设；中途分段预设必须作为玩家可见分段首帧，或拆成独立教程。`hiddenAutomation.kind = "compressed-repeat"` 只用于压缩已经由更早可见步骤教过的同类正式动作，并且必须填写 `equivalentStepIds` 指向此前的可见步骤。不要在隐藏自动步骤写玩家必须阅读的正文；应该在自动动作之后添加可见步骤解释刚才发生了什么。反过来，如果 `aiActions` 只是帮其它席位补确认、补响应或补同步，而当前玩家仍要阅读 / 点击 / 确认，必须保留 `requireAction` 或 `infoStep`，浮层不能隐藏。
+   `aiActions` 本身不再代表“可以隐藏 / 可以自动跳过”。只有同时声明 `hiddenAutomation` 的步骤才会被 `TutorialOverlay` 隐藏，并在 AI 动作消费后由教程系统自动推进；未声明 `hiddenAutomation` 的 `aiActions` 步骤必须作为玩家可见步骤保留。`hiddenAutomation.kind = "setup-precondition"` 只允许在首张玩家可见教程卡之前建立合法教程起点，进入教程后不能再隐藏中途预设；中途分段预设必须作为玩家可见分段首帧，或拆成独立教程。`hiddenAutomation.kind = "compressed-repeat"` 只用于压缩已经由更早可见步骤教过的同类正式动作，并且必须填写 `equivalentStepIds` 指向此前的可见步骤。不要在隐藏自动步骤写玩家必须阅读的正文；自动动作之后只有在当前玩家必须阅读公开结果或已经回到当前玩家可操作态时，才添加可见步骤承接。对手、队友或系统的纯自动动作不得拆成玩家可见教程卡解释它怎样移动、探索、确认或结束回合；如果 `aiActions` 只是帮其它席位补确认、补响应或补同步，而当前玩家仍要阅读 / 点击 / 确认，必须保留 `requireAction` 或 `infoStep`，浮层不能隐藏。
 
 2. **卡面 / 图标图例**：
    首次教学卡牌、角色卡、帮助卡、骰面或 token 的图面字段时，若已有官方或用户确认的图例截图，优先用 `visual` 展示真实图片并配极短文案。重复字段后续不再重复贴同一张图，只讲当前对象新增的类型差异、目标限制或结算后果。

@@ -1193,10 +1193,15 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
             scaleBadgeRect: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]')),
             phaseProgress: (() => {
                 const indicator = document.querySelector<HTMLElement>('[data-testid="mage-wars-phase-progress-indicator"]');
+                const items = Array.from(indicator?.querySelectorAll<HTMLElement>('[data-testid="mage-wars-phase-progress-item"]') ?? []);
                 return {
                     currentPhase: indicator?.dataset.currentPhase ?? null,
+                    role: indicator?.dataset.mageUiRole ?? null,
+                    axis: indicator?.dataset.phaseProgressAxis ?? null,
+                    placement: indicator?.dataset.phaseProgressPlacement ?? null,
                     activeCount: indicator?.querySelectorAll('[data-phase-active="true"]').length ?? 0,
-                    itemCount: indicator?.querySelectorAll('[data-testid="mage-wars-phase-progress-item"]').length ?? 0,
+                    itemCount: items.length,
+                    itemRects: items.map(toRect),
                     text: indicator?.innerText ?? '',
                 };
             })(),
@@ -1214,6 +1219,10 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
                 { name: 'discard-main-action', value: intersects(rects.discardPile, rects.mainAction) },
                 { name: 'phase-progress-life-toggle', value: intersects(rects.phaseProgressIndicator, rects.lifeToggle) },
                 { name: 'phase-progress-scale-badge', value: intersects(rects.phaseProgressIndicator, toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]'))) },
+                { name: 'phase-progress-self-hud', value: intersects(rects.phaseProgressIndicator, rects.selfHud) },
+                { name: 'phase-progress-opponent-hud', value: intersects(rects.phaseProgressIndicator, rects.opponentHud) },
+                { name: 'phase-progress-opponent-prepared', value: intersects(rects.phaseProgressIndicator, rects.opponentPreparedMirror) },
+                { name: 'phase-progress-bottom-grid', value: intersects(rects.phaseProgressIndicator, rects.bottomViewportGrid) },
             ],
         };
     });
@@ -1311,20 +1320,29 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
     expect(layoutAudit.phaseProgress.itemCount, '阶段进度必须覆盖 Mage Wars 正式 8 个回合阶段').toBe(8);
     expect(layoutAudit.phaseProgress.activeCount, '阶段进度只能有一个当前阶段').toBe(1);
     expect(layoutAudit.phaseProgress.text, '阶段进度必须使用玩家可读阶段文案').toContain('计划');
-    expect(layoutAudit.rects.phaseProgressIndicator!.x, '阶段进度必须贴左上 UI 锚点').toBeLessThanOrEqual(24);
+    expect(layoutAudit.phaseProgress.role, '阶段进度是左侧回看轨道，不能再冒充顶部主提示条').toBe('phase-progress-reference-rail');
+    expect(layoutAudit.phaseProgress.axis, '阶段进度必须按 DiceThrone 同类职责竖排').toBe('vertical');
+    expect(layoutAudit.phaseProgress.placement, '阶段进度必须落在左侧参考轨道').toBe('left-reference-rail');
+    expect(layoutAudit.rects.phaseProgressIndicator!.x, '阶段进度必须贴左侧 UI 锚点').toBeLessThanOrEqual(24);
     expect(layoutAudit.rects.phaseProgressIndicator!.y, '阶段进度必须位于生命显示开关下方，不能叠住左上工具').toBeGreaterThanOrEqual(layoutAudit.rects.lifeToggle!.bottom + 4);
-    const phaseProgressRightGap = layoutAudit.rects.opponentPreparedMirror!.x - layoutAudit.rects.phaseProgressIndicator!.right;
-    const phaseProgressAvailableWidth = layoutAudit.rects.opponentPreparedMirror!.x - layoutAudit.rects.phaseProgressIndicator!.x;
-    expect(layoutAudit.rects.phaseProgressIndicator!.width, '阶段进度是当前回合流程主提示，不能缩成左上小标签').toBeGreaterThan(layoutAudit.viewport.width * 0.55);
-    expect(layoutAudit.rects.phaseProgressIndicator!.right, '阶段进度应按剩余横向空间展开，而不是停在屏幕左侧 20%').toBeGreaterThan(layoutAudit.viewport.width * 0.7);
-    expect(phaseProgressRightGap, '阶段进度应自然让位给右上对手计划区，不能相交').toBeGreaterThanOrEqual(4);
-    expect(phaseProgressRightGap, '阶段进度右侧不能留下大段无职责空白').toBeLessThanOrEqual(28);
-    expect(
-        layoutAudit.rects.phaseProgressIndicator!.width / phaseProgressAvailableWidth,
-        '阶段进度应基本占满左侧工具到右上固定信息之间的剩余空间',
-    ).toBeGreaterThanOrEqual(0.96);
+    expect(layoutAudit.rects.phaseProgressIndicator!.right, '阶段进度不应横向铺成顶部主条').toBeLessThan(layoutAudit.viewport.width * 0.25);
+    expect(layoutAudit.rects.phaseProgressIndicator!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(128);
+    expect(layoutAudit.rects.phaseProgressIndicator!.height, '阶段轨道应是竖向列表').toBeGreaterThan(layoutAudit.rects.phaseProgressIndicator!.width * 1.6);
+    layoutAudit.phaseProgress.itemRects.forEach((rect, index, itemRects) => {
+        expect(rect, `阶段项 ${index + 1} 必须可见`).not.toBeNull();
+        if (index > 0) {
+            expect(rect!.y, `阶段项 ${index + 1} 必须排在上一项下方`).toBeGreaterThan(itemRects[index - 1]!.y);
+        }
+    });
     expect(Math.abs(layoutAudit.rects.spellbookShelf!.bottom - layoutAudit.rects.preparedArea!.bottom)).toBeLessThanOrEqual(3);
     expect(Math.abs(layoutAudit.rects.firstSpellbookCard!.bottom - layoutAudit.rects.preparedCard!.bottom)).toBeLessThanOrEqual(3);
+    const preparedToSpellbookHeightRatio = layoutAudit.rects.preparedCard!.height / layoutAudit.rects.firstSpellbookCard!.height;
+    expect(preparedToSpellbookHeightRatio, '已计划法术和法术书同属底部牌面系统，不能被压成右侧缩略图').toBeGreaterThanOrEqual(0.92);
+    expect(preparedToSpellbookHeightRatio, '已计划法术不应反向大过法术书牌面，造成另一个主对象').toBeLessThanOrEqual(1.04);
+    expect(
+        layoutAudit.rects.preparedArea!.width,
+        '已计划区域宽度必须足够容纳两个同尺度计划槽，不能靠缩小牌面凑布局',
+    ).toBeGreaterThanOrEqual(layoutAudit.rects.preparedCard!.width * 2 + 8);
     expect(layoutAudit.rects.selfHud!.x, '己方 HUD 必须贴左下顶层服务区，不能预留无职责大空白').toBeGreaterThanOrEqual(0);
     expect(layoutAudit.rects.selfHud!.x, '己方 HUD 不能启用按场上实体驱动的大比例安全偏移').toBeLessThanOrEqual(32);
     expect(layoutAudit.rects.selfHud!.right, '己方 HUD 集群不得越过桌面中线').toBeLessThan(layoutAudit.viewport.width * 0.52);
@@ -2318,6 +2336,12 @@ test.describe('Mage Wars foundation runtime board', () => {
                     ? {
                         rect: toRect(phaseProgressIndicator),
                         currentPhase: phaseProgressIndicator.dataset.currentPhase ?? null,
+                        role: phaseProgressIndicator.dataset.mageUiRole ?? null,
+                        axis: phaseProgressIndicator.dataset.phaseProgressAxis ?? null,
+                        placement: phaseProgressIndicator.dataset.phaseProgressPlacement ?? null,
+                        itemRects: Array.from(
+                            phaseProgressIndicator.querySelectorAll<HTMLElement>('[data-testid="mage-wars-phase-progress-item"]'),
+                        ).map(toRect),
                         itemCount: phaseProgressIndicator.querySelectorAll('[data-testid="mage-wars-phase-progress-item"]').length,
                         activeCount: phaseProgressIndicator.querySelectorAll('[data-phase-active="true"]').length,
                         text: phaseProgressIndicator.innerText,
@@ -2499,18 +2523,20 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.phaseProgress!.itemCount).toBe(8);
         expect(desktopLayoutAudit.phaseProgress!.activeCount).toBe(1);
         expect(desktopLayoutAudit.phaseProgress!.text).toContain('生物行动');
-        expect(desktopLayoutAudit.phaseProgress!.rect!.x, '左上阶段进度必须贴左侧锚点').toBeLessThanOrEqual(24);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.y, '左上阶段进度必须避开生命显示开关').toBeGreaterThanOrEqual(desktopLayoutAudit.lifeToggle!.rect!.bottom + 4);
-        const desktopPhaseProgressRightGap = desktopLayoutAudit.opponentPreparedMirror!.x - desktopLayoutAudit.phaseProgress!.rect!.right;
-        const desktopPhaseProgressAvailableWidth = desktopLayoutAudit.opponentPreparedMirror!.x - desktopLayoutAudit.phaseProgress!.rect!.x;
-        expect(desktopLayoutAudit.phaseProgress!.rect!.width, '阶段进度是当前回合流程主提示，不能缩成左上小标签').toBeGreaterThan(desktopLayoutAudit.viewportWidth * 0.55);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.right, '阶段进度应按剩余横向空间展开，而不是停在屏幕左侧 20%').toBeGreaterThan(desktopLayoutAudit.viewportWidth * 0.7);
-        expect(desktopPhaseProgressRightGap, '阶段进度应自然让位给右上对手计划区，不能相交').toBeGreaterThanOrEqual(4);
-        expect(desktopPhaseProgressRightGap, '阶段进度右侧不能留下大段无职责空白').toBeLessThanOrEqual(28);
-        expect(
-            desktopLayoutAudit.phaseProgress!.rect!.width / desktopPhaseProgressAvailableWidth,
-            '阶段进度应基本占满左侧工具到右上固定信息之间的剩余空间',
-        ).toBeGreaterThanOrEqual(0.96);
+        expect(desktopLayoutAudit.phaseProgress!.role, '阶段进度是左侧回看轨道，不能再冒充顶部主提示条').toBe('phase-progress-reference-rail');
+        expect(desktopLayoutAudit.phaseProgress!.axis, '阶段进度必须按 DiceThrone 同类职责竖排').toBe('vertical');
+        expect(desktopLayoutAudit.phaseProgress!.placement, '阶段进度必须落在左侧参考轨道').toBe('left-reference-rail');
+        expect(desktopLayoutAudit.phaseProgress!.rect!.x, '左侧阶段进度必须贴左侧锚点').toBeLessThanOrEqual(24);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.y, '左侧阶段进度必须避开生命显示开关').toBeGreaterThanOrEqual(desktopLayoutAudit.lifeToggle!.rect!.bottom + 4);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.right, '阶段进度不应横向铺成顶部主条').toBeLessThan(desktopLayoutAudit.viewportWidth * 0.25);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(128);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.height, '阶段轨道应是竖向列表').toBeGreaterThan(desktopLayoutAudit.phaseProgress!.rect!.width * 1.6);
+        desktopLayoutAudit.phaseProgress!.itemRects.forEach((rect, index, itemRects) => {
+            expect(rect, `2560 阶段项 ${index + 1} 必须可见`).not.toBeNull();
+            if (index > 0) {
+                expect(rect!.y, `2560 阶段项 ${index + 1} 必须排在上一项下方`).toBeGreaterThan(itemRects[index - 1]!.y);
+            }
+        });
         expect(desktopLayoutAudit.selfHud).not.toBeNull();
         expect(desktopLayoutAudit.opponentHud).not.toBeNull();
         expect(desktopLayoutAudit.selfHudDensity).toBe('full');
@@ -2752,6 +2778,13 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.spellbookCard!.y - desktopLayoutAudit.selfHud!.bottom, '己方 HUD 必须贴近左下牌桌区，不能悬到中场').toBeLessThanOrEqual(32);
         expect(Math.abs(desktopLayoutAudit.spellbookShelf!.bottom - desktopLayoutAudit.preparedArea!.bottom)).toBeLessThanOrEqual(3);
         expect(Math.abs(desktopLayoutAudit.spellbookCard!.bottom - desktopLayoutAudit.preparedCard!.bottom)).toBeLessThanOrEqual(3);
+        const preparedToSpellbookHeightRatio = desktopLayoutAudit.preparedCard!.height / desktopLayoutAudit.spellbookCard!.height;
+        expect(preparedToSpellbookHeightRatio, '已计划法术和法术书同属底部牌面系统，不能被压成右侧缩略图').toBeGreaterThanOrEqual(0.92);
+        expect(preparedToSpellbookHeightRatio, '已计划法术不应反向大过法术书牌面，造成另一个主对象').toBeLessThanOrEqual(1.04);
+        expect(
+            desktopLayoutAudit.preparedArea!.width,
+            '已计划区域宽度必须足够容纳两个同尺度计划槽，不能靠缩小牌面凑布局',
+        ).toBeGreaterThanOrEqual(desktopLayoutAudit.preparedCard!.width * 2 + 8);
         expect(desktopLayoutAudit.spellbookShelf!.x).toBeLessThanOrEqual(24);
         expect(desktopLayoutAudit.discardPile!.right).toBeLessThanOrEqual(desktopLayoutAudit.viewportWidth - 44);
         expect(desktopLayoutAudit.discardPile!.bottom, '弃牌堆必须在右侧主按钮上方，不得被按钮遮住').toBeLessThanOrEqual(desktopLayoutAudit.mainAction!.y - 6);

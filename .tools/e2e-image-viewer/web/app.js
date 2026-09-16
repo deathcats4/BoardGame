@@ -2,6 +2,7 @@ const params = new URLSearchParams(window.location.search);
 const directory = params.get("dir") ?? "";
 const directoryKey = params.get("key") ?? "";
 const focusPath = params.get("focus") ?? "";
+const selectedPaths = params.getAll("show").filter(Boolean);
 const directoryLabel = document.querySelector("#directory");
 const board = document.querySelector("#board");
 const viewport = document.querySelector("#viewport");
@@ -446,10 +447,19 @@ const loadDirectory = async ({ preserveView = true } = {}) => {
   }
 
   const previousSignature = listSignature;
-  const query = directoryKey
-    ? `key=${encodeURIComponent(directoryKey)}`
-    : `dir=${encodeURIComponent(directory)}`;
-  const response = await fetch(`/api/list?${query}`, { cache: "no-store" });
+  const query = new URLSearchParams();
+  if (directoryKey) {
+    query.set("key", directoryKey);
+  } else {
+    query.set("dir", directory);
+  }
+  if (focusPath) {
+    query.set("focus", focusPath);
+  }
+  for (const selectedPath of selectedPaths) {
+    query.append("show", selectedPath);
+  }
+  const response = await fetch(`/api/list?${query.toString()}`, { cache: "no-store" });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(body || `读取失败: ${response.status}`);

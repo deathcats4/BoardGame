@@ -580,7 +580,15 @@ const resolveSingleMediaDirectory = (imagePaths) => {
 
 const openImagesWithWebViewer = (imagePaths, { forceReopen = false } = {}) => {
     const directory = resolveSingleMediaDirectory(imagePaths);
-    const args = [E2E_IMAGE_VIEWER_ENTRY, '--dir', directory, '--focus', path.basename(imagePaths[0])];
+    const args = [
+        E2E_IMAGE_VIEWER_ENTRY,
+        '--dir',
+        directory,
+        '--focus',
+        path.basename(imagePaths[0]),
+        '--files',
+        ...imagePaths.map((imagePath) => path.basename(imagePath)),
+    ];
     if (forceReopen) {
         args.push('--reopen');
     }

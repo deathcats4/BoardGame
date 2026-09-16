@@ -119,9 +119,8 @@ export const expectRightTrayBonusDiceConfirmation = async (
     }
     await closeDebugPanelIfVisible(page);
 
-    const confirmButton = page.locator('[data-tutorial-id="dice-confirm-button"]:visible').first();
-    const rail = confirmButton.locator('xpath=ancestor::*[@data-player-seat-anchor][1]');
-    const diceTray = rail.locator('[data-testid="dicethrone-2d-dice-tray"]:visible').first();
+    const { diceTray, rail } = rightTrayRail(page);
+    const confirmButton = rail.locator('[data-tutorial-id="dice-confirm-button"]:visible').first();
     const ownerLabel = rail.getByTestId('bonus-dice-owner-label');
     const firstDie = diceTray.locator('[data-testid^="die-button-"]').first();
     await expectNoCentralBonusDicePresentation(page);

@@ -3752,8 +3752,8 @@ describe('MageWarsBoard token placement', () => {
         expect(guardedCatRail).not.toBeNull();
         expect(guardedCatRail?.querySelector('img[alt="tokens.guard"]')).not.toBeNull();
         expect(guardedCatRail?.className).toContain('left-1');
-        expect(guardedCatRail?.className).toContain('top-1/2');
-        expect(guardedCatRail?.className).toContain('-translate-y-1/2');
+        expect(guardedCatRail?.style.top).toBe('50%');
+        expect(guardedCatRail?.style.transform).toContain('translateY(-50%)');
         expect(guardedCatRail?.getAttribute('data-token-rail-position')).toBe('entity-left-inside-midline');
         expect(guardedCatRail?.getAttribute('data-token-rail-axis')).toBe('vertical');
         expect(guardedCatRail?.getAttribute('data-token-rail-placement')).toBe('inside');

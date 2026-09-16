@@ -114,4 +114,34 @@ describe('ActionLogSegments', () => {
 
         expect(await screen.findByTestId('card-preview-tooltip')).toBeInTheDocument();
     });
+
+    it('card 片段的卡图 tooltip 继承父浮层层级，避免被日志面板遮挡', async () => {
+        const getCardPreviewRef = vi.fn(() => ({
+            type: 'image' as const,
+            src: 'dicethrone/images/xixuegui/ability-cards',
+        }));
+
+        render(
+            <OverlayLayerProvider tooltipZIndex={2603}>
+                <ActionLogSegments
+                    locale="zh-CN"
+                    playerId="0"
+                    characterId="vampire_lord"
+                    getCardPreviewRef={getCardPreviewRef}
+                    segments={[
+                        {
+                            type: 'card',
+                            cardId: 'card-vampire-lord-total-demise',
+                            previewText: '死无全尸！',
+                        },
+                    ]}
+                />
+            </OverlayLayerProvider>
+        );
+
+        fireEvent.mouseEnter(screen.getByTestId('card-preview-tooltip-anchor'));
+
+        const tooltipLayer = await screen.findByTestId('card-preview-tooltip');
+        expect(tooltipLayer).toHaveStyle({ zIndex: '2603' });
+    });
 });

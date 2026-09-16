@@ -351,6 +351,43 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(settled.next.players['1'].statusEffects[STATUS_IDS.BLEED]).toBe(1);
     });
 
+    it('死无全尸投出 2 个血滴时必须给当前攻击加 2 伤害，但不施加流血', () => {
+        const cardId = 'card-vampire-lord-total-demise';
+        const state = createAttackModifierCardState(cardId);
+        const playCommand = command('PLAY_CARD', '0', { cardId });
+
+        const events = execute(state, playCommand, createQueuedRandom([6, 6, 1, 4, 5]));
+        const afterRoll = applyEvents(state.core, events);
+
+        expect(eventsOfType(events, 'BONUS_DIE_ROLLED').map(event => event.payload.face)).toEqual([
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+        ]);
+        expect(eventsOfType(events, 'BONUS_DAMAGE_ADDED')).toHaveLength(0);
+
+        const settled = confirmPendingBonusDice(afterRoll);
+
+        expect(eventsOfType(settled.events, 'BONUS_DICE_SETTLED')[0]?.payload).toMatchObject({
+            sourceAbilityId: cardId,
+            totalDamage: 2,
+            displayOnly: true,
+        });
+        expect(eventsOfType(settled.events, 'BONUS_DAMAGE_ADDED')[0]?.payload).toMatchObject({
+            playerId: '0',
+            amount: 2,
+            sourceCardId: cardId,
+        });
+        expect(eventsOfType(settled.events, 'STATUS_APPLIED')).toHaveLength(0);
+        expect(settled.next.pendingAttack?.bonusDamage).toBe(2);
+        expect(settled.next.pendingAttack?.attackModifierBonusDamage).toBe(2);
+        expect(settled.next.pendingAttack?.bonusDamageSources).toEqual([
+            { amount: 2, sourceId: cardId },
+        ]);
+    });
+
     it('死无全尸 0 血滴只给魅惑之力 +0，不应跳过原本 4 点不可防御伤害', () => {
         const cardId = 'card-vampire-lord-total-demise';
         const state = createVampireLordState();
