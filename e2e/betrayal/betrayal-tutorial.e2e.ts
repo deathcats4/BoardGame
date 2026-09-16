@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { mkdirSync, rmSync } from "fs";
 import { resolve } from "path";
 import sharp from "sharp";
 import {
@@ -19,8 +20,13 @@ import { MOBILE_LANDSCAPE_REFERENCE_VIEWPORT } from "../../src/shared/referenceV
 
 const EVIDENCE_DIR = resolve(process.cwd(), "evidence/betrayal-tutorial");
 const MAIN_FLOW_FULL_DIR = `${EVIDENCE_DIR}/main-flow-full-rerun`;
+const HAUNT_NATURAL_DIR = `${EVIDENCE_DIR}/haunt-natural-trigger-flow`;
 const mainFlowFullShot = (index: number, label: string) =>
   `${MAIN_FLOW_FULL_DIR}/${String(index).padStart(2, "0")}-${label}.jpg`;
+const resetEvidenceDir = (dir: string) => {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+};
 const STEP_00 = `${EVIDENCE_DIR}/00-山屋惊魂-教程-章节目录.jpg`;
 const STEP_01 = `${EVIDENCE_DIR}/01-山屋惊魂-教程-回合目标与行动区.jpg`;
 const STEP_02 = `${EVIDENCE_DIR}/03-山屋惊魂-教程-剩余移动.jpg`;
@@ -66,20 +72,20 @@ const STEP_39 = `${EVIDENCE_DIR}/09-山屋惊魂-教程-预兆作祟进度条.jp
 const STEP_40 = `${EVIDENCE_DIR}/topic-omen-confirmation/01-预兆牌确认与作祟检定.jpg`;
 const STEP_42 = `${EVIDENCE_DIR}/topic-omen-confirmation/02-确认后回牌桌持有区.jpg`;
 const STEP_43 = `${EVIDENCE_DIR}/topic-omen-confirmation/03-确认后预兆进度条.jpg`;
-const STEP_HAUNT_NATURAL_01 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/01-当前玩家结束回合前.jpg`;
-const STEP_HAUNT_NATURAL_02 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/02-队友自动行动后回到当前玩家.jpg`;
-const STEP_HAUNT_NATURAL_03 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/03-再次结束当前回合.jpg`;
-const STEP_HAUNT_NATURAL_04 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/04-队友一翻出面具并等待确认.jpg`;
-const STEP_HAUNT_NATURAL_05 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/05-当前玩家看到英雄开场过场.jpg`;
-const STEP_HAUNT_NATURAL_06 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/06-开场过场继续进入英雄剧本书.jpg`;
-const STEP_HAUNT_NATURAL_07 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/07-英雄剧本书目标页与图书馆原因.jpg`;
-const STEP_HAUNT_NATURAL_08 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/08-读完剧本书目标准备关闭.jpg`;
-const STEP_HAUNT_NATURAL_09 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/09-读完目标回到上层平台英雄.jpg`;
-const STEP_HAUNT_NATURAL_10 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/10-读完目标后准备打开移动目标.jpg`;
-const STEP_HAUNT_NATURAL_11 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/11-图书馆成为可点击移动目标.jpg`;
-const STEP_HAUNT_NATURAL_12 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/12-轮到英雄寻找木乃伊真名.jpg`;
-const STEP_HAUNT_NATURAL_13 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/13-寻找真名知识检定成功.jpg`;
-const STEP_HAUNT_NATURAL_14 = `${EVIDENCE_DIR}/haunt-natural-trigger-flow/14-确认后回到牌桌可结束回合.jpg`;
+const STEP_HAUNT_NATURAL_01 = `${HAUNT_NATURAL_DIR}/01-当前玩家结束回合前.jpg`;
+const STEP_HAUNT_NATURAL_02 = `${HAUNT_NATURAL_DIR}/02-队友自动行动后回到当前玩家.jpg`;
+const STEP_HAUNT_NATURAL_03 = `${HAUNT_NATURAL_DIR}/03-再次结束当前回合.jpg`;
+const STEP_HAUNT_NATURAL_04 = `${HAUNT_NATURAL_DIR}/04-队友一翻出面具并等待确认.jpg`;
+const STEP_HAUNT_NATURAL_05 = `${HAUNT_NATURAL_DIR}/05-当前玩家看到英雄开场过场.jpg`;
+const STEP_HAUNT_NATURAL_06 = `${HAUNT_NATURAL_DIR}/06-开场过场继续进入英雄剧本书.jpg`;
+const STEP_HAUNT_NATURAL_07 = `${HAUNT_NATURAL_DIR}/07-英雄剧本书目标页与图书馆原因.jpg`;
+const STEP_HAUNT_NATURAL_08 = `${HAUNT_NATURAL_DIR}/08-读完剧本书目标准备关闭.jpg`;
+const STEP_HAUNT_NATURAL_09 = `${HAUNT_NATURAL_DIR}/09-读完目标回到上层平台英雄.jpg`;
+const STEP_HAUNT_NATURAL_10 = `${HAUNT_NATURAL_DIR}/10-读完目标后准备打开移动目标.jpg`;
+const STEP_HAUNT_NATURAL_11 = `${HAUNT_NATURAL_DIR}/11-图书馆成为可点击移动目标.jpg`;
+const STEP_HAUNT_NATURAL_12 = `${HAUNT_NATURAL_DIR}/12-轮到英雄寻找木乃伊真名.jpg`;
+const STEP_HAUNT_NATURAL_13 = `${HAUNT_NATURAL_DIR}/13-寻找真名知识检定成功.jpg`;
+const STEP_HAUNT_NATURAL_14 = `${HAUNT_NATURAL_DIR}/14-确认后回到牌桌可结束回合.jpg`;
 const STEP_TRAITOR_01 = `${EVIDENCE_DIR}/traitor-path/01-叛徒打开木乃伊剧本目标页.jpg`;
 const STEP_TRAITOR_02 = `${EVIDENCE_DIR}/traitor-path/02-木乃伊怪物回合开始前.jpg`;
 const STEP_TRAITOR_03 = `${EVIDENCE_DIR}/traitor-path/03-木乃伊移动骰盘.jpg`;
@@ -2933,6 +2939,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       "betrayal-tutorial-haunt-natural-trigger-flow",
     );
+    resetEvidenceDir(HAUNT_NATURAL_DIR);
     const readOmenNamesByPlayer = () =>
       page.evaluate(() => {
         type HarnessExplorer = {
@@ -3972,6 +3979,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       page,
       "betrayal-tutorial-main-player-path",
     );
+    resetEvidenceDir(MAIN_FLOW_FULL_DIR);
 
     await page.setViewportSize({ width: 1600, height: 900 });
     let releaseCriticalEventAtlas!: () => void;
