@@ -3173,6 +3173,16 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
 
     it('灵质一号天赋必须由玩家选择目标基地、己方随从和是否摧毁新基地行动', () => {
         const core = makeState({
+            players: {
+                '0': makePlayer('0'),
+                '1': makePlayer('1', {
+                    deck: [
+                        makeCard('draw-1', 'wraithrustlers_resurgence', 'action', '1'),
+                        makeCard('draw-2', 'wraithrustlers_slimy', 'action', '1'),
+                        makeCard('draw-3', 'wraithrustlers_demon_dogs', 'action', '1'),
+                    ],
+                }),
+            },
             bases: [
                 makeBase({
                     defId: 'base_the_jungle',
@@ -3232,12 +3242,6 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
             FIXED_RANDOM,
         );
         const after = destroyed.finalState.core;
-        console.log('ECTO DEBUG', JSON.stringify({
-            eventTypes: destroyed.events.map(event => event.type),
-            targetBase: after.bases[1],
-            player1Discard: after.players['1'].discard,
-            prompts: destroyed.finalState.sys.interactionState?.prompts,
-        }, null, 2));
 
         expect(after.bases[0].minions.map(minion => minion.uid)).toEqual(['first-ally']);
         expect(after.bases[0].ongoingActions).toEqual([]);
