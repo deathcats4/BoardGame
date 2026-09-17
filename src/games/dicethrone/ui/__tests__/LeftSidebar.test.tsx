@@ -156,7 +156,7 @@ describe('LeftSidebar 飞行 Token 入口', () => {
     it('女猎手可从左侧 Token 徽章主动消耗妮拉之系治疗妮拉', () => {
         const player = initHeroState('0', 'lieren', createQueuedRandom([1]));
         player.tokens[TOKEN_IDS.NYRAS_BOND] = 1;
-        player.companion = { id: 'nyra', hp: 4, maxHp: 7 };
+        player.companion = { id: 'nyra', hp: 4, maxHp: 7, active: true };
         const onNyraBondHealClick = vi.fn();
 
         render(

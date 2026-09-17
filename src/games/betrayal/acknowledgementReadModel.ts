@@ -57,7 +57,7 @@ export function resolvePendingEventRollResolutionRequiredPlayerIds(
     if (configuredPlayerIds.length > 0) {
         return configuredPlayerIds;
     }
-    return [resolution.playerId];
+    return core.playerIds.length > 0 ? [...core.playerIds] : [resolution.playerId];
 }
 
 export function resolvePendingEventRollResolutionAcknowledgedPlayerIds(

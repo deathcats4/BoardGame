@@ -1109,7 +1109,7 @@ describe('formatDiceThroneActionEntry', () => {
         expect(finalDiceSegment?.dice.map(die => die.value)).toEqual([1, 2, 4, 4, 5]);
     });
 
-    it('死无全尸结算日志按血滴数量显示攻击伤害加值，不把 2 个血滴记成 +1', () => {
+    it('死无全尸结算日志按利爪数量显示攻击伤害加值，不把 2 个利爪记成 +1', () => {
         const state = createHeroMatchup('vampire_lord', 'monk')(['0', '1'], fixedRandom);
         const confirmCommand: Command = {
             type: 'CONFIRM_ROLL',
@@ -1121,11 +1121,11 @@ describe('formatDiceThroneActionEntry', () => {
             type: 'BONUS_DICE_SETTLED',
             payload: {
                 finalDice: [
-                    { index: 0, value: 6, face: 'blood_drop' },
-                    { index: 1, value: 6, face: 'blood_drop' },
-                    { index: 2, value: 1, face: 'claw' },
-                    { index: 3, value: 4, face: 'mesmerize' },
-                    { index: 4, value: 5, face: 'mesmerize' },
+                    { index: 0, value: 1, face: 'claw' },
+                    { index: 1, value: 2, face: 'claw' },
+                    { index: 2, value: 4, face: 'mesmerize' },
+                    { index: 3, value: 5, face: 'mesmerize' },
+                    { index: 4, value: 6, face: 'blood_drop' },
                 ],
                 totalDamage: 2,
                 attackerId: '0',
@@ -1134,7 +1134,7 @@ describe('formatDiceThroneActionEntry', () => {
                 displayOnly: true,
                 allowDiceModification: true,
                 effectKey: 'bonusDie.effect.vampireLordTotalDemiseResult',
-                effectParams: { bloodDropCount: 2, bonusDamage: 2 },
+                effectParams: { clawCount: 2, bonusDamage: 2 },
             },
             timestamp: 91,
         } as GameEvent;
@@ -1149,11 +1149,11 @@ describe('formatDiceThroneActionEntry', () => {
 
         const resultSeg = findI18nSegment(settledEntry!.segments, 'bonusDie.effect.vampireLordTotalDemiseResult');
         expect(resultSeg?.params).toMatchObject({
-            bloodDropCount: 2,
+            clawCount: 2,
             bonusDamage: 2,
         });
         const finalDiceSegment = settledEntry!.segments.find(segment => segment.type === 'diceResult') as Extract<ActionLogSegment, { type: 'diceResult' }> | undefined;
-        expect(finalDiceSegment?.dice.map(die => die.value)).toEqual([6, 6, 1, 4, 5]);
+        expect(finalDiceSegment?.dice.map(die => die.value)).toEqual([1, 2, 4, 5, 6]);
     });
 
     it('奖励骰确认不应复用正式防御骰和防御技能生成第二条确认日志', () => {

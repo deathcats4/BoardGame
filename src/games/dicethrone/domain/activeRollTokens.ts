@@ -41,7 +41,6 @@ const canUseActiveRollTokenDef = (
     if (!isMainRollPhase(phase)) return null;
     if (options.responseWindowType && options.responseWindowType !== 'afterRollConfirmed') return null;
     if (state.pendingDamage) return null;
-    if (!state.pendingAttack) return null;
     if (!tokenDef.activeUse?.timing?.includes('duringRoll')) return null;
 
     const player = state.players[playerId];
@@ -62,8 +61,9 @@ const canUseActiveRollTokenDef = (
     if (requiresOpponentRollDice) {
         if (options.responseWindowType !== 'afterRollConfirmed') return null;
         if (!hasOpponentDieInCurrentRoll(currentRollContext, playerId)) return null;
-    } else if (currentRollContext.ownerPlayerId !== playerId) {
-        return null;
+    } else {
+        if (!state.pendingAttack) return null;
+        if (currentRollContext.ownerPlayerId !== playerId) return null;
     }
 
     return {

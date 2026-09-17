@@ -260,7 +260,27 @@ export function buildAffectRecords(
         case SU_EVENTS.ONGOING_DETACHED: {
             const payload = (event as OngoingDetachedEvent).payload;
             const lookup = findCardInPlayByUid(core, payload.cardUid);
-            if (!lookup || (lookup.targetKind !== 'ongoing' && lookup.targetKind !== 'attached_action')) return [];
+            if (!lookup) {
+                if (payload.targetBaseIndex === undefined || !payload.targetKind) return [];
+                return [{
+                    targetKind: payload.targetKind,
+                    targetUid: payload.cardUid,
+                    baseIndex: payload.targetBaseIndex,
+                    affectType: 'destroy',
+                    reason: payload.reason,
+                    countsForOnMinionAffected: false,
+                    sourcePlayerId: payload.sourcePlayerId,
+                    sourceCardUid: payload.sourceCardUid,
+                    sourceDefId: payload.sourceDefId ?? payload.defId,
+                    sourceControllerId: payload.sourceControllerId,
+                    sourceBaseIndex: payload.sourceBaseIndex,
+                    triggerCardUid: payload.cardUid,
+                    triggerCardDefId: payload.defId,
+                    triggerCardOwnerId: payload.ownerId,
+                    triggerCardKind: payload.targetKind,
+                }];
+            }
+            if (lookup.targetKind !== 'ongoing' && lookup.targetKind !== 'attached_action') return [];
             return [buildInPlayCardAffectRecord(
                 lookup,
                 'destroy',

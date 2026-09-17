@@ -196,7 +196,7 @@ export const isNyraCompanionActive = (
     player?.characterId === 'lieren'
     && player.companion?.id === 'nyra'
     && player.companion.hp > 0
-    && (player.companion.active ?? true)
+    && player.companion.active === true
 );
 
 /**

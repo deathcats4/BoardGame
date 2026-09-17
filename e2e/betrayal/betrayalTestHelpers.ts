@@ -214,6 +214,22 @@ export const waitForBetrayalPageReady = async (page: Page, attempts = 4) => {
     : new Error("betrayal 页面未能稳定进入 harness");
 };
 
+export const waitForBetrayalPageReadyWithoutReload = async (
+  page: Page,
+  timeout = 30000,
+) => {
+  try {
+    await waitForTestHarness(page, timeout);
+    await waitForBetrayalHarnessState(page, timeout);
+  } catch (error) {
+    const diagnostics = await readBetrayalPageDiagnostics(page);
+    const detail = JSON.stringify(diagnostics, null, 2);
+    throw new Error(
+      `betrayal 页面未能在不刷新恢复态的情况下进入 harness。最后错误：${error instanceof Error ? error.message : String(error)}\n诊断：${detail}`,
+    );
+  }
+};
+
 export const warmBetrayalFrontend = async (
   context: BrowserContext,
   timeout = 45000,
@@ -954,8 +970,8 @@ export const expectEventRollWorkbenchReadable = async (
     }
     for (const target of metrics.rerollTargets) {
       const evidence = JSON.stringify({ target, metrics });
-      expect(target.shape, `${label}改骰方框必须绑定骰子本体：${evidence}`).toBe(
-        "projected-rounded-die-face",
+      expect(target.shape, `${label}改骰透明热区必须绑定骰子本体：${evidence}`).toBe(
+        "die-face",
       );
       expect(
         target.highlightRenderer,
@@ -967,8 +983,8 @@ export const expectEventRollWorkbenchReadable = async (
       ).toBe("projected-rounded-face-outline-plus-threejs-shell-plus-transparent-hitbox");
       expect(
         target.visualLayer,
-        `${label}DOM 层只能绘制贴脸 SVG 描边和透明命中区，不得回到大框或底线：${evidence}`,
-      ).toBe("projected-rounded-outline-plus-transparent-hitbox");
+        `${label}外层 DOM 只能作为透明命中区，不得回到大框或底线：${evidence}`,
+      ).toBe("transparent-hitbox-only");
       expect(
         target.outlinePaint,
         `${label}玩家可见方框必须来自骰面投影 SVG 描边，Three.js shell 只作外壳辅助：${evidence}`,

@@ -1103,7 +1103,7 @@ const resolveBonusDieEffectKeyForValue = (
             : 'bonusDie.effect.vampireLordBloodSurgeOther';
     }
     if (effectKey.startsWith('bonusDie.effect.vampireLordTotalDemise')) {
-        return face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP
+        return face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW
             ? 'bonusDie.effect.vampireLordTotalDemiseDie'
             : 'bonusDie.effect.vampireLordTotalDemiseOther';
     }
@@ -1151,7 +1151,7 @@ const rebuildBonusDieEffectParams = (
             break;
         case 'bonusDie.effect.vampireLordTotalDemiseDie':
         case 'bonusDie.effect.vampireLordTotalDemiseOther':
-            params.bonusDamage = face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP ? 1 : 0;
+            params.bonusDamage = face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW ? 1 : 0;
             break;
         case 'bonusDie.effect.artificerPerfectlyCalibrated':
             params.synth = halfUp(value);
@@ -1233,8 +1233,8 @@ const rebuildBonusSettlementSummary = (
             return { summaryEffectParams: { branchCount, leafCount, spiritCount } };
         }
         case 'bonusDie.effect.vampireLordTotalDemiseResult': {
-            const bloodDropCount = countBonusFaces(dice, VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP);
-            return { summaryEffectParams: { bloodDropCount, bonusDamage: bloodDropCount } };
+            const clawCount = countBonusFaces(dice, VAMPIRE_LORD_DICE_FACE_IDS.CLAW);
+            return { summaryEffectParams: { clawCount, bonusDamage: clawCount } };
         }
         default:
             return {};

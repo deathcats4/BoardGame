@@ -2153,6 +2153,8 @@ export interface OngoingDetachedEvent extends GameEvent<typeof SU_EVENTS.ONGOING
         /** Clyde 2.0 replacement choice: true = put into Clyde controller's hand, false/absent = normal discard. */
         clydeReturnToHand?: boolean;
         destination?: 'discard' | 'hand';
+        targetBaseIndex?: number;
+        targetKind?: 'ongoing' | 'attached_action';
         sourcePlayerId?: PlayerId;
         sourceCardUid?: string;
         sourceDefId?: string;

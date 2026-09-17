@@ -1427,7 +1427,7 @@ const validateUseToken = (
             if (currentAmount <= 0) {
                 return fail('no_token');
             }
-            if (!state.pendingAttack) {
+            if (!state.pendingAttack && tokenDef.activeUse?.requiresOpponentRollDice !== true) {
                 return fail('no_pending_attack');
             }
             return fail('invalid_token_timing');

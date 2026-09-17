@@ -337,6 +337,7 @@ async function snapshot(page) {
                 }
               : null,
             usedCardIdsThisTurn: harnessState.core.usedCardIdsThisTurn ?? null,
+            pendingCardResolutionQueueLength: harnessState.core.pendingCardResolutionQueue?.length ?? 0,
             pendingDamageAllocation: harnessState.core.pendingDamageAllocation
               ? { playerId: harnessState.core.pendingDamageAllocation.playerId ?? null }
               : null,
@@ -406,6 +407,8 @@ async function readDiceVisualState(page) {
           outlineHeight: target.getAttribute("data-reroll-target-outline-height"),
           outlineGap: target.getAttribute("data-reroll-target-outline-gap"),
           outlinePaint: target.getAttribute("data-reroll-target-outline-paint"),
+          highlightRenderer: target.getAttribute("data-reroll-target-highlight-renderer"),
+          visualContract: target.getAttribute("data-reroll-target-visual-contract"),
           visualLayer: target.getAttribute("data-reroll-target-visual-layer"),
           rect: rect(target),
           outlineRect: rect(outline),
@@ -1336,14 +1339,17 @@ async function main() {
       failures.push("rabbit confirm did not capture the state after clicking End Turn");
     } else {
       const afterEndTurn = endTurnFollowup.afterEndTurn;
-      if (afterEndTurn.core?.currentPlayer !== "1") {
-        failures.push(`rabbit post-damage END_TURN did not pass play to player 1; saw ${afterEndTurn.core?.currentPlayer ?? "missing"}`);
+      if (afterEndTurn.core?.currentPlayer !== "0") {
+        failures.push(`rabbit post-damage hidden teammate bridge did not return play to player 0; saw ${afterEndTurn.core?.currentPlayer ?? "missing"}`);
       }
       if (afterEndTurn.activeStepDom === "return-to-table-after-damage") {
         failures.push("rabbit post-damage END_TURN left the tutorial on the stale post-damage step");
       }
-      if (!["watch-teammate-one-omen-turn", "teammate-one-omen-results"].includes(afterEndTurn.activeStepDom)) {
-        failures.push(`rabbit post-damage END_TURN did not advance to teammate follow-up; saw ${afterEndTurn.activeStepDom}`);
+      if (afterEndTurn.activeStepDom !== "move-to-grand-staircase") {
+        failures.push(`rabbit post-damage hidden teammate bridge did not resume at the next player 0 decision; saw ${afterEndTurn.activeStepDom}`);
+      }
+      if (afterEndTurn.core?.pendingCardResolutionQueueLength !== 0) {
+        failures.push("rabbit post-damage hidden teammate bridge left a card confirmation pending");
       }
     }
     const firstRollMotion = result.rabbitConfirm.visual.firstRollMotion.state.source;
@@ -1371,7 +1377,8 @@ async function main() {
       !selectedHighlightTarget ||
       !(candidateHighlightScale >= 1.04 && candidateHighlightScale <= 1.055) ||
       !(selectedHighlightScale > candidateHighlightScale && selectedHighlightScale <= 1.075) ||
-      selectedHighlightTarget.outlinePaint !== "threejs-backside-shader-shell" ||
+      selectedHighlightTarget.outlinePaint !== "svg-projected-rounded-die-face" ||
+      selectedHighlightTarget.highlightRenderer !== "threejs-backside-shader-shell" ||
       selectedHighlightTarget.visualLayer !== "transparent-hitbox-only" ||
       selectedHighlightTarget.outlineSelected !== null ||
       Math.abs(selectedHitWidth - selectedHitHeight) > 1 ||

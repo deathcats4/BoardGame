@@ -352,7 +352,7 @@ export const DiceThroneDomain: DomainCore<DiceThroneCore, DiceThroneCommand, Dic
 };
 
 function normalizeLegacyDiceThroneMatchState(state: MatchState<DiceThroneCore>): MatchState<DiceThroneCore> {
-    const normalizedCore = normalizeLegacyDiceThroneCoreState(state.core);
+    const normalizedCore = normalizeLegacyDiceThroneCoreState(state.core, state.sys.eventStream?.entries);
     if (normalizedCore === state.core) {
         return state;
     }
@@ -362,14 +362,90 @@ function normalizeLegacyDiceThroneMatchState(state: MatchState<DiceThroneCore>):
     };
 }
 
-function normalizeLegacyDiceThroneCoreState(core: DiceThroneCore): DiceThroneCore {
-    const settlement = core.pendingBonusDiceSettlement;
+type LegacyCompanionEvent = {
+    type?: unknown;
+    payload?: {
+        playerId?: unknown;
+        companionId?: unknown;
+        delta?: unknown;
+        active?: unknown;
+    };
+};
+
+function inferLegacyNyraActive(
+    playerId: string,
+    companion: NonNullable<HeroState['companion']>,
+    eventStreamEntries: readonly { id: number; event: unknown }[] | undefined,
+): boolean {
+    // 没有完整事件流时只能保留旧版“血量大于 0 即可用”的语义，避免误杀正常受伤的旧对局。
+    if (!eventStreamEntries || eventStreamEntries.length === 0 || eventStreamEntries[0]?.id !== 1) {
+        return companion.hp > 0;
+    }
+
+    let hp = companion.maxHp;
+    let active = hp > 0;
+
+    for (const entry of eventStreamEntries) {
+        const event = entry.event as LegacyCompanionEvent;
+        if (event.type !== 'COMPANION_HEALTH_CHANGED') continue;
+        const payload = event.payload;
+        if (payload?.playerId !== playerId || payload.companionId !== 'nyra') continue;
+        if (typeof payload.delta !== 'number' || !Number.isFinite(payload.delta)) continue;
+
+        hp = Math.max(0, Math.min(companion.maxHp, hp + payload.delta));
+        if (hp <= 0) {
+            active = false;
+        } else if (typeof payload.active === 'boolean') {
+            active = payload.active;
+        }
+    }
+
+    return hp === companion.hp ? active : companion.hp > 0;
+}
+
+function normalizeLegacyDiceThroneCoreState(
+    core: DiceThroneCore,
+    eventStreamEntries?: readonly { id: number; event: unknown }[],
+): DiceThroneCore {
+    let normalizedCore = core;
+    let normalizedPlayers = core.players;
+
+    for (const [playerId, player] of Object.entries(core.players)) {
+        const companion = player.companion;
+        if (
+            player.characterId !== 'lieren'
+            || companion?.id !== 'nyra'
+            || typeof companion.active === 'boolean'
+        ) {
+            continue;
+        }
+
+        if (normalizedPlayers === core.players) {
+            normalizedPlayers = { ...core.players };
+        }
+        normalizedPlayers[playerId] = {
+            ...player,
+            companion: {
+                ...companion,
+                active: inferLegacyNyraActive(playerId, companion, eventStreamEntries),
+            },
+        };
+    }
+
+    if (normalizedPlayers !== core.players) {
+        normalizedCore = {
+            ...normalizedCore,
+            players: normalizedPlayers,
+        };
+    }
+
+    const settlement = normalizedCore.pendingBonusDiceSettlement;
     if (!settlement || Array.isArray(settlement.dice)) {
-        return core;
+        return normalizedCore;
     }
 
     return {
-        ...core,
+        ...normalizedCore,
         pendingBonusDiceSettlement: {
             ...settlement,
             dice: getPendingBonusSettlementDice(settlement),

@@ -44,6 +44,11 @@ const RADIO_DAMAGE_REROLL_SCREENSHOT = `${RADIO_DAMAGE_EVIDENCE_DIR}/04-无线�
 const RADIO_DAMAGE_ALLOCATION_SCREENSHOT = `${RADIO_DAMAGE_EVIDENCE_DIR}/05-无线电广播-精神伤害分配面板.png`;
 const RADIO_DAMAGE_AFTER_SCREENSHOT = `${RADIO_DAMAGE_EVIDENCE_DIR}/06-无线电广播-分配后属性结果.png`;
 const RADIO_DAMAGE_LOG_SCREENSHOT = `${RADIO_DAMAGE_EVIDENCE_DIR}/07-无线电广播-日志记录重新投骰与分配.png`;
+const RADIO_MULTI_CONFIRM_EVIDENCE_DIR =
+  "test-results/evidence-screenshots/betrayal/radio-event-multi-confirmation";
+const RADIO_MULTI_CONFIRM_PENDING_SCREENSHOT = `${RADIO_MULTI_CONFIRM_EVIDENCE_DIR}/01-无线电广播-事件结果等待三人确认.png`;
+const RADIO_MULTI_CONFIRM_SECOND_SCREENSHOT = `${RADIO_MULTI_CONFIRM_EVIDENCE_DIR}/02-无线电广播-第二位玩家确认后.png`;
+const RADIO_MULTI_CONFIRM_FINAL_SCREENSHOT = `${RADIO_MULTI_CONFIRM_EVIDENCE_DIR}/03-无线电广播-三人确认后进入伤害骰.png`;
 
 type BetrayalHarnessWindow = Window & {
   __BG_TEST_HARNESS__?: {
@@ -383,6 +388,10 @@ test.describe("山屋惊魂日志与撤回截图验收", () => {
     await expect(discoveryPanel).toBeVisible();
     await expect(discoveryPanel).toHaveAttribute("aria-label", "事件牌 无线电广播");
     await expect(page.getByTestId("betrayal-discovery-card-front-atlas")).toBeVisible();
+    const eventRollStart = page.getByTestId("betrayal-event-roll-start");
+    await expect(eventRollStart).toBeVisible();
+    await setHarnessRandomQueue(page, [0.834, 0.834]);
+    await eventRollStart.click();
     await expect(page.getByTestId("betrayal-discovery-detail")).toContainText(
       /无线电广播|获得 1 点知识|精神伤害/,
     );
@@ -485,6 +494,10 @@ test.describe("山屋惊魂日志与撤回截图验收", () => {
     await expect(discoveryPanel).toBeVisible();
     await expect(discoveryPanel).toHaveAttribute("aria-label", "事件牌 无线电广播");
     await expect(page.getByTestId("betrayal-discovery-card-front-atlas")).toBeVisible();
+    const eventRollStart = page.getByTestId("betrayal-event-roll-start");
+    await expect(eventRollStart).toBeVisible();
+    await setHarnessRandomQueue(page, [0, 0]);
+    await eventRollStart.click();
     const discoveryDetail = page.getByTestId("betrayal-discovery-detail");
     await expect(discoveryDetail).toContainText("无线电广播");
     await expect(discoveryDetail).toContainText("投 2 颗骰子 0");
@@ -662,10 +675,10 @@ test.describe("山屋惊魂日志与撤回截图验收", () => {
     );
     await expect(
       allocationPanel.getByTestId("betrayal-damage-allocation-source"),
-    ).toHaveAttribute("data-visible-source-owner", "discovery-card");
+    ).toHaveAttribute("data-visible-source-owner", "panel");
     await expect(
       allocationPanel.getByTestId("betrayal-damage-allocation-source"),
-    ).toHaveClass(/sr-only/);
+    ).not.toHaveClass(/sr-only/);
     await expect(allocationPanel.getByTestId("betrayal-damage-allocation-player")).toContainText(
       "薇薇安",
     );
@@ -785,6 +798,189 @@ test.describe("山屋惊魂日志与撤回截图验收", () => {
 
     assertNoFatalFrontendErrors([
       { label: "betrayal-radio-event-damage-flow", diagnostics },
+    ]);
+  });
+
+  test("无线电广播事件结果必须由三名真人分别确认后才进入伤害流程", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(150000);
+    const diagnostics = attachPageDiagnostics(
+      page,
+      "betrayal-radio-event-multi-confirmation",
+    );
+
+    await initBetrayalContext(context);
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await warmBetrayalFrontend(context);
+    await page.goto(
+      `${NAMED_PLAYER_ROUTE}&playerID=0`,
+      { waitUntil: "domcontentloaded" },
+    );
+    await waitForBetrayalPageReady(page);
+    await injectCore(page, createRadioDamageScreenshotCore());
+    await expect(page.getByTestId("betrayal-board")).toBeVisible({
+      timeout: 30000,
+    });
+
+    await page.getByTestId("betrayal-action-move").click();
+    await page.getByTestId("betrayal-room-hallway").click();
+    await page.getByTestId("betrayal-action-explore").click();
+    await expect(
+      page.getByTestId("betrayal-room-explore-target-ground-north"),
+    ).toBeVisible();
+    await page.getByTestId("betrayal-room-ground-north").click();
+    await expect(page.getByTestId("betrayal-room-placement-panel")).toBeVisible();
+    await setHarnessRandomQueue(page, [0, 0]);
+    await page.getByTestId("betrayal-room-placement-confirm").click();
+
+    const discoveryPanel = page.getByTestId("betrayal-discovery-panel");
+    await expect(discoveryPanel).toBeVisible();
+    await expect(discoveryPanel).toHaveAttribute(
+      "aria-label",
+      "事件牌 无线电广播",
+    );
+    const eventRollStart = page.getByTestId("betrayal-event-roll-start");
+    await expect(eventRollStart).toBeVisible();
+
+    await setHarnessRandomQueue(page, [0, 0]);
+    await eventRollStart.click();
+    await expectEventRollWorkbenchReadable(page, "无线电广播多人确认", {
+      expectedEventFrameIndex: "25",
+    });
+    const eventRollPanel = discoveryPanel.getByTestId(
+      "betrayal-recent-roll-panel",
+    );
+    await expect(eventRollPanel).toBeVisible();
+    await expect(
+      eventRollPanel.getByTestId("betrayal-recent-roll-thresholds"),
+    ).toBeVisible();
+    await expect(eventRollPanel).toContainText("受到一颗骰子的精神伤害");
+
+    let currentCore = await readCurrentCore(page);
+    expect(currentCore.pendingEventRollResolution).toMatchObject({
+      requiredPlayerIds: ["0", "1", "2"],
+      acknowledgedPlayerIds: [],
+    });
+    expect(currentCore.pendingDamageAllocation).toBeNull();
+    await expect(page.getByTestId("betrayal-damage-allocation-panel")).toHaveCount(
+      0,
+    );
+    await expect(discoveryPanel.getByTestId("betrayal-discovery-continue")).toContainText(
+      "确认 0/3",
+    );
+    await saveScreenshot(page, RADIO_MULTI_CONFIRM_PENDING_SCREENSHOT);
+
+    await discoveryPanel.getByTestId("betrayal-discovery-continue").click();
+    await expect
+      .poll(async () => {
+        const nextCore = await readCurrentCore(page);
+        return {
+          pending: nextCore.pendingEventRollResolution
+            ? {
+                requiredPlayerIds:
+                  nextCore.pendingEventRollResolution.requiredPlayerIds,
+                acknowledgedPlayerIds:
+                  nextCore.pendingEventRollResolution.acknowledgedPlayerIds,
+              }
+            : null,
+          pendingDamageAllocation: nextCore.pendingDamageAllocation,
+        };
+      })
+      .toEqual({
+        pending: {
+          requiredPlayerIds: ["0", "1", "2"],
+          acknowledgedPlayerIds: ["0"],
+        },
+        pendingDamageAllocation: null,
+      });
+    await expect(page.getByTestId("betrayal-damage-allocation-panel")).toHaveCount(
+      0,
+    );
+    await expect(discoveryPanel.getByTestId("betrayal-discovery-continue")).toContainText(
+      "已确认 1/3",
+    );
+
+    const pendingRollId = currentCore.pendingEventRollResolution!.rollId;
+    await dispatchHarnessCommand(
+      page,
+      BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+      "1",
+      { rollId: pendingRollId },
+    );
+    currentCore = await readCurrentCore(page);
+    expect(currentCore.pendingEventRollResolution).toMatchObject({
+      requiredPlayerIds: ["0", "1", "2"],
+      acknowledgedPlayerIds: ["0", "1"],
+    });
+    expect(currentCore.pendingDamageAllocation).toBeNull();
+    await expect(page.getByTestId("betrayal-damage-allocation-panel")).toHaveCount(
+      0,
+    );
+    await expect(discoveryPanel.getByTestId("betrayal-discovery-continue")).toContainText(
+      "确认 2/3",
+    );
+    await expect(eventRollPanel.getByTestId("betrayal-recent-roll-thresholds")).toBeVisible();
+    await expect(page.getByText("知识、神志")).toHaveCount(0);
+    await saveScreenshot(page, RADIO_MULTI_CONFIRM_SECOND_SCREENSHOT);
+
+    await setHarnessRandomQueue(page, [0.99]);
+    await dispatchHarnessCommand(
+      page,
+      BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+      "2",
+      { rollId: pendingRollId },
+    );
+    await expect
+      .poll(async () => {
+        currentCore = await readCurrentCore(page);
+        return {
+          pendingEventRollResolution:
+            currentCore.pendingEventRollResolution,
+          pendingDamageAllocation: currentCore.pendingDamageAllocation,
+        };
+      })
+      .toMatchObject({
+        pendingEventRollResolution: null,
+        pendingDamageAllocation: {
+          sourceTitle: "无线电广播",
+          playerId: "0",
+          damageKind: "mental",
+          amount: 2,
+        },
+      });
+    await expect(page.getByTestId("betrayal-damage-allocation-panel")).toHaveCount(
+      0,
+    );
+    const spectatorPage = await context.newPage();
+    const spectatorDiagnostics = attachPageDiagnostics(
+      spectatorPage,
+      "betrayal-radio-event-spectator-view",
+    );
+    await spectatorPage.setViewportSize({ width: 1600, height: 900 });
+    await spectatorPage.goto(
+      `${NAMED_PLAYER_ROUTE}&playerID=1`,
+      { waitUntil: "domcontentloaded" },
+    );
+    await waitForBetrayalPageReady(spectatorPage);
+    await injectCore(spectatorPage, currentCore);
+    await expect(spectatorPage.getByTestId("betrayal-board")).toBeVisible();
+    await expect(
+      spectatorPage.getByTestId("betrayal-recent-roll-panel"),
+    ).toBeVisible();
+    await expect(
+      spectatorPage.getByTestId("betrayal-damage-allocation-panel"),
+    ).toHaveCount(0);
+
+    await saveScreenshot(page, RADIO_MULTI_CONFIRM_FINAL_SCREENSHOT);
+
+    assertNoFatalFrontendErrors([
+      { label: "betrayal-radio-event-multi-confirmation", diagnostics },
+      {
+        label: "betrayal-radio-event-spectator-view",
+        diagnostics: spectatorDiagnostics,
+      },
     ]);
   });
 });

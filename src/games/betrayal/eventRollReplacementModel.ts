@@ -1,7 +1,6 @@
 import type { RandomFn } from '../../engine/types';
 import {
     eventRollResolutionNeedsAcknowledgement,
-    eventRollResolutionNeedsSharedAcknowledgement,
 } from './acknowledgementReadModel';
 import { findExplorerByPlayerId } from './explorerReadModel';
 import {
@@ -243,11 +242,15 @@ export function applyBetrayalEventRollReplacementState(
         uponReflectionSetup: replacement.uponReflectionSetup,
     };
     const requiresAcknowledgement = eventRollResolutionNeedsAcknowledgement(acknowledgementContext);
-    const needsSharedAcknowledgement = eventRollResolutionNeedsSharedAcknowledgement(acknowledgementContext);
+    const configuredRequiredPlayerIds = pending.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
     core.pendingEventRollResolution = {
         ...pending,
-        requiredPlayerIds: needsSharedAcknowledgement && core.playerIds.length > 0
-            ? [...core.playerIds]
+        requiredPlayerIds: requiresAcknowledgement
+            ? configuredRequiredPlayerIds.length > 0
+                ? [...configuredRequiredPlayerIds]
+                : core.playerIds.length > 0
+                    ? [...core.playerIds]
+                    : [pending.playerId]
             : [pending.playerId],
         acknowledgedPlayerIds: [],
         hauntRoll: replacement.hauntRoll ? { ...replacement.hauntRoll } : undefined,

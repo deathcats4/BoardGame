@@ -453,7 +453,7 @@ describe('DiceThrone timing opportunities', () => {
         state.core.players['1'] = {
             ...state.core.players['1'],
             characterId: 'lieren',
-            companion: { id: 'nyra', hp: 5, maxHp: 7 },
+            companion: { id: 'nyra', hp: 5, maxHp: 7, active: true },
             tokens: {
                 ...state.core.players['1'].tokens,
                 [TOKEN_IDS.NYRAS_BOND]: 1,

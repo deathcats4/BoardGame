@@ -304,22 +304,22 @@ const createMesmerizeOpponentRollState = (tokens = 1) => {
 };
 
 describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
-    it('死无全尸投 5 骰，按血滴数量给当前攻击加伤，3 点以上再施加流血', () => {
+    it('死无全尸投 5 骰，按利爪数量给当前攻击加伤，3 点以上再施加流血', () => {
         const cardId = 'card-vampire-lord-total-demise';
         const state = createAttackModifierCardState(cardId);
         const playCommand = command('PLAY_CARD', '0', { cardId });
 
         expect(validateCommand(state.core, playCommand, 'offensiveRoll').valid).toBe(true);
 
-        const events = execute(state, playCommand, createQueuedRandom([6, 6, 6, 1, 4]));
+        const events = execute(state, playCommand, createQueuedRandom([1, 2, 3, 4, 6]));
         const afterRoll = applyEvents(state.core, events);
 
         expect(eventsOfType(events, 'BONUS_DIE_ROLLED').map(event => event.payload.face)).toEqual([
-            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
-            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
-            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
             VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
             VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
         ]);
         expect(eventsOfType(events, 'DAMAGE_DEALT')).toHaveLength(0);
         expect(eventsOfType(events, 'BONUS_DAMAGE_ADDED')).toHaveLength(0);
@@ -351,20 +351,20 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(settled.next.players['1'].statusEffects[STATUS_IDS.BLEED]).toBe(1);
     });
 
-    it('死无全尸投出 2 个血滴时必须给当前攻击加 2 伤害，但不施加流血', () => {
+    it('死无全尸投出 2 个利爪且混有 1 个血滴时必须给当前攻击加 2 伤害，但不施加流血', () => {
         const cardId = 'card-vampire-lord-total-demise';
         const state = createAttackModifierCardState(cardId);
         const playCommand = command('PLAY_CARD', '0', { cardId });
 
-        const events = execute(state, playCommand, createQueuedRandom([6, 6, 1, 4, 5]));
+        const events = execute(state, playCommand, createQueuedRandom([1, 2, 4, 5, 6]));
         const afterRoll = applyEvents(state.core, events);
 
         expect(eventsOfType(events, 'BONUS_DIE_ROLLED').map(event => event.payload.face)).toEqual([
-            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
-            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
             VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
             VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
             VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
         ]);
         expect(eventsOfType(events, 'BONUS_DAMAGE_ADDED')).toHaveLength(0);
 
@@ -388,7 +388,7 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         ]);
     });
 
-    it('死无全尸 0 血滴只给魅惑之力 +0，不应跳过原本 4 点不可防御伤害', () => {
+    it('死无全尸 0 利爪只给魅惑之力 +0，不应跳过原本 4 点不可防御伤害', () => {
         const cardId = 'card-vampire-lord-total-demise';
         const state = createVampireLordState();
         state.sys.phase = 'offensiveRoll';
@@ -417,15 +417,15 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         const playEvents = execute(
             { ...state, core: afterAbility },
             command('PLAY_CARD', '0', { cardId }),
-            createQueuedRandom([5, 3, 2, 3, 5]),
+            createQueuedRandom([4, 5, 5, 6, 6]),
         );
         const afterRoll = applyEvents(afterAbility, playEvents);
         expect(eventsOfType(playEvents, 'BONUS_DIE_ROLLED').map(event => event.payload.face)).toEqual([
             VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
-            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
-            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
-            VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
             VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
         ]);
 
         const settled = confirmPendingBonusDice(afterRoll, fixedRandom, 120);
@@ -544,7 +544,7 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         const totalDemiseEvents = execute(
             { ...state, core: afterBloodPower },
             command('PLAY_CARD', '0', { cardId }),
-            createQueuedRandom([6, 1, 1, 1, 1]),
+            createQueuedRandom([6, 1, 4, 5, 5]),
         );
         const afterTotalDemiseRoll = applyEvents(afterBloodPower, totalDemiseEvents);
         const settled = confirmPendingBonusDice(afterTotalDemiseRoll);

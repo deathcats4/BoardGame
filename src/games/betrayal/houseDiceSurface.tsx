@@ -432,7 +432,7 @@ export function BetrayalHouseDice3DGroup({
                 data-reroll-target-outline-rotate-z={targetVisualRotation.toFixed(4)}
                 data-reroll-target-source={target.source}
                 data-reroll-target-center-source={BETRAYAL_REROLL_TARGET_CENTER_SOURCE}
-                data-reroll-target-shape="projected-rounded-die-face"
+                data-reroll-target-shape="die-face"
                 data-reroll-target-selected={isSelectedRerollTarget ? "true" : "false"}
                 data-reroll-target-box-size={targetMaxSize.toFixed(2)}
                 data-reroll-target-hit-width={targetWidth.toFixed(2)}
@@ -450,7 +450,7 @@ export function BetrayalHouseDice3DGroup({
                 data-reroll-target-outline-points={targetOutlinePoints}
                 data-reroll-target-highlight-renderer={BETRAYAL_REROLL_HIGHLIGHT_RENDERER}
                 data-reroll-target-visual-contract={BETRAYAL_REROLL_VISUAL_CONTRACT}
-                data-reroll-target-visual-layer="projected-rounded-outline-plus-transparent-hitbox"
+                data-reroll-target-visual-layer="transparent-hitbox-only"
                 className="group pointer-events-auto absolute outline-none"
                 style={{
                   left:

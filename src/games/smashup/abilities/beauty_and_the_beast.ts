@@ -684,7 +684,11 @@ function playDiscardedEnchantedObject(ctx: TriggerContext): SmashUpEvent[] {
             { playerId: ctx.playerId, now: ctx.now, matchState: ctx.matchState },
             ENCHANTED_OBJECTS_USAGE,
             undefined,
-            { specificCardUid: ctx.sourceCardUid, allowFromDiscard: true },
+            {
+                specificCardUid: ctx.sourceCardUid,
+                allowFromDiscard: true,
+                playTiming: 'immediate',
+            },
         ),
     ];
 }
@@ -692,7 +696,11 @@ function playDiscardedEnchantedObject(ctx: TriggerContext): SmashUpEvent[] {
 function discardedActionSpecial(ctx: AbilityContext): AbilityResult {
     return {
         events: [
-            grantContextualExtraAction(ctx, ctx.defId, { restrictToCardUid: ctx.cardUid, allowFromDiscard: true }),
+            grantContextualExtraAction(ctx, ctx.defId, {
+                restrictToCardUid: ctx.cardUid,
+                allowFromDiscard: true,
+                playTiming: 'immediate',
+            }),
         ],
     };
 }
@@ -708,7 +716,11 @@ function playDiscardedActionSpecial(ctx: TriggerContext): SmashUpEvent[] {
         grantContextualExtraAction(
             { playerId: ctx.playerId, now: ctx.now, matchState: ctx.matchState },
             discarded.defId,
-            { restrictToCardUid: discarded.uid, allowFromDiscard: true },
+            {
+                restrictToCardUid: discarded.uid,
+                allowFromDiscard: true,
+                playTiming: 'immediate',
+            },
         ),
     ];
 }

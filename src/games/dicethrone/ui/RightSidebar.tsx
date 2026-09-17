@@ -14,7 +14,10 @@ import { ActiveModifierBadge } from './ActiveModifierBadge';
 import type { ActiveModifier } from '../hooks/useActiveModifiers';
 import { PassiveAbilityPanel, type PassiveAbilityPanelProps } from './PassiveAbilityPanel';
 import { resolveCharacterIdFromDiceDefinitionId } from './assets';
-import { buildBoardShellInlineUnitValue } from '../../../shared/runtimeLayoutUnits';
+import {
+    buildBoardShellBlockUnitValue,
+    buildBoardShellInlineUnitValue,
+} from '../../../shared/runtimeLayoutUnits';
 
 type SidebarDiceMeta = {
     dtType?: 'modifyDie' | 'selectDie';
@@ -169,13 +172,17 @@ export const RightSidebar = ({
     };
     const hintContainerStyle: CSSProperties = {
         marginRight: buildBoardShellInlineUnitValue(0.6),
+        maxWidth: 'calc(100vw - 2rem)',
     };
     const hintBubbleStyle: CSSProperties = {
-        maxWidth: buildBoardShellInlineUnitValue(8.8),
+        maxWidth: `min(calc(100vw - 4rem), ${buildBoardShellInlineUnitValue(8.8)})`,
+        maxHeight: `min(calc(100vh - 2rem), ${buildBoardShellBlockUnitValue(8)})`,
         gap: buildBoardShellInlineUnitValue(0.4),
         borderRadius: buildBoardShellInlineUnitValue(0.5),
         paddingInline: buildBoardShellInlineUnitValue(0.6),
         paddingBlock: buildBoardShellInlineUnitValue(0.4),
+        overflowY: 'auto',
+        overflowWrap: 'anywhere',
     };
     const hintIconStyle: CSSProperties = {
         width: buildBoardShellInlineUnitValue(1),
@@ -306,10 +313,10 @@ export const RightSidebar = ({
                         <div
                             className="pointer-events-none absolute top-0 z-20"
                             data-testid="current-total-damage-badge-anchor"
-                            data-placement="dice-tray-left-top-outside"
+                            data-placement="dice-tray-right-top-outside"
                             style={{
                                 zIndex: UI_Z_INDEX.hint,
-                                right: `calc(100% + ${buildBoardShellInlineUnitValue(0.35)})`,
+                                left: `calc(100% + ${buildBoardShellInlineUnitValue(0.35)})`,
                             }}
                         >
                             <CurrentTotalDamageBadge summary={damageSummary} />
@@ -321,12 +328,12 @@ export const RightSidebar = ({
                             style={hintContainerStyle}
                         >
                             <div
-                                className="flex min-w-0 items-center overflow-hidden border border-amber-500/50 bg-amber-950/95 shadow-lg shadow-amber-900/40 backdrop-blur-sm whitespace-nowrap"
+                                className="flex min-w-0 items-start overflow-hidden border border-amber-500/50 bg-amber-950/95 shadow-lg shadow-amber-900/40 backdrop-blur-sm whitespace-normal"
                                 style={hintBubbleStyle}
                             >
                                 <MousePointerClick className="text-amber-400 shrink-0" style={hintIconStyle} />
                                 <span
-                                    className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-amber-200 font-medium leading-snug"
+                                    className="min-w-0 overflow-wrap-anywhere break-words text-amber-200 font-medium leading-snug"
                                     style={hintTextStyle}
                                 >
                                     {interactionHint}
@@ -421,16 +428,18 @@ const CurrentTotalDamageBadge = ({ summary }: { summary: DamageSummary }) => {
 
     return (
         <div
-            className="pointer-events-auto flex items-center justify-center rounded-full border border-rose-400/55 bg-gradient-to-r from-rose-950/95 to-red-900/90 backdrop-blur-sm"
+            className="pointer-events-auto flex flex-col items-center justify-center rounded-full border border-rose-400/55 bg-gradient-to-b from-rose-950/95 to-red-900/90 backdrop-blur-sm"
             data-testid="current-total-damage-badge"
             data-current-damage={currentDamage}
             data-original-damage={originalDamage}
             aria-label={title}
             title={title}
             style={{
-                height: buildBoardShellInlineUnitValue(1.75),
+                minWidth: buildBoardShellInlineUnitValue(3.1),
+                minHeight: buildBoardShellInlineUnitValue(2.8),
                 gap: buildBoardShellInlineUnitValue(0.32),
                 paddingInline: buildBoardShellInlineUnitValue(0.58),
+                paddingBlock: buildBoardShellInlineUnitValue(0.38),
                 boxShadow: `0 0 ${buildBoardShellInlineUnitValue(1)} rgba(244,63,94,0.32)`,
             }}
         >
@@ -442,7 +451,7 @@ const CurrentTotalDamageBadge = ({ summary }: { summary: DamageSummary }) => {
                 }}
             />
             <div
-                className="flex items-baseline whitespace-nowrap leading-none"
+                className="flex flex-col items-center whitespace-nowrap leading-none"
                 style={{ gap: buildBoardShellInlineUnitValue(0.22) }}
             >
                 <span

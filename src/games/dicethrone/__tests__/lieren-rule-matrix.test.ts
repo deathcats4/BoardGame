@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import '../domain';
+import { DiceThroneDomain } from '../domain';
 import { diceThroneFlowHooks } from '../domain/flowHooks';
 import { resolveEffectsToEvents, type EffectContext } from '../domain/effects';
 import { execute } from '../domain/execute';
 import { buildBonusDiceSettlementEvents } from '../domain/executeTokens';
 import { reduce } from '../domain/reducer';
 import { getAvailableAbilityIds } from '../domain/rules';
+import { isNyraCompanionActive } from '../domain/rules';
 import { LIEREN_DICE_FACE_IDS as FACE, STATUS_IDS, TOKEN_IDS } from '../domain/ids';
 import type { AbilityEffect, EffectTiming } from '../domain/combat';
 import type { DiceThroneCommand, DiceThroneCore, DiceThroneEvent } from '../domain/types';
@@ -558,6 +559,52 @@ describe('DiceThrone 女猎手规则矩阵', () => {
             payload: { tokenId: TOKEN_IDS.NYRA_REDIRECT, amount: 4 },
         });
         expect(redirectEvents).toEqual([]);
+    });
+
+    it('旧存档事件流能证明妮拉曾倒下时，回血到 2 仍保持未激活', () => {
+        const state = createLierenState();
+        state.core.players['0'].companion = { id: 'nyra', hp: 2, maxHp: 7 };
+        state.sys.eventStream.entries = [
+            {
+                id: 1,
+                event: {
+                    type: 'COMPANION_HEALTH_CHANGED',
+                    payload: { playerId: '0', companionId: 'nyra', delta: -7 },
+                    timestamp: 1,
+                },
+            },
+            {
+                id: 2,
+                event: {
+                    type: 'COMPANION_HEALTH_CHANGED',
+                    payload: { playerId: '0', companionId: 'nyra', delta: 2 },
+                    timestamp: 2,
+                },
+            },
+        ];
+
+        const normalized = DiceThroneDomain.normalizeRuntimeState?.(state);
+        expect(normalized?.core.players['0'].companion).toMatchObject({ hp: 2, active: false });
+        expect(isNyraCompanionActive(normalized?.core.players['0'])).toBe(false);
+    });
+
+    it('旧存档只有受伤记录且未倒下时，仍保留妮拉承伤资格', () => {
+        const state = createLierenState();
+        state.core.players['0'].companion = { id: 'nyra', hp: 2, maxHp: 7 };
+        state.sys.eventStream.entries = [
+            {
+                id: 1,
+                event: {
+                    type: 'COMPANION_HEALTH_CHANGED',
+                    payload: { playerId: '0', companionId: 'nyra', delta: -5 },
+                    timestamp: 1,
+                },
+            },
+        ];
+
+        const normalized = DiceThroneDomain.normalizeRuntimeState?.(state);
+        expect(normalized?.core.players['0'].companion).toMatchObject({ hp: 2, active: true });
+        expect(isNyraCompanionActive(normalized?.core.players['0'])).toBe(true);
     });
 
     it('倒下的妮拉在维持阶段先回血，到 5 后下次维持阶段才恢复激活', () => {

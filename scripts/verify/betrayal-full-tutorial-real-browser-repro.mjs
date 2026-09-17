@@ -451,50 +451,18 @@ async function playRabbitAndEndTurn(page, result) {
   await page.locator('[data-testid="betrayal-action-endTurn"]').click();
   await sleep(100);
   result.boundaries.push(await captureCommandBoundary(page, "after-end-turn"));
-  await waitForStep(page, "watch-teammate-one-omen-turn", 45000);
-}
-
-async function reachDogConfirmation(page) {
-  await waitForAiActionsConsumed(page, "watch-teammate-one-omen-turn");
-  await clickTutorialNext(page);
-  await waitForStep(page, "teammate-one-omen-results", 45000);
-  await waitForAiActionsConsumed(page, "teammate-one-omen-results");
-  await page.waitForFunction(
-    () => window.__BG_TEST_HARNESS__?.state?.get?.()?.core?.currentPlayer === "2",
-    undefined,
-    { timeout: 45000 },
-  );
-
-  await clickTutorialNext(page);
-  await waitForStep(page, "watch-teammate-two-omen-turn", 45000);
-  await waitForAiActionsConsumed(page, "watch-teammate-two-omen-turn");
+  await waitForStep(page, "move-to-grand-staircase", 45000);
   await page.waitForFunction(
     () => {
-      const state = window.__BG_TEST_HARNESS__?.state?.get?.();
-      const dogInPanel = document
-        .querySelector('[data-testid="betrayal-discovery-panel"]')
-        ?.textContent?.includes("狗");
-      const pendingDog = state?.core?.pendingCardResolutionQueue?.[0]?.cardName === "狗";
-      return Boolean(dogInPanel || pendingDog);
+      const core = window.__BG_TEST_HARNESS__?.state?.get?.()?.core;
+      return core?.currentPlayer === "0" && !core?.pendingCardResolutionQueue?.length;
     },
     undefined,
     { timeout: 45000 },
   );
 }
 
-async function resolveDogConfirmation(page) {
-  await clickTutorialNext(page);
-  await waitForStep(page, "teammate-two-omen-results", 45000);
-  await waitForAiActionsConsumed(page, "teammate-two-omen-results");
-  await page.waitForFunction(
-    () => window.__BG_TEST_HARNESS__?.state?.get?.()?.core?.currentPlayer === "0",
-    undefined,
-    { timeout: 45000 },
-  );
-}
-
 async function reachHauntConfirmationAfterDog(page) {
-  await clickTutorialNext(page);
   await waitForStep(page, "move-to-grand-staircase", 45000);
   await page.locator('[data-testid="betrayal-action-move"]').click();
   for (const roomId of ["hallway", "grand-staircase"]) {
@@ -512,16 +480,16 @@ async function reachHauntConfirmationAfterDog(page) {
   await waitForStep(page, "end-turn-from-upper-landing", 45000);
   await page.locator('[data-testid="betrayal-action-endTurn"]').click();
 
-  await waitForStep(page, "watch-teammate-haunt-trigger", 45000);
-  await waitForAiActionsConsumed(page, "watch-teammate-haunt-trigger");
+  await waitForStep(page, "haunt-hero-reader", 45000);
   await page.waitForFunction(
     () => {
       const state = window.__BG_TEST_HARNESS__?.state?.get?.();
-      const maskInPanel = document
-        .querySelector('[data-testid="betrayal-discovery-panel"]')
-        ?.textContent?.includes("面具");
-      const pendingMask = state?.core?.pendingCardResolutionQueue?.[0]?.cardName === "面具";
-      return Boolean(maskInPanel || pendingMask);
+      const core = state?.core;
+      return Boolean(
+        core?.currentPlayer === "2" &&
+          core?.scenarioRuntime?.hauntTriggered &&
+          !core?.pendingCardResolutionQueue?.length,
+      );
     },
     undefined,
     { timeout: 45000 },
@@ -529,7 +497,6 @@ async function reachHauntConfirmationAfterDog(page) {
 }
 
 async function continueHeroReaderAndFirstObjective(page, result) {
-  await clickTutorialNext(page);
   await waitForStep(page, "haunt-hero-reader", 45000);
   result.points.push(await savePoint(page, "05-hero-reader-opening"));
 
@@ -559,8 +526,7 @@ async function continueHeroReaderAndFirstObjective(page, result) {
     timeout: 15000,
   });
 
-  await waitForStep(page, "wait-for-hero-turn-after-haunt", 45000);
-  await waitForAiActionsConsumed(page, "wait-for-hero-turn-after-haunt");
+  await waitForStep(page, "open-library-move-after-goal", 45000);
   await page.waitForFunction(
     () => {
       const core = window.__BG_TEST_HARNESS__?.state?.get?.()?.core;
@@ -571,8 +537,6 @@ async function continueHeroReaderAndFirstObjective(page, result) {
   );
   result.points.push(await savePoint(page, "09-back-to-hero-turn-after-reader"));
 
-  await clickTutorialNext(page);
-  await waitForStep(page, "open-library-move-after-goal", 15000);
   result.points.push(await savePoint(page, "10-open-library-move-action"));
   await page.locator('[data-testid="betrayal-action-move"]').click();
 
@@ -612,30 +576,39 @@ function assertStep(point, stepId, failures) {
   }
 }
 
-function assertDogWaiting(point, failures) {
+function assertTeammateBridgeReturnedToPlayer(point, failures) {
   const snapshotValue = point.snapshot;
-  assertStep(point, "watch-teammate-two-omen-turn", failures);
-  assertIncludes(snapshotValue.overlay?.text, "翻出狗", failures, "Dog waiting prompt does not mention Dog", snapshotValue);
-  assertIncludes(snapshotValue.overlay?.text, "确认按钮显示等待", failures, "Dog waiting prompt does not explain waiting confirmation", snapshotValue);
-  if (snapshotValue.core?.pendingCardResolution?.cardName !== "狗" || snapshotValue.core?.pendingCardResolution?.playerId !== "2") {
-    addFailure(failures, "formal pending card confirmation is not teammate 2 confirming Dog", snapshotValue);
+  assertStep(point, "move-to-grand-staircase", failures);
+  assertIncludes(snapshotValue.overlay?.text, "回到你的回合", failures, "teammate bridge did not resume at the current player's turn", snapshotValue);
+  if (snapshotValue.overlay?.text?.includes("队友 1") || snapshotValue.overlay?.text?.includes("队友 2")) {
+    addFailure(failures, "teammate automatic actions leaked into the visible tutorial prompt", snapshotValue);
   }
-  if (!snapshotValue.discoveryConfirm?.visible || !snapshotValue.discoveryConfirm.disabled || !snapshotValue.discoveryConfirm.text?.includes("等待确认 0/1")) {
-    addFailure(failures, "Dog waiting confirmation button is not visible, disabled, and readable as 0/1", snapshotValue);
+  if (snapshotValue.bodyText?.includes("队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。")) {
+    addFailure(failures, "removed teammate result copy is still visible in the page", snapshotValue);
+  }
+  if (snapshotValue.core?.currentPlayer !== "0") {
+    addFailure(failures, "teammate bridge did not return control to the current player", snapshotValue);
+  }
+  if (snapshotValue.core?.pendingCardResolutionQueueLength !== 0) {
+    addFailure(failures, "teammate bridge left a card confirmation pending", snapshotValue);
   }
 }
 
-function assertMaskWaiting(point, failures) {
+function assertHeroReaderOpening(point, failures) {
   const snapshotValue = point.snapshot;
-  assertStep(point, "watch-teammate-haunt-trigger", failures);
-  assertIncludes(snapshotValue.overlay?.text, "队友 1", failures, "Mask waiting prompt does not name teammate 1", snapshotValue);
-  assertIncludes(snapshotValue.overlay?.text, "面具", failures, "Mask waiting prompt does not mention Mask", snapshotValue);
-  assertIncludes(snapshotValue.overlay?.text, "下一步", failures, "Mask waiting prompt does not explain Next handoff", snapshotValue);
-  if (snapshotValue.core?.pendingCardResolution?.cardName !== "面具" || snapshotValue.core?.pendingCardResolution?.playerId !== "1") {
-    addFailure(failures, "formal pending card confirmation is not teammate 1 confirming Mask", snapshotValue);
+  assertStep(point, "haunt-hero-reader", failures);
+  assertIncludes(snapshotValue.overlay?.text, "英雄开场过场", failures, "hero reader prompt did not show the hero opening", snapshotValue);
+  if (snapshotValue.overlay?.text?.includes("队友")) {
+    addFailure(failures, "teammate automatic action leaked into the hero reader prompt", snapshotValue);
   }
-  if (!snapshotValue.discoveryConfirm?.visible || !snapshotValue.discoveryConfirm.disabled || !snapshotValue.discoveryConfirm.text?.includes("等待确认 0/1")) {
-    addFailure(failures, "Mask waiting confirmation button is not visible, disabled, and readable as 0/1", snapshotValue);
+  if (snapshotValue.core?.currentPlayer !== "2") {
+    addFailure(failures, "hero reader should appear before player 2 formally ends the handoff turn", snapshotValue);
+  }
+  if (snapshotValue.core?.pendingCardResolutionQueueLength !== 0) {
+    addFailure(failures, "haunt bridge left a card confirmation pending before the hero reader", snapshotValue);
+  }
+  if (snapshotValue.core?.scenarioRuntime?.hauntTriggered !== true) {
+    addFailure(failures, "hero reader appeared before the haunt was marked as triggered", snapshotValue);
   }
 }
 
@@ -700,20 +673,14 @@ async function run() {
     await page.goto(TARGET_URL, { waitUntil: "domcontentloaded", timeout: 90000 });
 
     await playRabbitAndEndTurn(page, result);
-    result.points.push(await savePoint(page, "01-after-rabbit-damage-end-turn"));
-
-    await reachDogConfirmation(page);
-    const dogPoint = await savePoint(page, "02-dog-waiting-confirmation");
-    result.points.push(dogPoint);
-    assertDogWaiting(dogPoint, result.failures);
-
-    await resolveDogConfirmation(page);
-    result.points.push(await savePoint(page, "03-after-dog-confirmation-handoff"));
+    const teammateBridgePoint = await savePoint(page, "01-after-teammate-omen-bridge-returned");
+    result.points.push(teammateBridgePoint);
+    assertTeammateBridgeReturnedToPlayer(teammateBridgePoint, result.failures);
 
     await reachHauntConfirmationAfterDog(page);
-    const maskPoint = await savePoint(page, "04-mask-waiting-confirmation");
-    result.points.push(maskPoint);
-    assertMaskWaiting(maskPoint, result.failures);
+    const heroReaderPoint = await savePoint(page, "02-after-hidden-haunt-bridge-hero-reader");
+    result.points.push(heroReaderPoint);
+    assertHeroReaderOpening(heroReaderPoint, result.failures);
 
     await continueHeroReaderAndFirstObjective(page, result);
     assertHeroObjectiveCloseout(result.points.at(-1), result.failures);

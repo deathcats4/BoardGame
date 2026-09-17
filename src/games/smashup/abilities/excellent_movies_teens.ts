@@ -141,6 +141,8 @@ function detachOngoing(
         sourceControllerId?: PlayerId;
         sourceBaseIndex?: number;
         destination?: 'discard' | 'hand';
+        targetBaseIndex?: number;
+        targetKind?: 'ongoing' | 'attached_action';
     },
 ): OngoingDetachedEvent {
     return buildOngoingDetachedEvent({ cardUid, defId, ownerId, reason, now, ...source }) as OngoingDetachedEvent;
@@ -4230,7 +4232,11 @@ function buildDestroyActionLocationEvents(
     sourceInfo: WraithEffectSourceInfo,
 ): SmashUpEvent[] {
     const events: SmashUpEvent[] = [
-        detachOngoing(location.action.uid, location.action.defId, location.action.ownerId, reason, now, sourceInfo),
+        detachOngoing(location.action.uid, location.action.defId, location.action.ownerId, reason, now, {
+            ...sourceInfo,
+            targetBaseIndex: location.baseIndex,
+            targetKind: location.targetType === 'base' ? 'ongoing' : 'attached_action',
+        }),
     ];
     if (isWraith(location.action.defId)) {
         const marker = markWraithActionDestroyedOnBase(core, location.baseIndex, playerId, reason, now);
@@ -4323,22 +4329,15 @@ function wraithAncientSumerianGodDestroyed(ctx: Pick<TriggerContext, 'state' | '
     if (!playerId || !ctx.sourceCardUid) return wraithDestroyedMarker(ctx, 'wraithrustlers_ancient_sumerian_god');
     const storedActions = (ctx.state.players[playerId]?.storedCards ?? [])
         .filter(card => card.storedUnderUid === ctx.sourceCardUid && getCardDef(card.defId)?.type === 'action');
-    const releaseEvents = storedActions
+    const extraPlayEvents = storedActions
         .slice(0, ctx.state.bases.length)
-        .flatMap((card, index) => [
-            {
-                type: SU_EVENTS.STORED_CARD_RELEASED,
-                payload: { playerId, cardUid: card.uid, reason: 'wraithrustlers_ancient_sumerian_god' },
-                timestamp: ctx.now,
-            } as SmashUpEvent,
-            grantExtraAction(playerId, 'wraithrustlers_ancient_sumerian_god', ctx.now, {
+        .map((card, index) => grantExtraAction(playerId, 'wraithrustlers_ancient_sumerian_god', ctx.now, {
                 restrictToCardUid: card.uid,
                 restrictToCardDefId: card.defId,
                 restrictToBase: index,
                 playTiming: 'immediate',
-            }),
-        ]);
-    return [...wraithDestroyedMarker(ctx, 'wraithrustlers_ancient_sumerian_god'), ...releaseEvents];
+            }));
+    return [...wraithDestroyedMarker(ctx, 'wraithrustlers_ancient_sumerian_god'), ...extraPlayEvents];
 }
 
 function wraithDemonDogsDestroyed(ctx: Pick<TriggerContext, 'state' | 'baseIndex' | 'sourceBaseIndex' | 'sourceControllerId' | 'triggerCardOwnerId' | 'sourceCardUid' | 'now'>): SmashUpEvent[] {

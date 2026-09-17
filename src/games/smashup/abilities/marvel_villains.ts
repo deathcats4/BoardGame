@@ -473,8 +473,8 @@ function extraLowPowerMinions(
     baseIndex: number,
 ): SmashUpEvent[] {
     return [
-        grantContextualExtraMinion(ctx, reason, baseIndex, { powerMax: 2 }),
-        grantContextualExtraMinion(ctx, reason, baseIndex, { powerMax: 2 }),
+        grantContextualExtraMinion(ctx, reason, baseIndex, { powerMax: 2, playTiming: 'immediate' }),
+        grantContextualExtraMinion(ctx, reason, baseIndex, { powerMax: 2, playTiming: 'immediate' }),
     ];
 }
 

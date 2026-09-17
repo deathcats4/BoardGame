@@ -633,6 +633,7 @@ const injectNyraDamageResponseFromCurrentCompanion = async (matchId: string, pag
         pendingDamage,
     } as unknown as DiceThroneCore;
     const candidates = buildDiceThroneTokenResponseChoiceCandidates(nextCore, pendingDamage);
+    const actionableCandidates = candidates.filter(candidate => candidate.id !== 'skip');
     const resolutionFrameId = `dicethrone:token-response-frame:${pendingDamage.id}`;
     const choiceRequestContract = {
         requestId: `dicethrone:token-response:${pendingDamage.id}:${pendingDamage.responseType}:${pendingDamage.responderId}`,
@@ -664,7 +665,7 @@ const injectNyraDamageResponseFromCurrentCompanion = async (matchId: string, pag
         ...sys,
         interaction: {
             ...asRecord(sys.interaction),
-            current: candidates.length > 0
+            current: actionableCandidates.length > 0
                 ? {
                     id: `dt-token-response-${pendingDamage.id}`,
                     kind: 'dt:token-response',
@@ -677,7 +678,7 @@ const injectNyraDamageResponseFromCurrentCompanion = async (matchId: string, pag
         },
     };
     await injectMatchState(matchId, next as never, page);
-    return candidates.map(candidate => candidate.id);
+    return actionableCandidates.map(candidate => candidate.id);
 };
 
 test.describe('DiceThrone 女猎手真实入口', () => {

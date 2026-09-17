@@ -1,5 +1,6 @@
 import type {
     ActionLogEntry,
+    ActionLogInteractiveParam,
     ActionLogSegment,
     Command,
     GameEvent,
@@ -11,14 +12,12 @@ import type { BetrayalCore, BetrayalTraitKey } from './game';
 export const BETRAYAL_ACTION_LOG_ALLOWLIST = [
     BETRAYAL_COMMANDS.SELECT_EXPLORER,
     BETRAYAL_COMMANDS.CONFIRM_EXPLORER,
-    BETRAYAL_COMMANDS.PROPOSE_SCENARIO_CARD,
-    BETRAYAL_COMMANDS.CONFIRM_SCENARIO_CARD,
-    BETRAYAL_COMMANDS.START_SCENARIO,
     BETRAYAL_COMMANDS.MOVE_TO_ROOM,
     BETRAYAL_COMMANDS.EXPLORE_ROOM,
     BETRAYAL_COMMANDS.USE_POSSESSION,
     BETRAYAL_COMMANDS.USE_RABBIT_FOOT,
     BETRAYAL_COMMANDS.USE_ROLL_REROLL_ITEM,
+    BETRAYAL_COMMANDS.ROLL_EVENT,
     BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
     BETRAYAL_COMMANDS.RESOLVE_EVENT_CHOICE,
     BETRAYAL_COMMANDS.USE_ROOM_EFFECT,
@@ -120,12 +119,14 @@ const i18nSeg = (
     key: string,
     params?: Record<string, string | number>,
     paramI18nKeys?: string[],
+    interactiveParams?: Record<string, ActionLogInteractiveParam>,
 ): ActionLogSegment => ({
     type: 'i18n',
     ns: NS,
     key,
     ...(params ? { params } : {}),
     ...(paramI18nKeys ? { paramI18nKeys } : {}),
+    ...(interactiveParams ? { interactiveParams } : {}),
 });
 
 const roomNameOf = (core: BetrayalCore, roomId: unknown) => (
@@ -133,6 +134,15 @@ const roomNameOf = (core: BetrayalCore, roomId: unknown) => (
         ? core.rooms.find((room) => room.id === roomId)?.name
         : undefined
 );
+
+const roomInteractiveParam = (
+    roomName: string,
+): Record<string, ActionLogInteractiveParam> => ({
+    room: {
+        text: roomName,
+        tooltip: `房间：${roomName}`,
+    },
+});
 
 const playerParams = (
     playerId: string,
@@ -220,6 +230,7 @@ const buildRoomExploredEventEntries = (
         return [];
     }
 
+    const core = state.core as BetrayalCore;
     const payload = asRecord(event.payload);
     if (!payload || payload.deckKind !== 'event') {
         return [];
@@ -239,6 +250,8 @@ const buildRoomExploredEventEntries = (
             roomName
                 ? playerParams(command.playerId, { room: roomName, event: eventTitle })
                 : playerParams(command.playerId, { event: eventTitle }),
+            undefined,
+            roomName ? roomInteractiveParam(roomName) : undefined,
         )]),
     ];
 
@@ -347,17 +360,13 @@ export function formatBetrayalActionEntry({
             return entry(command, state, [i18nSeg('actionLog.selectExplorer', playerParams(command.playerId))]);
         case BETRAYAL_COMMANDS.CONFIRM_EXPLORER:
             return entry(command, state, [i18nSeg('actionLog.confirmExplorer', playerParams(command.playerId))]);
-        case BETRAYAL_COMMANDS.PROPOSE_SCENARIO_CARD:
-            return entry(command, state, [i18nSeg('actionLog.proposeScenarioCard', playerParams(command.playerId))]);
-        case BETRAYAL_COMMANDS.CONFIRM_SCENARIO_CARD:
-            return entry(command, state, [i18nSeg('actionLog.confirmScenarioCard', playerParams(command.playerId))]);
-        case BETRAYAL_COMMANDS.START_SCENARIO:
-            return entry(command, state, [i18nSeg('actionLog.startScenario', playerParams(command.playerId))]);
         case BETRAYAL_COMMANDS.MOVE_TO_ROOM: {
             const room = roomNameOf(core, payload.roomId);
             return entry(command, state, [i18nSeg(
                 room ? 'actionLog.moveToRoom' : 'actionLog.move',
                 room ? playerParams(command.playerId, { room }) : playerParams(command.playerId),
+                undefined,
+                room ? roomInteractiveParam(room) : undefined,
             )]);
         }
         case BETRAYAL_COMMANDS.EXPLORE_ROOM: {
@@ -369,6 +378,8 @@ export function formatBetrayalActionEntry({
                 entry(command, state, [i18nSeg(
                     room ? 'actionLog.exploreRoom' : 'actionLog.explore',
                     room ? playerParams(command.playerId, { room }) : playerParams(command.playerId),
+                    undefined,
+                    room ? roomInteractiveParam(room) : undefined,
                 )]),
                 ...events.flatMap((event) => buildRoomExploredEventEntries(
                     command,
@@ -383,6 +394,30 @@ export function formatBetrayalActionEntry({
             return entry(command, state, [i18nSeg('actionLog.useRabbitFoot', playerParams(command.playerId))]);
         case BETRAYAL_COMMANDS.USE_ROLL_REROLL_ITEM:
             return entry(command, state, [i18nSeg('actionLog.useRollRerollItem', playerParams(command.playerId))]);
+        case BETRAYAL_COMMANDS.ROLL_EVENT: {
+            const recentRoll = core.recentRoll;
+            const sourceTitle = stringValue(payload.sourceTitle);
+            if (
+                !recentRoll
+                || recentRoll.kind !== 'eventDiceRoll'
+                || (sourceTitle && recentRoll.sourceTitle !== sourceTitle)
+            ) {
+                return null;
+            }
+            const total = recentRoll.dice.reduce((sum, value) => sum + value, 0)
+                + recentRoll.passiveBonus;
+            const rollLabel = recentRoll.rollLabel
+                || `投 ${recentRoll.dice.length} 颗骰子`;
+            return entry(command, state, [i18nSeg(
+                'actionLog.eventRollResult',
+                playerParams(command.playerId, {
+                    event: recentRoll.sourceTitle,
+                    roll: rollLabel,
+                    total,
+                    result: recentRoll.latestLabel,
+                }),
+            )]);
+        }
         case BETRAYAL_COMMANDS.RESOLVE_EVENT_CHOICE:
             return entry(command, state, [i18nSeg('actionLog.resolveEventChoice', playerParams(command.playerId))]);
         case BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL: {
@@ -397,6 +432,8 @@ export function formatBetrayalActionEntry({
             return entry(command, state, [i18nSeg(
                 room ? 'actionLog.useRoomEffectAt' : 'actionLog.useRoomEffect',
                 room ? playerParams(command.playerId, { room }) : playerParams(command.playerId),
+                undefined,
+                room ? roomInteractiveParam(room) : undefined,
             )]);
         }
         case BETRAYAL_COMMANDS.TRADE_POSSESSION:

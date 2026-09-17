@@ -285,8 +285,8 @@ describe('攻击修正指示器撤回测试', () => {
         expect(html).toContain('damageSummary.label');
         expect(html).toContain('damageSummary.changed:original=5,current=7');
         expect(html).toContain('data-testid="current-total-damage-badge-anchor"');
-        expect(html).toContain('data-placement="dice-tray-left-top-outside"');
-        expect(html).toContain('right:calc(100% + calc(var(--mobile-board-shell-inline-unit, 1vw) * 0.35))');
+        expect(html).toContain('data-placement="dice-tray-right-top-outside"');
+        expect(html).toContain('left:calc(100% + calc(var(--mobile-board-shell-inline-unit, 1vw) * 0.35))');
         expect(html).not.toContain('bottom-full');
         expect(html).not.toContain('right-full');
         expect(html).not.toContain('-translate-x-[0.35vw]');

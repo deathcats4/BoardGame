@@ -87,7 +87,7 @@ function createMockState(actionId: string): any {
                 discard: [],
                 abilityLevels: {},
                 dice: p0Data.diceDefinition,
-                ...(isLierenKindredBond ? { companion: { id: 'nyra', hp: 5, maxHp: 5 } } : {}),
+                ...(isLierenKindredBond ? { companion: { id: 'nyra', hp: 5, maxHp: 5, active: true } } : {}),
             },
             '1': {
                 characterId: p1CharId,

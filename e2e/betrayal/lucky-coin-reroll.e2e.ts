@@ -144,7 +144,7 @@ test.describe("山屋惊魂幸运硬币重掷完整链路", () => {
     await expect(page.getByTestId("betrayal-discovery-detail")).toContainText(
       "知识检定 1",
     );
-    await expectUnifiedEventRollConfirmButton(page, "确认 2/3");
+    await expectUnifiedEventRollConfirmButton(page, "确认 0/1");
     const rollPanel = page.getByTestId("betrayal-recent-roll-panel");
     await expect(rollPanel).toBeVisible();
     await expectEventRollWorkbenchReadable(page, "幸运硬币重掷前", {

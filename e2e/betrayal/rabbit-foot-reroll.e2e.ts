@@ -308,14 +308,14 @@ async function expectRabbitFootRerollHighlightState(
     const evidence = JSON.stringify({ target, metrics });
     const isSelected = target.dieIndex === selectedDieIndex;
     expect(target.shape, `选骰热区必须绑定骰子本体：${evidence}`).toBe(
-      "projected-rounded-die-face",
+      "die-face",
     );
     expect(
       target.highlightRenderer,
       `WebGL 辅助高亮必须继续来自 Three.js 骰体描边：${evidence}`,
     ).toBe(REROLL_HIGHLIGHT_RENDERER);
     expect(target.visualContract).toBe(REROLL_VISUAL_CONTRACT);
-    expect(target.visualLayer).toBe("projected-rounded-outline-plus-transparent-hitbox");
+    expect(target.visualLayer).toBe("transparent-hitbox-only");
     expect(target.outlinePaint).toBe(REROLL_TARGET_OUTLINE_RENDERER);
     expect(Number.isFinite(target.outlineRotateZ)).toBe(true);
     expect(
@@ -547,7 +547,7 @@ test.describe("山屋惊魂兔脚重掷完整链路", () => {
     await expect(rerollTargetDie).toHaveAttribute("role", "button");
     await expect(rerollTargetDie).toHaveAttribute(
       "data-reroll-target-shape",
-      "projected-rounded-die-face",
+      "die-face",
     );
     const targetBox = await rerollTargetDie.evaluate((element) => {
       const rect = element.getBoundingClientRect();

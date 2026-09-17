@@ -322,7 +322,7 @@ describe('GameHUD', () => {
 
         const fabMenu = screen.getByTestId('fab-menu-stub');
         expect(fabMenu).toHaveAttribute('data-fab-position', 'top-left');
-        expect(fabMenu).toHaveAttribute('data-fab-storage-key', 'game_hud_fab_position:mage-wars');
+        expect(fabMenu).toHaveAttribute('data-fab-storage-key', 'game_hud_fab_position:mage-wars:v2');
         expect(screen.getByTestId('fab-action-feedback')).toBeInTheDocument();
         expect(screen.getByTestId('fab-action-display-theme')).toBeInTheDocument();
     });

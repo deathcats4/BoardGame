@@ -1735,6 +1735,24 @@ export const applyPendingBonusDiceValues = async (page: Page, values: number[]) 
                 : { value, index },
         };
     });
+    const nextContextDice = nextDice.map((die, index) => {
+        const dieIndex = typeof die.index === 'number' ? die.index : index;
+        const definitionId = typeof die.definitionId === 'string'
+            ? die.definitionId
+            : characterId
+                ? `${characterId}-dice`
+                : undefined;
+        return {
+            id: dieIndex,
+            definitionId,
+            value: die.value,
+            symbol: die.face,
+            symbols: die.face ? [die.face] : [],
+            isKept: false,
+            ownerId: attackerId,
+            displayOnly: Boolean(settlement.displayOnly),
+        };
+    });
 
     const currentRollContext = isRecord(core.currentRollContext) ? core.currentRollContext : undefined;
     root.core = {
@@ -1746,7 +1764,7 @@ export const applyPendingBonusDiceValues = async (page: Page, values: number[]) 
         ...(currentRollContext?.id === `bonus:${settlement.id}` && Array.isArray(currentRollContext.dice) ? {
             currentRollContext: {
                 ...currentRollContext,
-                dice: nextDice,
+                dice: nextContextDice,
             },
         } : {}),
     };

@@ -677,6 +677,44 @@ async function expectActionLogCardTooltipPreview(
         async () => atlasImage.getAttribute('src'),
         { timeout: 15000 },
     ).toMatch(expectedSrcPattern);
+
+    const tooltipLayering = await tooltip.evaluate((node) => {
+        const element = node as HTMLElement;
+        const panel = document.querySelector('[data-testid="fab-panel-action-log"]') as HTMLElement | null;
+        const readStackingZIndex = (target: HTMLElement | null): number | null => {
+            let current: HTMLElement | null = target;
+            while (current) {
+                const raw = window.getComputedStyle(current).zIndex;
+                if (raw !== 'auto') {
+                    const parsed = Number(raw);
+                    if (Number.isFinite(parsed)) return parsed;
+                }
+                current = current.parentElement;
+            }
+            return null;
+        };
+        const rect = element.getBoundingClientRect();
+        return {
+            width: rect.width,
+            height: rect.height,
+            left: rect.left,
+            top: rect.top,
+            right: rect.right,
+            bottom: rect.bottom,
+            tooltipZIndex: readStackingZIndex(element),
+            actionLogPanelZIndex: readStackingZIndex(panel),
+            inViewport: rect.width > 0
+                && rect.height > 0
+                && rect.right > 0
+                && rect.bottom > 0
+                && rect.left < window.innerWidth
+                && rect.top < window.innerHeight,
+        };
+    });
+    expect(tooltipLayering.inViewport, '行动日志卡图 hover 浮层应位于当前视口内').toBe(true);
+    expect(tooltipLayering.tooltipZIndex, '行动日志卡图 hover 浮层必须高于操作日志面板').toBeGreaterThan(
+        tooltipLayering.actionLogPanelZIndex ?? 0,
+    );
 }
 
 const readVampireLordCardPoolMetrics = async (page: Page) => (
@@ -1538,6 +1576,208 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
         }, { timeout: 10000 }).toBeNull();
         await waitForDiceThroneVisualIdle(page);
         await game.screenshot('吸血鬼领主-催眠响应窗口-重掷后收口', testInfo);
+    });
+
+    test('催眠应在对手进攻投掷确认后打开响应窗口，重掷后仍允许对手声明攻击', async ({ page, game }, testInfo) => {
+        await clearEvidenceScreenshotsForTest(testInfo);
+        await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
+        await game.setupScene({
+            gameId: 'dicethrone',
+            player0: {
+                resources: { CP: 2, HP: 50 },
+                tokens: { [TOKEN_IDS.MESMERIZE]: 1 },
+            },
+            player1: {
+                resources: { CP: 2, HP: 50 },
+            },
+            currentPlayer: '1',
+            phase: 'offensiveRoll',
+            extra: {
+                selectedCharacters: { '0': VAMPIRE_LORD_HERO_ID, '1': VISIBLE_GUEST_HERO_ID },
+                hostStarted: true,
+                activePlayerId: '1',
+                rollCount: 1,
+                rollLimit: 1,
+                rollDiceCount: 5,
+                rollConfirmed: false,
+                dice: [
+                    { id: 0, value: 1, isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                    { id: 1, value: 3, isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                    { id: 2, value: 3, isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                    { id: 3, value: 3, isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                    { id: 4, value: 1, isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                ],
+                currentRollContext: {
+                    id: 'e2e-vampire-lord-opponent-offensive-roll',
+                    kind: 'offensive',
+                    ownerPlayerId: '1',
+                    targetPlayerId: '0',
+                    phase: 'offensiveRoll',
+                    dice: [
+                        { id: 0, value: 1, symbol: 'heart', symbols: ['heart'], isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                        { id: 1, value: 3, symbol: 'sword', symbols: ['sword'], isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                        { id: 2, value: 3, symbol: 'sword', symbols: ['sword'], isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                        { id: 3, value: 3, symbol: 'sword', symbols: ['sword'], isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                        { id: 4, value: 1, symbol: 'heart', symbols: ['heart'], isKept: false, ownerId: '1', definitionId: 'barbarian-dice' },
+                    ],
+                    status: 'open',
+                    policy: {
+                        modifiableBy: 'owner',
+                        rerollableBy: 'owner',
+                        allowPassiveReroll: true,
+                        allowDiceCardTargeting: true,
+                        ultimateLocked: false,
+                        blocksPhaseFlow: true,
+                    },
+                    settlement: { mode: 'selectAttack' },
+                    display: { surface: 'diceTray', replayOnly: false },
+                },
+                pendingAttack: null,
+                pendingDamage: undefined,
+                pendingBonusDiceSettlement: undefined,
+            },
+        });
+        await closeDebugPanelIfVisible(page);
+
+        const mesmerizeToken = page.getByTestId(`dt-player-0-token-${TOKEN_IDS.MESMERIZE}`);
+        const mesmerizeTokenHitTarget = page.getByTestId(`dt-player-0-token-${TOKEN_IDS.MESMERIZE}-hit-target`);
+        const diceTray = getRightTrayDiceTray(page);
+        const firstOpponentDie = diceTray.getByTestId('die-button-0').first();
+
+        await expect(mesmerizeToken).toBeVisible({ timeout: 10000 });
+        await expect(mesmerizeToken).toHaveAttribute('data-token-clickable', 'false');
+        await expect(firstOpponentDie).toBeVisible({ timeout: 10000 });
+        await expect(firstOpponentDie).toHaveAttribute('data-owner-id', '1');
+        await expect(firstOpponentDie).toHaveAttribute('data-display-value', '1');
+
+        await dispatchDiceThroneCommand(page, { type: 'CONFIRM_ROLL', playerId: '1' });
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const responseWindow = state?.sys?.responseWindow?.current;
+            return {
+                phase: state?.sys?.phase ?? null,
+                rollConfirmed: state?.core?.rollConfirmed ?? null,
+                pendingAttack: state?.core?.pendingAttack ?? null,
+                windowType: responseWindow?.windowType ?? null,
+                currentResponderId: responseWindow?.responderQueue?.[responseWindow.currentResponderIndex] ?? null,
+                currentRollOwner: state?.core?.currentRollContext?.ownerPlayerId ?? null,
+            };
+        }, { timeout: 10000 }).toEqual({
+            phase: 'offensiveRoll',
+            rollConfirmed: true,
+            pendingAttack: null,
+            windowType: 'afterRollConfirmed',
+            currentResponderId: '0',
+            currentRollOwner: '1',
+        });
+        await expectVisibleUsableTokenAction(mesmerizeToken, mesmerizeTokenHitTarget);
+        await game.screenshot('吸血鬼领主-催眠-对手进攻骰确认后响应窗口', testInfo);
+
+        await setDiceThroneBonusDiceValues(page, [6]);
+        await mesmerizeTokenHitTarget.click();
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const settlement = state?.core?.pendingBonusDiceSettlement;
+            return {
+                mesmerize: state?.core?.players?.['0']?.tokens?.[TOKEN_IDS.MESMERIZE] ?? null,
+                sourceAbilityId: settlement?.sourceAbilityId ?? null,
+                bonusValue: settlement?.dice?.[0]?.value ?? null,
+                bonusFace: settlement?.dice?.[0]?.face ?? null,
+            };
+        }, { timeout: 10000 }).toEqual({
+            mesmerize: 0,
+            sourceAbilityId: TOKEN_IDS.MESMERIZE,
+            bonusValue: 6,
+            bonusFace: VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+        });
+        await expectRightTrayBonusDiceConfirmation(page, () => game.getState(), {
+            sourceAbilityId: TOKEN_IDS.MESMERIZE,
+            ...VAMPIRE_LORD_BONUS_DICE_OWNER,
+        });
+        await settleCurrentBonusDice(page, () => game.getState(), {
+            sourceAbilityId: TOKEN_IDS.MESMERIZE,
+        });
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const current = state?.sys?.interaction?.current;
+            return {
+                kind: current?.kind ?? null,
+                playerId: current?.playerId ?? null,
+                targetOpponentDice: current?.data?.meta?.targetOpponentDice ?? null,
+                diceOwnerId: current?.data?.meta?.diceOwnerId ?? null,
+                allowedDieIds: current?.data?.allowedDieIds ?? [],
+                responseWindow: state?.sys?.responseWindow?.current ?? null,
+            };
+        }, { timeout: 10000 }).toEqual({
+            kind: 'multistep-choice',
+            playerId: '0',
+            targetOpponentDice: true,
+            diceOwnerId: '1',
+            allowedDieIds: [0, 1, 2, 3, 4],
+            responseWindow: expect.objectContaining({
+                windowType: 'afterRollConfirmed',
+                pendingInteractionId: expect.any(String),
+            }),
+        });
+        await expect(firstOpponentDie).toHaveAttribute('data-clickable', 'true', { timeout: 10000 });
+
+        await firstOpponentDie.click();
+        await expect(firstOpponentDie).toHaveAttribute('data-selected', 'true', { timeout: 5000 });
+        await setDiceThroneBonusDiceValues(page, [3]);
+        const rerollConfirmButton = page.getByTestId('dice-interaction-confirm-button');
+        await expect(rerollConfirmButton).toBeVisible({ timeout: 5000 });
+        await expect(rerollConfirmButton).toBeEnabled({ timeout: 5000 });
+        await rerollConfirmButton.click();
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const currentRollContext = state?.core?.currentRollContext;
+            const firstDie = currentRollContext?.dice?.find((die: any) => die.id === 0);
+            return {
+                firstDieValue: firstDie?.value ?? null,
+                firstDieOwner: firstDie?.ownerId ?? null,
+                interactionKind: state?.sys?.interaction?.current?.kind ?? null,
+                responseWindow: state?.sys?.responseWindow?.current ?? null,
+                pendingAttack: state?.core?.pendingAttack ?? null,
+                attackDeclarationGate: state?.core?.afterRollResponseWindowRequiresAttackDeclaration ?? null,
+                events: getLastEventTypes(state),
+            };
+        }, { timeout: 10000 }).toEqual({
+            firstDieValue: 3,
+            firstDieOwner: '1',
+            interactionKind: null,
+            responseWindow: null,
+            pendingAttack: null,
+            attackDeclarationGate: true,
+            events: expect.arrayContaining(['DIE_REROLLED']),
+        });
+        await game.screenshot('吸血鬼领主-催眠-对手进攻骰重掷后仍等待声明攻击', testInfo);
+
+        await dispatchDiceThroneCommand(page, {
+            type: 'SELECT_ABILITY',
+            playerId: '1',
+            payload: { abilityId: 'slap-4' },
+        });
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const pendingAttack = state?.core?.pendingAttack;
+            return {
+                sourceAbilityId: pendingAttack?.sourceAbilityId ?? null,
+                attackerId: pendingAttack?.attackerId ?? null,
+                defenderId: pendingAttack?.defenderId ?? null,
+                phase: state?.sys?.phase ?? null,
+                pendingAttackStillExists: Boolean(pendingAttack),
+            };
+        }, { timeout: 10000 }).toEqual({
+            sourceAbilityId: 'slap-4',
+            attackerId: '1',
+            defenderId: '0',
+            phase: 'offensiveRoll',
+            pendingAttackStillExists: true,
+        });
+        await game.screenshot('吸血鬼领主-催眠-重掷后对手攻击已重新建立', testInfo);
     });
 
     test('催眠从真实防御确认按钮后应打开响应窗口，临时骰后攻击不能被跳过', async ({ browser }, testInfo) => {
@@ -2631,6 +2871,140 @@ test.describe('DiceThrone 吸血鬼领主真实入口', () => {
             await waitForDiceThroneVisualIdle(page);
             await game.screenshot('吸血鬼领主-饮血如酒-花费4血力获得8CP', testInfo);
         });
+    });
+
+    test('死无全尸真实入口应按 2 个利爪加 2 伤害，且行动日志卡图 hover 不被遮挡', async ({ page, game }, testInfo) => {
+        await clearEvidenceScreenshotsForTest(testInfo);
+        const cardId = 'card-vampire-lord-total-demise';
+        await game.openTestGame('dicethrone', VAMPIRE_LORD_QUERY);
+        await game.setupScene({
+            gameId: 'dicethrone',
+            player0: {
+                hand: [cardId],
+                deck: [],
+                resources: { CP: 2, HP: 50 },
+                tokens: { [TOKEN_IDS.BLOOD_POWER]: 0 },
+            },
+            player1: {
+                hand: [],
+                deck: [],
+                resources: { CP: 2, HP: 50 },
+            },
+            currentPlayer: '0',
+            phase: 'offensiveRoll',
+            extra: {
+                selectedCharacters: { '0': VAMPIRE_LORD_HERO_ID, '1': VISIBLE_GUEST_HERO_ID },
+                hostStarted: true,
+                activePlayerId: '0',
+                rollCount: 1,
+                rollLimit: 3,
+                rollDiceCount: 5,
+                rollConfirmed: true,
+                dice: buildVampireLordDiceForValues([1, 2, 3, 4, 6]),
+                currentRollContext: undefined,
+                pendingAttack: {
+                    attackerId: '0',
+                    defenderId: '1',
+                    sourceAbilityId: 'blood-thirst',
+                    settlementStage: 'preDamage',
+                    isDefendable: true,
+                    bonusDamage: 0,
+                    attackModifierBonusDamage: 0,
+                    damageResolved: false,
+                    resolvedDamage: 0,
+                },
+                pendingDamage: undefined,
+                pendingBonusDiceSettlement: undefined,
+            },
+        });
+        await closeDebugPanelIfVisible(page);
+        await setDiceThroneBonusDiceValues(page, [1, 2, 4, 5, 6]);
+        await expectVampireLordCardPreview(page, cardId, 19);
+
+        await dragVampireLordHandCardToPlay(page, cardId);
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const settlement = state?.core?.pendingBonusDiceSettlement;
+            return {
+                sourceAbilityId: settlement?.sourceAbilityId ?? null,
+                diceValues: (settlement?.dice ?? []).map((die: any) => die.value),
+                diceFaces: (settlement?.dice ?? []).map((die: any) => die.face),
+                handHasCard: (state?.core?.players?.['0']?.hand ?? []).some((card: any) => card.id === cardId),
+                discardHasCard: (state?.core?.players?.['0']?.discard ?? []).some((card: any) => card.id === cardId),
+                cp: state?.core?.players?.['0']?.resources?.[RESOURCE_IDS.CP] ?? null,
+                events: getLastEventTypes(state),
+            };
+        }, { timeout: 10000 }).toEqual({
+            sourceAbilityId: cardId,
+            diceValues: [1, 2, 4, 5, 6],
+            diceFaces: [
+                VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+                VAMPIRE_LORD_DICE_FACE_IDS.CLAW,
+                VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+                VAMPIRE_LORD_DICE_FACE_IDS.MESMERIZE,
+                VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP,
+            ],
+            handHasCard: false,
+            discardHasCard: true,
+            cp: 1,
+            events: expect.arrayContaining(['CARD_PLAYED', 'BONUS_DIE_ROLLED']),
+        });
+        await expectRightTrayBonusDiceConfirmation(page, () => game.getState(), {
+            sourceAbilityId: cardId,
+            ...VAMPIRE_LORD_BONUS_DICE_OWNER,
+        });
+        await game.screenshot('吸血鬼领主-死无全尸-2利爪奖励骰待确认', testInfo);
+
+        await settleCurrentBonusDice(page, () => game.getState(), { sourceAbilityId: cardId });
+
+        await expect.poll(async () => {
+            const state = await game.getState();
+            const events = (state?.sys?.eventStream?.entries ?? [])
+                .map((entry: any) => entry?.event)
+                .filter(Boolean)
+                .reverse();
+            const settled = events.find((event: any) => event.type === 'BONUS_DICE_SETTLED');
+            const bonusDamage = events.find((event: any) => event.type === 'BONUS_DAMAGE_ADDED');
+            return {
+                pendingBonusDiceSettlement: state?.core?.pendingBonusDiceSettlement ?? null,
+                bonusDamage: state?.core?.pendingAttack?.bonusDamage ?? null,
+                attackModifierBonusDamage: state?.core?.pendingAttack?.attackModifierBonusDamage ?? null,
+                defenderHp: state?.core?.players?.['1']?.resources?.[RESOURCE_IDS.HP] ?? null,
+                defenderBleed: state?.core?.players?.['1']?.statusEffects?.[STATUS_IDS.BLEED] ?? 0,
+                settledPayload: settled?.payload ?? null,
+                bonusDamagePayload: bonusDamage?.payload ?? null,
+                events: getLastEventTypes(state),
+            };
+        }, { timeout: 10000 }).toEqual({
+            pendingBonusDiceSettlement: null,
+            bonusDamage: 2,
+            attackModifierBonusDamage: 2,
+            defenderHp: 50,
+            defenderBleed: 0,
+            settledPayload: expect.objectContaining({
+                sourceAbilityId: cardId,
+                totalDamage: 2,
+            }),
+            bonusDamagePayload: expect.objectContaining({
+                sourceCardId: cardId,
+                amount: 2,
+            }),
+            events: expect.arrayContaining(['BONUS_DICE_SETTLED', 'BONUS_DAMAGE_ADDED']),
+        });
+        await waitForDiceThroneVisualIdle(page);
+        await game.screenshot('吸血鬼领主-死无全尸-2利爪加2伤害后', testInfo);
+        await expectActionLogContains(page, ['死无全尸']);
+        await expectActionLogContains(page, ['利爪 2 个', '+2']);
+        await expectActionLogCardTooltipPreview(
+            page,
+            ['死无全尸'],
+            /死无全尸/,
+            VAMPIRE_LORD_CARD_ATLAS_ID,
+            19,
+            /dicethrone\/images\/xixuegui\/(?:compressed\/)?ability-cards\.webp/i,
+        );
+        await game.screenshot('吸血鬼领主-死无全尸-行动日志hover卡图可见', testInfo);
     });
 
     test('基础魅惑之力不可防御攻击后应暂停并允许鲜血之力 4 档吸血', async ({ page, game }, testInfo) => {

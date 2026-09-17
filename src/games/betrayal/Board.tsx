@@ -3261,6 +3261,9 @@ export default function BetrayalBoard({
     !recentRollFullyAcknowledged &&
     !isRecentRollDismissed,
   );
+  const shouldShowEventDamageAllocationToViewer =
+    core.recentRoll?.kind !== "eventRolledDamage" ||
+    isPendingDamageAllocationForViewer;
   const shouldShowBlockingRecentRollOverlay = Boolean(
     core.recentRoll &&
     !isRecentRollDismissed &&
@@ -6264,6 +6267,7 @@ export default function BetrayalBoard({
 
                 {pendingDamageAllocation &&
                 pendingDamageExplorer &&
+                shouldShowEventDamageAllocationToViewer &&
                 !shouldGateDamageAllocationBehindRecentRoll ? (
                   <BetrayalDamageAllocationSurface
                     allocation={pendingDamageAllocation}
@@ -6926,7 +6930,7 @@ export default function BetrayalBoard({
                   ? "pc-isomorphic-status-rail"
                   : undefined
               }
-              className={`pointer-events-auto absolute z-40 w-[216px] min-h-0 flex-col gap-2 overflow-y-auto px-1 py-1 md:px-1 ${
+              className={`no-scrollbar pointer-events-auto absolute z-40 w-[216px] min-h-0 flex-col gap-2 overflow-y-auto px-1 py-1 md:px-1 ${
                 shouldShowMobileEventStatusRail
                   ? "bottom-[76px] right-2 top-8 flex origin-top-right scale-[0.56]"
                   : "bottom-3 right-3 top-3"

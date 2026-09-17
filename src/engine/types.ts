@@ -147,6 +147,11 @@ export interface BreakdownLine {
  * - i18n: 延迟翻译片段（存储 key + params，渲染时翻译，支持服务端无 i18n 环境）
  * - breakdown: 带 tooltip 的数值片段（hover 显示构成明细，虚线下划线）
  */
+export interface ActionLogInteractiveParam {
+    text: string;
+    tooltip?: string;
+}
+
 export type ActionLogSegment =
     | { type: 'text'; text: string }
     | {
@@ -168,6 +173,8 @@ export type ActionLogSegment =
           params?: Record<string, string | number>;
           /** 需要先翻译的 params key 列表（值为同 ns 下的 i18n key） */
           paramI18nKeys?: string[];
+          /** 将指定插值文本渲染为可悬浮查看的交互片段 */
+          interactiveParams?: Record<string, ActionLogInteractiveParam>;
       }
     | {
           type: 'breakdown';

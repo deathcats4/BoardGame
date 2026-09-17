@@ -1781,6 +1781,62 @@ describe('迪士尼四派系代表性玩法行为', () => {
         expect(resolvedDiscard.finalState.core.players['0'].discard.filter(card => card.uid === 'library')).toHaveLength(1);
     });
 
+    it.each([
+        ['魔法物品', 'enchanted-object', 'beauty_and_the_beast_enchanted_objects', 'minion'],
+        ['打破诅咒', 'curse', 'beauty_and_the_beast_break_the_curse', 'action'],
+        ['图书馆', 'library', 'beauty_and_the_beast_discover_the_library', 'action'],
+    ] as const)('出牌阶段弃掉%s后仍立即打开对应的额外出牌选择', (_label, discardedUid, discardedDefId, discardedType) => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard(discardedUid, discardedDefId, discardedType, '0')],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_enchanted_castle', [
+                makeMinion('beast', 'beauty_and_the_beast_beast', '0', 4),
+                makeMinion('ally', 'beauty_and_the_beast_belle', '0', 3),
+            ])],
+        });
+        const matchState = makeMatchState(core);
+
+        const talent = invokeRegisteredAbilityContract('beauty_and_the_beast_beast', 'talent', {
+            state: core,
+            matchState,
+            playerId: '0',
+            cardUid: 'beast',
+            defId: 'beauty_and_the_beast_beast',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 90,
+        });
+        const discardPrompt = getSimpleChoicePrompt(talent.matchState!, 'beauty_and_the_beast_discard_hand');
+        const discarded = respondToPromptOption(
+            talent.matchState!,
+            option => option.value?.cardUid === discardedUid,
+            `${_label} 出牌阶段触发弃牌`,
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(discarded.success, discarded.error).toBe(true);
+        const reactionPrompt = getReactionPrompt(discarded.finalState);
+        const reactionOption = getReactionPromptOptionBySourceDefId(
+            discarded.finalState,
+            reactionPrompt,
+            discardedDefId,
+        );
+        const openedExtraPrompt = respondToPrompt(discarded.finalState, reactionOption.id, '0', FIXED_RANDOM);
+        const extraSource = discardedType === 'minion'
+            ? 'smashup_immediate_extra_minion'
+            : 'smashup_immediate_extra_action';
+        expect(getSimpleChoicePrompt(openedExtraPrompt.finalState, extraSource)).toBeTruthy();
+        expect(getPromptOptions(getSimpleChoicePrompt(openedExtraPrompt.finalState, extraSource))
+            .map(option => option.value?.cardUid ?? (option.value?.skip ? 'skip' : undefined)))
+            .toContain(discardedUid);
+        expect(discardPrompt).toBeTruthy();
+    });
+
     it('电源插排移动角色时必须保留跳过和目标选择，不自动移动到第一个基地', () => {
         const core = makeState({
             players: { '0': makePlayer('0'), '1': makePlayer('1') },

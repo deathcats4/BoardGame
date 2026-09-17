@@ -12,6 +12,7 @@ import {
   saveScreenshot,
   setHarnessRandomQueue,
   waitForBetrayalPageReady,
+  waitForBetrayalPageReadyWithoutReload,
   armPhysicalDiceRerollMotionCapture,
   warmBetrayalFrontend,
 } from "./betrayalTestHelpers";
@@ -26,6 +27,22 @@ const mainFlowFullShot = (index: number, label: string) =>
 const resetEvidenceDir = (dir: string) => {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
+};
+const forbiddenOtherSeatOperationCopy = [
+  /(?:请|现在|先|再|然后|接着|需要|要|去|点击|点)[^。\n]{0,18}(?:替|代替)(?:队友|对手|另一名玩家|另一名探索者)/,
+  /切到(?:队友|对手|另一名玩家|另一名探索者)[^。\n]{0,24}(?:点|确认|探索|结束回合|同意)/,
+  /你来[^。\n]{0,24}(?:队友|对手|另一名玩家|另一名探索者)[^。\n]{0,24}(?:回合|确认|探索|结束回合|同意)/,
+];
+const expectNoCurrentPlayerDelegatesOtherSeat = async (
+  locator: Locator,
+  label: string,
+) => {
+  const text = await locator.innerText();
+  for (const pattern of forbiddenOtherSeatOperationCopy) {
+    expect(text, `${label} 不能要求当前玩家代操作其它席位`).not.toMatch(
+      pattern,
+    );
+  }
 };
 const STEP_00 = `${EVIDENCE_DIR}/00-山屋惊魂-教程-章节目录.jpg`;
 const STEP_01 = `${EVIDENCE_DIR}/01-山屋惊魂-教程-回合目标与行动区.jpg`;
@@ -1446,7 +1463,7 @@ const expectRabbitFootRerollWebglHighlights = async (
   for (const target of metrics.targets) {
     const evidence = JSON.stringify({ target, metrics });
     expect(target.shape, `兔脚选骰热区必须绑定骰子本体：${evidence}`).toBe(
-      "projected-rounded-die-face",
+      "die-face",
     );
     expect(Math.abs(target.targetWidth - target.targetHeight)).toBeLessThanOrEqual(1);
     expect(target.visibleMax).toBeGreaterThan(0);
@@ -1458,8 +1475,8 @@ const expectRabbitFootRerollWebglHighlights = async (
     ).toBe("svg-projected-rounded-die-face");
     expect(
       target.visualLayer,
-      `兔脚候选框必须和透明命中区同层贴合骰面：${evidence}`,
-    ).toBe("projected-rounded-outline-plus-transparent-hitbox");
+      `兔脚外层 DOM 只能作为透明命中区，不得回到大框或底线：${evidence}`,
+    ).toBe("transparent-hitbox-only");
     expect(target.faceOutlineExists, `缺少骰面贴边候选框：${evidence}`).toBe(true);
     expect(target.outlinePointCount).toBeGreaterThanOrEqual(4);
     expect(Number.isFinite(target.outlineGap)).toBe(true);
@@ -3105,11 +3122,13 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     );
     await waitForStep(page, "hand-off-to-teammate-second-cycle", 10000);
     await expect(tutorialOverlayCard).toContainText("现在又轮到你");
+    await expect(tutorialOverlayCard).toContainText("两名探索者");
+    await expect(tutorialOverlayCard).toContainText("公开预兆");
+    await expect(tutorialOverlayCard).toContainText("没有达到 5+");
     await expect(tutorialOverlayCard).toContainText("作祟风险来自");
-    await expect(tutorialOverlayCard).not.toContainText("队友 1");
-    await expect(tutorialOverlayCard).not.toContainText("队友 2");
-    await expect(page.locator("body")).not.toContainText(
-      "队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。",
+    await expectNoCurrentPlayerDelegatesOtherSeat(
+      tutorialOverlayCard,
+      "作祟自然触发公开预兆承接卡",
     );
     const visibleNaturalStepIds = await readVisibleTutorialStepIds(page);
     expect(visibleNaturalStepIds).not.toContain("watch-teammate-omen-turns");
@@ -3210,7 +3229,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeVisible();
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeEnabled();
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toContainText("进入剧本书");
+    await expect(tutorialOverlayCard).toContainText("另一名探索者");
+    await expect(tutorialOverlayCard).toContainText("新的预兆");
+    await expect(tutorialOverlayCard).toContainText("达到 5+");
     await expect(tutorialOverlayCard).toContainText("英雄开场过场");
+    await expectNoCurrentPlayerDelegatesOtherSeat(
+      tutorialOverlayCard,
+      "作祟公开后英雄读本承接卡",
+    );
     await expectTutorialCardInForeground(page, "英雄开场过场");
     await saveScreenshot(page, STEP_HAUNT_NATURAL_03);
 
@@ -4786,7 +4812,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(rerollTargetDie).toHaveAttribute("role", "button");
     await expect(rerollTargetDie).toHaveAttribute(
       "data-reroll-target-shape",
-      "projected-rounded-die-face",
+      "die-face",
     );
     const rerollTargetBox = await rerollTargetDie.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -5137,7 +5163,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       "兔脚结果恢复态必须出现继续上次教程确认",
     ).toBeVisible({ timeout: 30000 });
     await continueFromSavedTutorial.click();
-    await waitForBetrayalPageReady(page);
+    await waitForBetrayalPageReadyWithoutReload(page);
     const restoredEventRollConfirm = await expectRabbitFootResultConfirmationReady(
       page,
       "刷新恢复后的兔脚重投结果",
@@ -5272,13 +5298,17 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         currentPlayer: "0",
         phase: "preHaunt",
         hauntTriggered: false,
-      });
+    });
     await waitForStep(page, "move-to-grand-staircase", 10000);
     await expect(tutorialOverlayCard).toContainText("回到你的回合");
+    await expect(tutorialOverlayCard).toContainText("两名探索者");
+    await expect(tutorialOverlayCard).toContainText("公开预兆");
+    await expect(tutorialOverlayCard).toContainText("作祟仍未开始");
     await expect(tutorialOverlayCard).toContainText("沿厨房、门厅");
     await expect(tutorialOverlayCard).toContainText("大阶梯");
-    await expect(page.locator("body")).not.toContainText(
-      "队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。",
+    await expectNoCurrentPlayerDelegatesOtherSeat(
+      tutorialOverlayCard,
+      "主线回到当前玩家公开预兆承接卡",
     );
     const visibleMainFlowStepIds = await readVisibleTutorialStepIds(page);
     expect(visibleMainFlowStepIds).not.toContain("watch-teammate-one-omen-turn");
@@ -5485,7 +5515,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeVisible();
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toBeEnabled();
     await expect(page.getByTestId("betrayal-scenario-reader-next-zone")).toContainText("进入剧本书");
+    await expect(tutorialOverlayCard).toContainText("另一名探索者");
+    await expect(tutorialOverlayCard).toContainText("新的预兆");
+    await expect(tutorialOverlayCard).toContainText("达到 5+");
     await expect(tutorialOverlayCard).toContainText("英雄开场过场");
+    await expectNoCurrentPlayerDelegatesOtherSeat(
+      tutorialOverlayCard,
+      "主线作祟公开后英雄读本承接卡",
+    );
     await expectTutorialCardInForeground(page, "英雄开场过场");
     await saveMainFlowVisibleStep(
       page,

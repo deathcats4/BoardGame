@@ -1,4 +1,3 @@
-import { eventRollResolutionNeedsSharedAcknowledgement } from './acknowledgementReadModel';
 import {
     acknowledgeEventEffectCardResolution,
     cloneDiscoverySummary,
@@ -164,19 +163,10 @@ function createPendingEventRollResolution(core: BetrayalCore, input: {
     const nextPendingEventChoice = input.nextPendingEventChoice
         ? clonePendingEventChoice(input.nextPendingEventChoice)
         : undefined;
-    const needsSharedEventRollAcknowledgement = eventRollResolutionNeedsSharedAcknowledgement({
-        nextPendingEventChoice,
-        hauntRevealResolution: input.hauntRevealResolution,
-        hauntTraitorResolution: input.hauntTraitorResolution,
-        dustSetup: input.dustSetup,
-        magicCameraSetup: input.magicCameraSetup,
-        helpingHandsSetup: input.helpingHandsSetup,
-        uponReflectionSetup: input.uponReflectionSetup,
-    });
     const configuredRequiredPlayerIds = input.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
     const requiredPlayerIds = configuredRequiredPlayerIds.length > 0
         ? [...configuredRequiredPlayerIds]
-        : needsSharedEventRollAcknowledgement && core.playerIds.length > 0
+        : core.playerIds.length > 0
             ? [...core.playerIds]
             : [input.playerId];
     return {

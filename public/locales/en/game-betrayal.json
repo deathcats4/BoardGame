@@ -986,6 +986,7 @@
       "passiveBonus": "Bonus {{value}}",
       "detail": "Dice faces {{subtotal}} | bonus {{bonus}} | total {{total}}",
       "total": "Total {{value}}",
+      "thresholds": "Result thresholds: {{value}}",
       "eventRollTotal": "Event total {{value}}",
       "eventRollDiceSubtotal": "Event dice faces {{value}}",
       "eventDamageDiceLabel": "Damage Dice",
@@ -1071,13 +1072,13 @@
       "description": "Start before the haunt and move naturally through one core turn: movement, exploration, event resolution, Book use, Rabbit's Foot reroll, damage allocation, a natural haunt reveal, and the first hero goal action.",
       "steps": {
         "endTurnAfterEvent": "After damage allocation, discovering the Event room has already ended your turn. Choose End Turn to pass play to the next explorer.",
-        "watchTeammateOneOmenTurn": "Please wait; turn order will return to your next playable moment.",
-        "watchTeammateTwoOmenTurn": "Please wait; turn order will return to your next playable moment.",
-        "moveToGrandStaircase": "Play has returned to your turn. You already know movement; stay in move mode and move from the Kitchen through the Hallway to the Grand Staircase; it connects the floors.",
+        "watchTeammateOneOmenTurn": "The next explorer takes their own turn, moves, discovers an Omen room, and gains an Omen. You do not operate for them; read the public result. If the haunt roll fails, turn order continues.",
+        "watchTeammateTwoOmenTurn": "Another explorer also takes their own turn, moves, discovers, and gains an Omen. Because the haunt roll still fails, turn order returns to you.",
+        "moveToGrandStaircase": "Two other explorers have gained public Omens and the haunt has not begun, so play has returned to your turn. You already know movement; stay in move mode and move from the Kitchen through the Hallway to the Grand Staircase; it connects the floors.",
         "switchToUpperFloor": "At the Grand Staircase, the floor switcher shows an upper-floor move target. Choose the up arrow to switch the map to the upper floor and reveal the Upper Landing.",
         "moveToUpperLanding": "The discovered Upper Landing is now visible. Choose it to move beside the Library; this is movement and will not reveal a new room.",
         "endTurnFromUpperLanding": "You are on the Upper Landing, with the Library to the west. Do not continue exploring this turn; choose End Turn and let turn order advance naturally to the public haunt reveal.",
-        "watchTeammateHauntTrigger": "Please wait; once the haunt is public, your Hero Scenario Book will open."
+        "watchTeammateHauntTrigger": "The next explorer takes their own turn, draws a new Omen, and makes the haunt roll. When it reaches 5+, the haunt is revealed and your Hero Scenario Book opens."
       }
     },
     "basicSetup": {
@@ -1125,11 +1126,11 @@
       "steps": {
         "setupNaturalHauntFlow": "This section teaches the majority hero perspective: you end your turn beside the Library and control only your own turn. The traitor book has its own chapter.",
         "handOffToTeammateOne": "Choose End Turn to pass play to the next explorer. Haunt risk rises as players actually gain Omens.",
-        "watchTeammateOmenTurns": "Please wait; turn order will return to your next playable moment.",
-        "watchTeammateTwoOmenTurn": "Please wait; turn order will return to your next playable moment.",
-        "handOffToTeammateSecondCycle": "It is your turn again. Haunt risk comes from the number of public Omens; end your own turn so turn order can continue.",
-        "watchTeammateHauntTrigger": "Please wait; once the haunt is public, your Hero Scenario Book will open.",
-        "heroReaderOpened": "After the public haunt reveal, you are still a hero; the game first shows the hero opening cutscene, not the goal page of the Scenario Book. Read this one-time opening.",
+        "watchTeammateOmenTurns": "The next explorer takes their own turn, discovers, and gains a public Omen. You do not operate for them; read the public result. If the haunt roll fails, turn order continues.",
+        "watchTeammateTwoOmenTurn": "Another explorer also takes their own turn, moves, discovers, and gains a public Omen. Because the haunt roll still does not reach 5+, turn order returns to you.",
+        "handOffToTeammateSecondCycle": "Two other explorers gained public Omens on their own turns; the haunt roll still has not reached 5+, so it is your turn again. Haunt risk comes from the number of public Omens; end your own turn so turn order can continue.",
+        "watchTeammateHauntTrigger": "The next explorer takes their own turn, draws a new Omen, and makes the haunt roll. When it reaches 5+, the haunt is revealed and your Hero Scenario Book opens.",
+        "heroReaderOpened": "Another explorer drew a new Omen on their own turn, and this haunt roll reached 5+. After the public haunt reveal, you are still a hero; the game first shows the hero opening cutscene, not the goal page of the Scenario Book. Read this one-time opening.",
         "heroReaderTurnPage": "After the opening cutscene, choose Enter Scenario Book to open the Hero Scenario Book goal page; that page explains finding the true name, learning the spell, and banishing the Mummy.",
         "heroReaderGoal": "The Hero Scenario Book goal page says the hero can find the true name in the Sarcophagus room, Study, or Library. You are beside the Library now, so after reading you should move into it.",
         "heroReaderClose": "After reading the Hero Scenario Book goal page, close it and return to the table; the next hero turn follows this goal.",

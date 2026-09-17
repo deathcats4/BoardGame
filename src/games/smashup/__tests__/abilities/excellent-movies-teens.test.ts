@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { initAllAbilities, resetAbilityInit } from '../../abilities';
+import { postProcessSystemEvents } from '../../domain';
 import { fireTriggers, hasRegisteredTrigger, isMinionProtected } from '../../domain/ongoingEffects';
 import { getEffectiveBreakpoint, getEffectivePower } from '../../domain/ongoingModifiers';
 import { SU_COMMANDS, SU_EVENTS } from '../../domain/types';
@@ -3016,6 +3017,61 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
         expect(getEffectivePower(after, host, 0)).toBe(6);
     });
 
+    it('未授权核加速器摧毁恶魔犬时，真实后处理仍打开暂存随从的额外出牌提示', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    storedCards: [{
+                        ...makeCard('stored-minion', 'teens_prep', 'minion', '0'),
+                        storedByPlayerId: '0',
+                        storedUnderUid: 'dogs',
+                        storedUnderDefId: 'wraithrustlers_demon_dogs',
+                    }] as any,
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase({
+                defId: 'base_the_jungle',
+                minions: [makeMinion('host', 'wraithrustlers_roy', '0', 3, {
+                    attachedActions: [{ uid: 'accelerator', defId: 'wraithrustlers_unlicensed_nuclear_accelerator', ownerId: '0' }],
+                })],
+                ongoingActions: [{
+                    uid: 'dogs',
+                    defId: 'wraithrustlers_demon_dogs',
+                    ownerId: '0',
+                }],
+            })],
+        });
+
+        const talent = invokeRegisteredAbilityContract(
+            'wraithrustlers_unlicensed_nuclear_accelerator',
+            'talent',
+            makeAbilityContext(core, 'wraithrustlers_unlicensed_nuclear_accelerator', 'accelerator'),
+        );
+        const actionPrompt = getSimpleChoicePrompt(
+            talent.matchState!,
+            'wraithrustlers_unlicensed_nuclear_accelerator_destroy_action',
+        );
+        const destroyed = respondToPromptOption(
+            talent.matchState!,
+            option => option.value?.cardUid === 'dogs',
+            '未授权核加速器摧毁恶魔犬',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(destroyed.success, destroyed.error).toBe(true);
+        expect(actionPrompt.autoResolveIfSingle).toBe(false);
+        expect(destroyed.finalState.core.bases[0].ongoingActions).toEqual([]);
+
+        const extraPrompt = getSimpleChoicePrompt(
+            destroyed.finalState,
+            'smashup_immediate_extra_minion',
+        );
+        expect(getPromptOptions(extraPrompt).map(option => option.value?.cardUid ?? (option.value?.skip ? 'skip' : undefined)))
+            .toEqual(['stored-minion', 'skip']);
+    });
+
     it('恶魔狗存放弱随从必须由玩家从手牌或弃牌堆选择；被摧毁后释放为限定额外随从', () => {
         const core = makeState({
             players: {
@@ -3176,6 +3232,12 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
             FIXED_RANDOM,
         );
         const after = destroyed.finalState.core;
+        console.log('ECTO DEBUG', JSON.stringify({
+            eventTypes: destroyed.events.map(event => event.type),
+            targetBase: after.bases[1],
+            player1Discard: after.players['1'].discard,
+            prompts: destroyed.finalState.sys.interactionState?.prompts,
+        }, null, 2));
 
         expect(after.bases[0].minions.map(minion => minion.uid)).toEqual(['first-ally']);
         expect(after.bases[0].ongoingActions).toEqual([]);
@@ -3308,10 +3370,16 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
 
         const onDestroy = invokeRegisteredAbilityContract('wraithrustlers_ancient_sumerian_god', 'onDestroy',
             makeAbilityContext(storedState, 'wraithrustlers_ancient_sumerian_god', 'god'));
-        const releasedState = applyEvents(storedState, onDestroy.events);
+        const afterDestroy = applyEvents(storedState, onDestroy.events);
 
-        expect(releasedState.players['0'].storedCards).toBeUndefined();
-        expect(onDestroy.events).toContainEqual(expect.objectContaining({
+        expect(afterDestroy.players['0'].storedCards).toEqual([
+            expect.objectContaining({
+                uid: 'slimy',
+                storedUnderUid: 'god',
+                storedUnderDefId: 'wraithrustlers_ancient_sumerian_god',
+            }),
+        ]);
+        expect(onDestroy.events).not.toContainEqual(expect.objectContaining({
             type: SU_EVENTS.STORED_CARD_RELEASED,
             payload: expect.objectContaining({ cardUid: 'slimy' }),
         }));
@@ -3324,6 +3392,64 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
                 restrictToBase: 0,
             }),
         }));
+    });
+
+    it('古苏美尔神被真实 onCardDestroyed 触发时，额外行动提示仍能看到暂存行动牌', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    storedCards: [{
+                        ...makeCard('slimy', 'wraithrustlers_slimy', 'action', '0'),
+                        storedByPlayerId: '0',
+                        storedUnderUid: 'god',
+                        storedUnderDefId: 'wraithrustlers_ancient_sumerian_god',
+                    }] as any,
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_the_jungle', [
+                makeMinion('god', 'wraithrustlers_ancient_sumerian_god', '0', 4),
+            ])],
+        });
+        const matchState = makeMatchState(core);
+        matchState.sys.phase = 'playCards';
+
+        const destroyed = fireTriggers(core, 'onCardDestroyed', {
+            state: core,
+            matchState,
+            playerId: '0',
+            baseIndex: 0,
+            sourceBaseIndex: 0,
+            sourceCardUid: 'god',
+            sourceControllerId: '0',
+            triggerCardUid: 'god',
+            triggerCardDefId: 'wraithrustlers_ancient_sumerian_god',
+            triggerCardOwnerId: '0',
+            triggerCardKind: 'minion',
+            random: FIXED_RANDOM,
+            now: 11,
+        });
+
+        const processed = postProcessSystemEvents(
+            core,
+            destroyed.events,
+            FIXED_RANDOM,
+            destroyed.matchState,
+        );
+
+        expect(processed.matchState).toBeDefined();
+        const extraPrompt = getSimpleChoicePrompt(processed.matchState!, 'smashup_immediate_extra_action');
+        expect(getPromptOptions(extraPrompt)).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                value: expect.objectContaining({
+                    cardUid: 'slimy',
+                    source: 'stored',
+                }),
+            }),
+        ]));
+        expect(processed.matchState!.core.players['0'].storedCards).toEqual([
+            expect.objectContaining({ uid: 'slimy' }),
+        ]);
     });
 
     it('艾伦看到怨灵被摧毁时，出牌阶段暂存额外行动，非出牌阶段才立即处理', () => {

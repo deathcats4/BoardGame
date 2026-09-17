@@ -39,7 +39,7 @@ const usage = () => {
   --pureref         等同于 --viewer pureref；非默认
   --pass-manifest <路径>  本轮用户要求达标清单；没有清单禁止实际代理打开
   --confirmed-pass  历史参数，已废弃；请使用 --pass-manifest
-  --force-reopen    强制重开同一份已 PASS 媒体；只在用户明确说没看到、打开错图或要求代开重开时使用
+  --force-reopen    强制重开同一份已 PASS 媒体；只在用户明确说没看到、打开错图或要求强制重开时使用
   --dry-run         只解析路径和校验清单，不实际代理打开
   --help            显示帮助
 `);
@@ -483,10 +483,13 @@ const assertNotDuplicateOpen = ({ passManifest, imagePaths, viewer, forceReopen 
 
     if (!forceReopen && duplicate) {
         const openedAt = duplicate.openedAt ?? '未知时间';
-        throw new Error(`拒绝重复打开：同一 PASS 清单和同一组媒体已在 ${openedAt} 打开过。若用户明确说没看到、打开错图或要求代开重开，请追加 --force-reopen。状态文件: ${OPEN_STATE_PATH}`);
+        console.log(`ALREADY_OPEN=true`);
+        console.log(`PREVIOUSLY_OPENED_AT=${openedAt}`);
+        console.log(`OPEN_STATE_PATH=${OPEN_STATE_PATH}`);
+        return { fingerprint, mediaFingerprint, payload, duplicate: true };
     }
 
-    return { fingerprint, mediaFingerprint, payload };
+    return { fingerprint, mediaFingerprint, payload, duplicate: false };
 };
 
 const recordSuccessfulOpen = ({ fingerprint, mediaFingerprint, payload }) => {
@@ -598,15 +601,17 @@ const openImagesWithWebViewer = (imagePaths, { forceReopen = false } = {}) => {
         encoding: 'utf8',
         stdio: 'pipe',
     });
-    if (result.stdout?.trim()) {
-        console.log(result.stdout.trim());
+    const stdout = result.stdout?.trim() ?? '';
+    if (stdout) {
+        console.log(stdout);
     }
     if (result.status !== 0) {
         const stderr = result.stderr?.trim();
-        const stdout = result.stdout?.trim();
         throw new Error(stderr || stdout || `网页查看器打开失败，退出码: ${result.status}`);
     }
-    console.log(`OPENED_WITH_WEB_VIEWER=${directory}`);
+    const reused = stdout.includes('ALREADY_OPEN=true');
+    console.log(`${reused ? 'REUSED_WITH_WEB_VIEWER' : 'OPENED_WITH_WEB_VIEWER'}=${directory}`);
+    return { reused };
 };
 
 const main = () => {
@@ -659,8 +664,18 @@ const main = () => {
         forceReopen: parsed.forceReopen,
     });
 
+    if (openRecord.duplicate && normalizedViewer !== 'web') {
+        for (const resolvedImage of resolvedImages) {
+            console.log(`REUSED_MEDIA=${resolvedImage}`);
+            console.log(`${isVideoFile(resolvedImage) ? 'REUSED_VIDEO' : 'REUSED_IMAGE'}=${resolvedImage}`);
+        }
+        return;
+    }
+
+    let reused = false;
     if (normalizedViewer === 'web') {
-        openImagesWithWebViewer(resolvedImages, { forceReopen: parsed.forceReopen });
+        const webResult = openImagesWithWebViewer(resolvedImages, { forceReopen: parsed.forceReopen });
+        reused = webResult.reused;
     } else if (normalizedViewer === 'pureref') {
         openImagesWithPureRef(resolvedImages);
     } else {
@@ -670,8 +685,9 @@ const main = () => {
     recordSuccessfulOpen(openRecord);
 
     for (const resolvedImage of resolvedImages) {
-        console.log(`OPENED_MEDIA=${resolvedImage}`);
-        console.log(`${isVideoFile(resolvedImage) ? 'OPENED_VIDEO' : 'OPENED_IMAGE'}=${resolvedImage}`);
+        const prefix = reused ? 'REUSED' : 'OPENED';
+        console.log(`${prefix}_MEDIA=${resolvedImage}`);
+        console.log(`${isVideoFile(resolvedImage) ? `${prefix}_VIDEO` : `${prefix}_IMAGE`}=${resolvedImage}`);
     }
 };
 

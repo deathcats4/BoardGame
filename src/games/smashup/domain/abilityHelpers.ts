@@ -1990,7 +1990,15 @@ export function grantContextualExtraMinion(
     ctx: { playerId: PlayerId; now: number; matchState?: Pick<MatchState<SmashUpCore>, 'sys'> },
     reason: string,
     restrictToBase?: number,
-    options?: { sameNameOnly?: boolean; sameNameDefId?: string; powerMax?: number; specificCardUid?: string; excludedMinionDefIds?: string[]; allowFromDiscard?: boolean },
+    options?: {
+        sameNameOnly?: boolean;
+        sameNameDefId?: string;
+        powerMax?: number;
+        specificCardUid?: string;
+        excludedMinionDefIds?: string[];
+        allowFromDiscard?: boolean;
+        playTiming?: 'banked' | 'immediate';
+    },
 ): LimitModifiedEvent {
     return grantExtraMinion(
         ctx.playerId,
@@ -1999,7 +2007,7 @@ export function grantContextualExtraMinion(
         restrictToBase,
         {
             ...options,
-            playTiming: resolveExtraPlayTiming(ctx.matchState),
+            playTiming: options?.playTiming ?? resolveExtraPlayTiming(ctx.matchState),
         },
     );
 }

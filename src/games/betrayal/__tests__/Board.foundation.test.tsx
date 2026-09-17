@@ -5587,9 +5587,9 @@ describe('Betrayal Board foundation', () => {
         expect(alienGeometrySteps[0]).toHaveTextContent('事件效果');
         expect(alienGeometrySteps[0]).toHaveTextContent('知识 +1');
         expect(screen.getByTestId('betrayal-discovery-panel')).toHaveAttribute('data-backdrop-dismiss', 'disabled');
-        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/1');
+        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/4');
         expect(screen.getByTestId('betrayal-discovery-continue')).toHaveAttribute('data-event-roll-confirmed-count', '0');
-        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveAttribute('data-event-roll-required-count', '1');
+        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveAttribute('data-event-roll-required-count', '4');
         expect(screen.getByTestId('betrayal-discovery-continue')).not.toHaveAttribute('data-pending-card-resolution-step');
         fireEvent.click(screen.getByTestId('betrayal-discovery-continue'));
         await waitFor(() => {
@@ -5635,7 +5635,7 @@ describe('Betrayal Board foundation', () => {
         );
         expect(screen.getByTestId('betrayal-discovery-detail')).toHaveTextContent('受到 1 点物理伤害');
         const eventRollConfirm = screen.getByTestId('betrayal-discovery-continue');
-        expect(eventRollConfirm).toHaveTextContent('确认 0/1');
+        expect(eventRollConfirm).toHaveTextContent('确认 0/4');
         fireEvent.click(eventRollConfirm);
 
         await waitFor(() => {
@@ -6117,9 +6117,9 @@ describe('Betrayal Board foundation', () => {
         expect(screen.getByTestId('betrayal-discovery-panel')).toHaveAttribute('data-backdrop-dismiss', 'disabled');
         expect(screen.queryByTestId('betrayal-event-roll-finalize')).not.toBeInTheDocument();
         const eventRollConfirm = screen.getByTestId('betrayal-discovery-continue');
-        expect(eventRollConfirm).toHaveTextContent('确认 0/1');
+        expect(eventRollConfirm).toHaveTextContent('确认 0/4');
         expect(eventRollConfirm).toHaveAttribute('data-event-roll-confirmed-count', '0');
-        expect(eventRollConfirm).toHaveAttribute('data-event-roll-required-count', '1');
+        expect(eventRollConfirm).toHaveAttribute('data-event-roll-required-count', '4');
         expect(eventRollConfirm).not.toHaveAttribute('data-pending-card-resolution-step');
         expectEventRollConfirmButtonStyle(eventRollConfirm);
 
@@ -6130,7 +6130,7 @@ describe('Betrayal Board foundation', () => {
         });
     });
 
-    it('别人触发的普通事件投骰只要求触发者确认，观看方点击空白仍不能关闭发现面板', () => {
+    it('别人触发的普通事件投骰要求所有真人确认，观看方确认后仍保留结果面板', () => {
         const core = createBetrayalFoundationCore(['0', '1', '2']);
         core.currentExplorer = {
             ...core.currentExplorer,
@@ -6194,20 +6194,20 @@ describe('Betrayal Board foundation', () => {
         expect(screen.getByTestId('betrayal-recent-roll-actor')).toHaveTextContent('由 测试玩家 触发');
         expect(screen.queryByTestId('betrayal-event-roll-finalize')).not.toBeInTheDocument();
         const eventRollConfirm = screen.getByTestId('betrayal-discovery-continue');
-        expect(eventRollConfirm).toHaveTextContent('确认 0/1');
+        expect(eventRollConfirm).toHaveTextContent('确认 0/3');
         expectEventRollConfirmButtonStyle(eventRollConfirm);
-        expect(eventRollConfirm).toBeDisabled();
+        expect(eventRollConfirm).not.toBeDisabled();
 
         fireEvent.click(eventRollConfirm);
 
-        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/1');
+        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('已确认 1/3');
         expect(screen.getByTestId('betrayal-discovery-continue')).toBeDisabled();
 
         fireEvent.click(discoveryPanel);
 
         expect(screen.getByTestId('betrayal-discovery-panel')).toBeInTheDocument();
         expect(screen.getByTestId('betrayal-recent-roll-panel')).toBeInTheDocument();
-        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/1');
+        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('已确认 1/3');
     });
 
     it('别人触发的普通事件投骰在横屏观看方不能被误确认或空白关闭', async () => {
@@ -6280,15 +6280,16 @@ describe('Betrayal Board foundation', () => {
             expect(screen.getByTestId('betrayal-discovery-panel')).toBeInTheDocument();
             expect(screen.getByTestId('betrayal-recent-roll-panel')).toBeInTheDocument();
             await waitFor(() => {
-                expect(screen.getByTestId('betrayal-discovery-continue')).toBeDisabled();
+                expect(screen.getByTestId('betrayal-discovery-continue')).not.toBeDisabled();
             });
 
             const eventRollConfirm = screen.getByTestId('betrayal-discovery-continue');
-            expect(eventRollConfirm).toHaveTextContent('确认 0/1');
+            expect(eventRollConfirm).toHaveTextContent('确认 0/3');
             expectEventRollConfirmButtonStyle(eventRollConfirm);
+            expect(eventRollConfirm).not.toBeDisabled();
             fireEvent.click(eventRollConfirm);
 
-            expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/1');
+            expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('已确认 1/3');
             expect(screen.getByTestId('betrayal-discovery-continue')).toBeDisabled();
         } finally {
             if (originalInnerWidthDescriptor) {
@@ -6371,7 +6372,8 @@ describe('Betrayal Board foundation', () => {
             'projected-rounded-face-outline-plus-threejs-shell-plus-transparent-hitbox',
         );
         const firstTarget = screen.getByTestId('betrayal-house-dice-reroll-target-0');
-        expect(firstTarget).toHaveAttribute('data-reroll-target-visual-layer', 'projected-rounded-outline-plus-transparent-hitbox');
+        expect(firstTarget).toHaveAttribute('data-reroll-target-shape', 'die-face');
+        expect(firstTarget).toHaveAttribute('data-reroll-target-visual-layer', 'transparent-hitbox-only');
         expect(firstTarget).toHaveAttribute('data-reroll-target-outline-paint', 'svg-projected-rounded-die-face');
         expect(Number(firstTarget.getAttribute('data-reroll-target-outline-point-count'))).toBeGreaterThanOrEqual(3);
         expect(screen.getByTestId('betrayal-house-dice-reroll-outline-0')).toHaveAttribute(
@@ -9298,7 +9300,7 @@ describe('Betrayal Board foundation', () => {
         expect(screen.getByTestId('betrayal-house-dice-3d-group')).toHaveAttribute('data-dice-rule-subtotal', '0');
         expect(screen.getByTestId('betrayal-discovery-detail')).toHaveTextContent('受到一颗骰子的精神伤害');
         expect(screen.getByTestId('betrayal-discovery-detail')).toHaveTextContent('重新投掷 1 颗骰子');
-        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/1');
+        expect(screen.getByTestId('betrayal-discovery-continue')).toHaveTextContent('确认 0/4');
         fireEvent.click(screen.getByTestId('betrayal-discovery-continue'));
 
         await waitFor(() => {

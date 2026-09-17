@@ -929,18 +929,30 @@ export function collectTriggers(
     const allowedSourceDefIds = options?.sourceDefIds ? new Set(options.sourceDefIds) : undefined;
     const buildExplicitSourceFallback = (entry: TriggerEntry): TriggerSourceLocation | undefined => {
         if (!entry.perInstance) return undefined;
-        if (!ctx.sourceCardUid || ctx.sourceControllerId === undefined) return undefined;
-        if (isCardSuppressed(state, ctx.sourceCardUid)) return undefined;
+        const destroyedCardTrigger = timing === 'onCardDestroyed';
+        const sourceCardUid = destroyedCardTrigger ? ctx.triggerCardUid : ctx.sourceCardUid;
+        const sourceDefId = destroyedCardTrigger ? ctx.triggerCardDefId : ctx.sourceDefId;
+        const sourceControllerId = destroyedCardTrigger
+            ? ctx.triggerCardOwnerId
+            : ctx.sourceControllerId;
+        const sourceOwnerPlayerId = destroyedCardTrigger
+            ? ctx.triggerCardOwnerId
+            : ctx.sourceOwnerPlayerId;
+        const sourceBaseIndex = destroyedCardTrigger
+            ? ctx.baseIndex ?? ctx.sourceBaseIndex
+            : ctx.sourceBaseIndex;
+        if (!sourceCardUid || sourceControllerId === undefined) return undefined;
+        if (isCardSuppressed(state, sourceCardUid)) return undefined;
         if (allowedSourceDefIds) {
             if (!allowedSourceDefIds.has(entry.sourceDefId)) return undefined;
-        } else if (!ctx.sourceDefId || entry.sourceDefId !== ctx.sourceDefId) {
+        } else if (!sourceDefId || entry.sourceDefId !== sourceDefId) {
             return undefined;
         }
         return {
-            uid: ctx.sourceCardUid,
-            baseIndex: ctx.sourceBaseIndex,
-            controllerId: ctx.sourceControllerId,
-            ownerId: ctx.sourceOwnerPlayerId,
+            uid: sourceCardUid,
+            baseIndex: sourceBaseIndex,
+            controllerId: sourceControllerId,
+            ownerId: sourceOwnerPlayerId,
         };
     };
 

@@ -1103,6 +1103,7 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
             bottomViewportGrid: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-bottom-viewport-grid"]')),
             lifeToggle: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-life-toggle"]')),
             phaseProgressIndicator: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-phase-progress-indicator"]')),
+            fabMenu: toRect(document.querySelector<HTMLElement>('[data-testid="fab-menu"]')),
             selfHud: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-mage-hud-self"]')),
             opponentHud: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-mage-hud-opponent"]')),
             opponentPreparedMirror: toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-opponent-prepared-mirror"]')),
@@ -1219,6 +1220,9 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
                 { name: 'discard-main-action', value: intersects(rects.discardPile, rects.mainAction) },
                 { name: 'phase-progress-life-toggle', value: intersects(rects.phaseProgressIndicator, rects.lifeToggle) },
                 { name: 'phase-progress-scale-badge', value: intersects(rects.phaseProgressIndicator, toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]'))) },
+                { name: 'fab-phase-progress', value: intersects(toRect(document.querySelector<HTMLElement>('[data-testid="fab-menu"]')), rects.phaseProgressIndicator) },
+                { name: 'fab-life-toggle', value: intersects(toRect(document.querySelector<HTMLElement>('[data-testid="fab-menu"]')), rects.lifeToggle) },
+                { name: 'fab-scale-badge', value: intersects(toRect(document.querySelector<HTMLElement>('[data-testid="fab-menu"]')), toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]'))) },
                 { name: 'phase-progress-self-hud', value: intersects(rects.phaseProgressIndicator, rects.selfHud) },
                 { name: 'phase-progress-opponent-hud', value: intersects(rects.phaseProgressIndicator, rects.opponentHud) },
                 { name: 'phase-progress-opponent-prepared', value: intersects(rects.phaseProgressIndicator, rects.opponentPreparedMirror) },
@@ -1256,6 +1260,7 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
         ['bottomViewportGrid', layoutAudit.rects.bottomViewportGrid],
         ['lifeToggle', layoutAudit.rects.lifeToggle],
         ['phaseProgressIndicator', layoutAudit.rects.phaseProgressIndicator],
+        ['fabMenu', layoutAudit.rects.fabMenu],
         ['selfHud', layoutAudit.rects.selfHud],
         ['opponentHud', layoutAudit.rects.opponentHud],
         ['opponentPreparedMirror', layoutAudit.rects.opponentPreparedMirror],
@@ -1315,19 +1320,20 @@ async function expectMageWarsDesktop2560Layout(page: Page) {
     expect(layoutAudit.arenaStageCenterDelta!, centerDebug).toBeLessThanOrEqual(3);
     expect(layoutAudit.lifeToggleLeftGap).not.toBeNull();
     expect(layoutAudit.lifeToggleLeftGap!).toBeGreaterThanOrEqual(0);
-    expect(layoutAudit.lifeToggleLeftGap!).toBeLessThanOrEqual(160);
     expect(layoutAudit.phaseProgress.currentPhase, '左上阶段进度必须绑定当前正式阶段').toBe(layoutAudit.boardPhase);
     expect(layoutAudit.phaseProgress.itemCount, '阶段进度必须覆盖 Mage Wars 正式 8 个回合阶段').toBe(8);
     expect(layoutAudit.phaseProgress.activeCount, '阶段进度只能有一个当前阶段').toBe(1);
     expect(layoutAudit.phaseProgress.text, '阶段进度必须使用玩家可读阶段文案').toContain('计划');
+    expect(layoutAudit.phaseProgress.text, '阶段轨道已经自明，不应显示“回合流程 / Turn Flow”自称标题').not.toMatch(/回合流程|Turn Flow/);
     expect(layoutAudit.phaseProgress.role, '阶段进度是左侧回看轨道，不能再冒充顶部主提示条').toBe('phase-progress-reference-rail');
     expect(layoutAudit.phaseProgress.axis, '阶段进度必须按 DiceThrone 同类职责竖排').toBe('vertical');
     expect(layoutAudit.phaseProgress.placement, '阶段进度必须落在左侧参考轨道').toBe('left-reference-rail');
     expect(layoutAudit.rects.phaseProgressIndicator!.x, '阶段进度必须贴左侧 UI 锚点').toBeLessThanOrEqual(24);
-    expect(layoutAudit.rects.phaseProgressIndicator!.y, '阶段进度必须位于生命显示开关下方，不能叠住左上工具').toBeGreaterThanOrEqual(layoutAudit.rects.lifeToggle!.bottom + 4);
+    expect(layoutAudit.rects.lifeToggle!.x, '生命显示眼睛是辅助控件，应在阶段轨道右侧避让正式 UI').toBeGreaterThanOrEqual(layoutAudit.rects.phaseProgressIndicator!.right + 6);
+    expect(layoutAudit.rects.phaseProgressIndicator!.y, '阶段轨道应保持在生命显示眼睛下方的独立槽位').toBeGreaterThanOrEqual(layoutAudit.rects.lifeToggle!.bottom + 4);
     expect(layoutAudit.rects.phaseProgressIndicator!.right, '阶段进度不应横向铺成顶部主条').toBeLessThan(layoutAudit.viewport.width * 0.25);
-    expect(layoutAudit.rects.phaseProgressIndicator!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(128);
-    expect(layoutAudit.rects.phaseProgressIndicator!.height, '阶段轨道应是竖向列表').toBeGreaterThan(layoutAudit.rects.phaseProgressIndicator!.width * 1.6);
+    expect(layoutAudit.rects.phaseProgressIndicator!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(160);
+    expect(layoutAudit.rects.phaseProgressIndicator!.height, '阶段轨道应是竖向列表').toBeGreaterThan(layoutAudit.rects.phaseProgressIndicator!.width * 1.4);
     layoutAudit.phaseProgress.itemRects.forEach((rect, index, itemRects) => {
         expect(rect, `阶段项 ${index + 1} 必须可见`).not.toBeNull();
         if (index > 0) {
@@ -2523,14 +2529,16 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.phaseProgress!.itemCount).toBe(8);
         expect(desktopLayoutAudit.phaseProgress!.activeCount).toBe(1);
         expect(desktopLayoutAudit.phaseProgress!.text).toContain('生物行动');
+        expect(desktopLayoutAudit.phaseProgress!.text, '阶段轨道已经自明，不应显示“回合流程 / Turn Flow”自称标题').not.toMatch(/回合流程|Turn Flow/);
         expect(desktopLayoutAudit.phaseProgress!.role, '阶段进度是左侧回看轨道，不能再冒充顶部主提示条').toBe('phase-progress-reference-rail');
         expect(desktopLayoutAudit.phaseProgress!.axis, '阶段进度必须按 DiceThrone 同类职责竖排').toBe('vertical');
         expect(desktopLayoutAudit.phaseProgress!.placement, '阶段进度必须落在左侧参考轨道').toBe('left-reference-rail');
         expect(desktopLayoutAudit.phaseProgress!.rect!.x, '左侧阶段进度必须贴左侧锚点').toBeLessThanOrEqual(24);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.y, '左侧阶段进度必须避开生命显示开关').toBeGreaterThanOrEqual(desktopLayoutAudit.lifeToggle!.rect!.bottom + 4);
+        expect(desktopLayoutAudit.lifeToggle!.rect!.x, '生命显示眼睛是辅助控件，应在阶段轨道右侧避让正式 UI').toBeGreaterThanOrEqual(desktopLayoutAudit.phaseProgress!.rect!.right + 6);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.y, '阶段轨道应保持在生命显示眼睛下方的独立槽位').toBeGreaterThanOrEqual(desktopLayoutAudit.lifeToggle!.rect!.bottom + 4);
         expect(desktopLayoutAudit.phaseProgress!.rect!.right, '阶段进度不应横向铺成顶部主条').toBeLessThan(desktopLayoutAudit.viewportWidth * 0.25);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(128);
-        expect(desktopLayoutAudit.phaseProgress!.rect!.height, '阶段轨道应是竖向列表').toBeGreaterThan(desktopLayoutAudit.phaseProgress!.rect!.width * 1.6);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.width, '左侧阶段轨道仍要可读，不能缩成角标').toBeGreaterThanOrEqual(160);
+        expect(desktopLayoutAudit.phaseProgress!.rect!.height, '阶段轨道应是竖向列表').toBeGreaterThan(desktopLayoutAudit.phaseProgress!.rect!.width * 1.4);
         desktopLayoutAudit.phaseProgress!.itemRects.forEach((rect, index, itemRects) => {
             expect(rect, `2560 阶段项 ${index + 1} 必须可见`).not.toBeNull();
             if (index > 0) {
@@ -2797,10 +2805,8 @@ test.describe('Mage Wars foundation runtime board', () => {
         expect(desktopLayoutAudit.preparedCard!.width).toBeGreaterThanOrEqual(150);
         expect(desktopLayoutAudit.spellbookCard!.width).toBeGreaterThanOrEqual(195);
         expect(desktopLayoutAudit.preparedArea!.y).toBeGreaterThan(desktopLayoutAudit.mainAction!.bottom);
-        expect(Math.abs(
-            desktopLayoutAudit.mainAction!.x + desktopLayoutAudit.mainAction!.width / 2
-            - (desktopLayoutAudit.preparedArea!.x + desktopLayoutAudit.preparedArea!.width / 2),
-        )).toBeLessThanOrEqual(2);
+        expect(desktopLayoutAudit.mainAction!.x, '右侧主按钮必须留在计划区列内，不能回压法术书牌列').toBeGreaterThanOrEqual(desktopLayoutAudit.preparedArea!.x);
+        expect(desktopLayoutAudit.mainAction!.right, '右侧主按钮必须留在视口安全距内').toBeLessThanOrEqual(desktopLayoutAudit.viewportWidth - 8);
         expect(desktopLayoutAudit.fieldCards).toHaveLength(10);
         expect(desktopLayoutAudit.fieldCards.every((card) => card.zoneId === 'a2')).toBe(true);
         expect(desktopLayoutAudit.fieldCards.filter((card) => card.role === 'target').length).toBeGreaterThan(0);

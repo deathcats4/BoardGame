@@ -14,6 +14,7 @@ import {
     getMinionPower,
     grantContextualExtraAction,
     grantContextualExtraMinion,
+    inspectDeck,
     queueMinionPlayEffect,
     recoverCardsFromDiscard,
     removePowerCounter,
@@ -44,6 +45,7 @@ import type {
     CardInstance,
     CardsDrawnEvent,
     CardsDiscardedEvent,
+    CardsMilledEvent,
     DeckReorderedEvent,
     MinionMetadataUpdatedEvent,
     MinionOnBase,
@@ -114,6 +116,7 @@ type DisneyPromptContext = {
         | 'destroyOngoing'
         | 'protectMinionAffect'
         | 'playDeckMinion'
+        | 'searchPlayMinion'
         | 'recoverDiscard'
         | 'recoverCards'
         | 'scarDestroy'
@@ -324,6 +327,18 @@ function collectDeckCards(
             zone: 'deck' as const,
             label: getCardDef(card.defId)?.name ?? card.defId,
         }));
+}
+
+function collectSearchableMinions(
+    state: SmashUpCore,
+    playerId: PlayerId,
+): Array<CardChoice & { label: string }> {
+    return [
+        ...collectDeckCards(state, playerId, card => getMinionDef(card.defId) !== undefined)
+            .map(card => ({ ...card, label: `${card.label}（牌库）` })),
+        ...collectDiscardCards(state, playerId, card => getMinionDef(card.defId) !== undefined)
+            .map(card => ({ ...card, label: `${card.label}（弃牌堆）` })),
+    ];
 }
 
 function recoverDeckCardsToHandEvents(
@@ -783,6 +798,44 @@ function resolvePromptChoice(
             const baseIndex = context.targetBaseIndex ?? 0;
             return { events: found ? playDeckMinionEvents(state.core, context.playerId, found, baseIndex, context.reason, timestamp) : [] };
         }
+        case 'searchPlayMinion': {
+            const choice = value as CardChoice;
+            if (!choice?.cardUid || (choice.zone !== 'deck' && choice.zone !== 'discard')) return { events: [] };
+            const player = state.core.players[context.playerId];
+            if (!player) return { events: [] };
+            const sourceCards = choice.zone === 'deck' ? player.deck : player.discard;
+            const card = sourceCards.find(candidate => candidate.uid === choice.cardUid && candidate.defId === choice.defId);
+            const power = card ? getMinionDef(card.defId)?.power : undefined;
+            if (!card || power === undefined) return { events: [] };
+
+            if (power <= 3) {
+                return {
+                    events: [
+                        grantContextualExtraMinion(
+                            { playerId: context.playerId, now: timestamp, matchState: state },
+                            context.reason,
+                            undefined,
+                            {
+                                specificCardUid: card.uid,
+                                allowFromDiscard: choice.zone === 'discard',
+                                playTiming: 'immediate',
+                                powerMax: 3,
+                            },
+                        ),
+                    ],
+                };
+            }
+
+            return choice.zone === 'deck'
+                ? {
+                    events: [{
+                        type: SU_EVENTS.CARDS_MILLED,
+                        payload: { playerId: context.playerId, cardUids: [card.uid], reason: context.reason },
+                        timestamp,
+                    } as CardsMilledEvent],
+                }
+                : { events: [] };
+        }
         case 'mode':
             return resolveMode(context, state, value as ModeChoice, random, timestamp);
         default:
@@ -801,6 +854,7 @@ const disneyPromptProgram = createPromptProgram<DisneyPromptContext, SmashUpCore
             if (
                 context.kind === 'discardThenDestroyLowPower'
                 || context.kind === 'playDeckMinion'
+                || context.kind === 'searchPlayMinion'
                 || context.kind === 'recoverDiscard'
                 || context.kind === 'recoverCards'
             ) {
@@ -845,10 +899,14 @@ const disneyPromptProgram = createPromptProgram<DisneyPromptContext, SmashUpCore
                     : context.kind === 'mode' ? 'button'
                         : context.kind === 'discardThenDestroyLowPower' ? 'hand'
                             : context.kind === 'recoverDiscard' ? 'discard'
-                                : context.kind === 'playDeckMinion' || context.kind === 'recoverCards' ? 'generic'
+                                : context.kind === 'playDeckMinion'
+                                    || context.kind === 'searchPlayMinion'
+                                    || context.kind === 'recoverCards' ? 'generic'
                                     : context.kind === 'destroyOngoing' ? 'ongoing'
                                         : 'minion',
-                ...(context.kind === 'playDeckMinion' || context.kind === 'recoverCards'
+                ...(context.kind === 'playDeckMinion'
+                    || context.kind === 'searchPlayMinion'
+                    || context.kind === 'recoverCards'
                     ? { genericIntent: 'card-pool' as const }
                     : {}),
                 ...(context.kind === 'recoverDiscard' ? { autoRefresh: 'discard' as const } : {}),
@@ -1527,14 +1585,25 @@ function letItGo(ctx: AbilityContext): AbilityResult {
 }
 
 function reindeers(ctx: AbilityContext): AbilityResult {
-    return promptMinion(ctx, {
+    const cards = collectSearchableMinions(ctx.state, ctx.playerId);
+    if (cards.length === 0 || !ctx.matchState) return { events: [] };
+    const result = runPrompt({
+        matchState: ctx.matchState,
+        playerId: ctx.playerId,
+        now: ctx.now,
         sourceId: 'frozen_reindeers_are_better_than_people',
-        title: '驯鹿的心地比人好：选择你的一个角色',
-        kind: 'addTempPower',
-        minions: collectOwnMinions(ctx.state, ctx.playerId),
-        amount: hasDefInPlay(ctx.state, 'frozen_sven') ? 4 : 2,
+        title: '驯鹿的心地比人好：搜索牌库和/或弃牌堆中的一个角色',
+        kind: 'searchPlayMinion',
+        cards,
         reason: 'frozen_reindeers_are_better_than_people',
     });
+    return {
+        ...result,
+        events: [
+            inspectDeck(ctx.playerId, ctx.playerId, ctx.state.players[ctx.playerId]?.deck.length ?? 0, 'frozen_reindeers_are_better_than_people', ctx.now),
+            ...result.events,
+        ],
+    };
 }
 
 function rafiki(ctx: AbilityContext): AbilityResult {

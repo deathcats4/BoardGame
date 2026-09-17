@@ -163,6 +163,12 @@ export function RecentRollPanel({
         })
       : "";
   const primaryOutcomeLabel = roll.latestLabel;
+  const eventThresholdsLabel = roll.branchThresholds?.length
+    ? [...roll.branchThresholds]
+      .sort((left, right) => right.min - left.min)
+      .map((branch) => `${branch.min}+ ${branch.label}`)
+      .join(" · ")
+    : "";
   const diceStageRoll: BetrayalRecentRollState = showEventDamageDiceStage
     ? roll.kind === "eventRolledDamage"
       ? roll
@@ -248,6 +254,7 @@ export function RecentRollPanel({
       shouldShowEventDamageSubtitle ||
       shouldShowEventDamageEffect ||
       shouldShowPrimaryOutcome ||
+      Boolean(eventThresholdsLabel && showOutcome && !showEventDamageDiceStage) ||
       shouldShowEventDamageVisibleSummary ||
       (showBreakdown && attackComparisonText),
   );
@@ -357,6 +364,15 @@ export function RecentRollPanel({
         {shouldShowVisibleRollLabel ? (
           <div className="mt-0.5 truncate text-[12px] font-semibold text-[#d8c38b]">
             {roll.rollLabel ?? t("board.roll.fallbackLabel")}
+          </div>
+        ) : null}
+        {eventThresholdsLabel && showOutcome && !showEventDamageDiceStage ? (
+          <div
+            data-testid="betrayal-recent-roll-thresholds"
+            data-result-role="roll-thresholds"
+            className="mt-1 whitespace-normal break-words text-[11px] font-semibold leading-[15px] text-[#f0d99a]"
+          >
+            {t("board.roll.thresholds", { value: eventThresholdsLabel })}
           </div>
         ) : null}
         {shouldShowEventDamageDescription ? (
@@ -496,6 +512,9 @@ export function RecentRollPanel({
       ))}
       <span>{rollDetailText}</span>
       <span>{totalLabel}</span>
+      {eventThresholdsLabel && showOutcome && !showEventDamageDiceStage ? (
+        <span>{t("board.roll.thresholds", { value: eventThresholdsLabel })}</span>
+      ) : null}
       {shouldShowEventDamageDescription ? <span>{eventDamageDescriptionLabel}</span> : null}
       {shouldShowEventDamageSubtitle ? <span>{eventDamageSubtitleLabel}</span> : null}
       {shouldShowEventDamageEffect ? <span>{eventDamageEffectLabel}</span> : null}

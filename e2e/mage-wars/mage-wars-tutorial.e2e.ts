@@ -694,6 +694,7 @@ async function expectMageWarsReadableViewport(page: Page, viewport: ResponsivePl
         const opponentPreparedMirror = document.querySelector<HTMLElement>('[data-testid="mage-wars-opponent-prepared-mirror"]');
         const lifeToggle = document.querySelector<HTMLElement>('[data-testid="mage-wars-life-toggle"]');
         const scaleBadge = document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport-scale"]');
+        const fabMenu = document.querySelector<HTMLElement>('[data-testid="fab-menu"]');
         const arenaViewport = document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-viewport"]');
         const arenaStage = document.querySelector<HTMLElement>('[data-testid="mage-wars-arena-stage"]');
         const arenaZones = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="mage-wars-arena-zone-"]'));
@@ -828,6 +829,7 @@ async function expectMageWarsReadableViewport(page: Page, viewport: ResponsivePl
                 opponentPreparedMirror: toRect(opponentPreparedMirror),
                 lifeToggle: toRect(lifeToggle),
                 scaleBadge: toRect(scaleBadge),
+                fabMenu: toRect(fabMenu),
                 arenaViewport: toRect(arenaViewport),
                 arenaStage: toRect(arenaStage),
                 spellbookShelf: toRect(spellbookShelf),
@@ -844,6 +846,11 @@ async function expectMageWarsReadableViewport(page: Page, viewport: ResponsivePl
                 { name: 'hud-plan-button', value: intersects(toRect(selfHud), toRect(planButton)) },
                 { name: 'life-toggle-self-hud', value: intersects(toRect(lifeToggle), toRect(selfHud)) },
                 { name: 'life-toggle-scale-badge', value: intersects(toRect(lifeToggle), toRect(scaleBadge)) },
+                { name: 'fab-phase-progress', value: intersects(toRect(fabMenu), toRect(document.querySelector<HTMLElement>('[data-testid="mage-wars-phase-progress-indicator"]'))) },
+                { name: 'fab-life-toggle', value: intersects(toRect(fabMenu), toRect(lifeToggle)) },
+                { name: 'fab-scale-badge', value: intersects(toRect(fabMenu), toRect(scaleBadge)) },
+                { name: 'fab-self-hud', value: intersects(toRect(fabMenu), toRect(selfHud)) },
+                { name: 'fab-bottom-grid', value: intersects(toRect(fabMenu), toRect(bottomGrid)) },
                 { name: 'opponent-hint-opponent-plans', value: intersects(toRect(opponentHintCard), toRect(opponentPreparedMirror)) },
             ],
         };
@@ -947,6 +954,7 @@ async function expectMageWarsReadableViewport(page: Page, viewport: ResponsivePl
     expect(audit.rects.opponentPreparedMirror, '对手隐藏计划提示必须可见').not.toBeNull();
     expect(audit.rects.lifeToggle, '全场生命眼睛必须可见').not.toBeNull();
     expect(audit.rects.scaleBadge, '地图缩放读数必须有独立锚点').not.toBeNull();
+    expect(audit.rects.fabMenu, '真实布局验收必须保留全局辅助悬浮球').not.toBeNull();
     expect(audit.rects.selfHud!.x, `${viewport.label} 计划态己方 HUD 必须贴左下顶层服务区`).toBeGreaterThanOrEqual(0);
     expect(audit.rects.selfHud!.x, `${viewport.label} 计划态己方 HUD 不能启用按场上实体驱动的大比例安全偏移`).toBeLessThanOrEqual(32);
     expect(audit.rects.selfHud!.right, `${viewport.label} 己方 HUD 集群不得越过桌面中线`).toBeLessThan(audit.viewport.width * 0.58);

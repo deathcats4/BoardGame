@@ -42,6 +42,18 @@ const collectPlayerText = (value: unknown): string[] => {
     return [];
 };
 
+const forbiddenOtherSeatOperationCopy = [
+    /(?:请|现在|先|再|然后|接着|需要|要|去|点击|点)[^。\n]{0,18}(?:替|代替)(?:队友|对手|另一名玩家|另一名探索者)/,
+    /切到(?:队友|对手|另一名玩家|另一名探索者)[^。\n]{0,24}(?:点|确认|探索|结束回合|同意)/,
+    /你来[^。\n]{0,24}(?:队友|对手|另一名玩家|另一名探索者)[^。\n]{0,24}(?:回合|确认|探索|结束回合|同意)/,
+];
+
+const expectNoCurrentPlayerDelegatesOtherSeat = (text: string) => {
+    for (const pattern of forbiddenOtherSeatOperationCopy) {
+        expect(text).not.toMatch(pattern);
+    }
+};
+
 const LOCKED_EVENT_FRONT_FRAMES = {
     标本剥制: 0,
     不可能的房间: 1,
@@ -375,7 +387,7 @@ describe('Betrayal 教程配置', () => {
         expect(manifest?.steps.find((step) => step.id === 'banish-mummy')).toBeUndefined();
     });
 
-    it('队友自动行动只能隐藏推进，不能停成玩家可见教程卡', () => {
+    it('队友规则动作由系统执行，但规则原文和公开结果必须由可见卡承接', () => {
         for (const tutorialId of ['basic-setup-and-turn', 'haunt-natural-trigger-flow'] as const) {
             const manifest = tutorialCatalog.tutorials[tutorialId]?.manifest;
             expect(manifest).toBeTruthy();
@@ -395,6 +407,15 @@ describe('Betrayal 教程配置', () => {
             expect(manifest?.steps.find((step) => step.id === 'teammate-two-omen-results')).toBeUndefined();
             expect(manifest?.steps.find((step) => step.id === 'teammate-confirm-haunt-trigger')).toBeUndefined();
         }
+        expect(zhCNLocale.tutorial.mainPath.steps.moveToGrandStaircase).toContain('两名探索者');
+        expect(zhCNLocale.tutorial.mainPath.steps.moveToGrandStaircase).toContain('公开预兆');
+        expect(zhCNLocale.tutorial.mainPath.steps.moveToGrandStaircase).toContain('作祟仍未开始');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.handOffToTeammateSecondCycle).toContain('两名探索者');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.handOffToTeammateSecondCycle).toContain('公开预兆');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.handOffToTeammateSecondCycle).toContain('没有达到 5+');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.heroReaderOpened).toContain('另一名探索者');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.heroReaderOpened).toContain('新的预兆');
+        expect(zhCNLocale.tutorial.hauntNaturalTrigger.steps.heroReaderOpened).toContain('达到 5+');
     });
 
     it('默认教程在兔脚已消费后会判定“使用兔脚”步骤过期', () => {
@@ -1512,8 +1533,9 @@ describe('Betrayal 教程配置', () => {
         expect(hauntTriggerSteps.setupNaturalHauntFlow).toContain('你在图书馆旁边结束自己的回合');
         expect(hauntTriggerSteps.setupNaturalHauntFlow).toContain('叛徒读本另有独立章节');
         expect(hauntTriggerSteps.handOffToTeammateOne).toContain('结束回合');
-        expect(hauntTriggerSteps.watchTeammateOmenTurns).toContain('请稍候');
-        expect(hauntTriggerSteps.watchTeammateOmenTurns).toContain('下一次可操作时刻');
+        expect(hauntTriggerSteps.watchTeammateOmenTurns).toContain('下一名探索者');
+        expect(hauntTriggerSteps.watchTeammateOmenTurns).toContain('公开预兆');
+        expect(hauntTriggerSteps.watchTeammateOmenTurns).toContain('你不用代操作');
         expect(hauntTriggerSteps.watchTeammateOmenTurns).not.toContain('点“探索”');
         expect(hauntTriggerSteps.watchTeammateOmenTurns).not.toContain('点“结束回合”');
         expect(zhCNLocale.tutorial.mainPath.steps).not.toHaveProperty('teammateOneOmenResults');
@@ -1525,19 +1547,24 @@ describe('Betrayal 教程配置', () => {
         const mainPathText = collectPlayerText(zhCNLocale.tutorial.mainPath.steps).join('\n');
         const naturalFlowText = collectPlayerText(hauntTriggerSteps).join('\n');
         for (const text of [mainPathText, naturalFlowText]) {
-            expect(text).not.toContain('队友 1 获得指环，作祟仍未开始；轮到队友 2 继续行动。');
-            expect(text).not.toMatch(/队友\s*[12].*(移动|探索|确认|获得|翻出|结束回合)/);
+            expectNoCurrentPlayerDelegatesOtherSeat(text);
             expect(text).not.toContain('这一步不是你确认');
             expect(text).not.toContain('点“下一步”');
-            expect(text).not.toContain('等待队友');
         }
-        expect(hauntTriggerSteps.watchTeammateTwoOmenTurn).toContain('请稍候');
-        expect(hauntTriggerSteps.watchTeammateTwoOmenTurn).toContain('下一次可操作时刻');
+        expect(hauntTriggerSteps.watchTeammateTwoOmenTurn).toContain('另一名探索者');
+        expect(hauntTriggerSteps.watchTeammateTwoOmenTurn).toContain('公开预兆');
+        expect(hauntTriggerSteps.watchTeammateTwoOmenTurn).toContain('未达到 5+');
         expect(hauntTriggerSteps.handOffToTeammateSecondCycle).toContain('现在又轮到你');
+        expect(hauntTriggerSteps.handOffToTeammateSecondCycle).toContain('两名探索者');
+        expect(hauntTriggerSteps.handOffToTeammateSecondCycle).toContain('公开预兆');
         expect(hauntTriggerSteps.handOffToTeammateSecondCycle).toContain('作祟风险来自');
-        expect(hauntTriggerSteps.watchTeammateHauntTrigger).toContain('请稍候');
+        expect(hauntTriggerSteps.watchTeammateHauntTrigger).toContain('下一名探索者');
+        expect(hauntTriggerSteps.watchTeammateHauntTrigger).toContain('新的预兆');
+        expect(hauntTriggerSteps.watchTeammateHauntTrigger).toContain('5+');
         expect(hauntTriggerSteps.watchTeammateHauntTrigger).toContain('英雄读本');
-        expect(hauntTriggerSteps.heroReaderOpened).not.toContain('队友');
+        expect(hauntTriggerSteps.heroReaderOpened).toContain('另一名探索者');
+        expect(hauntTriggerSteps.heroReaderOpened).toContain('新的预兆');
+        expect(hauntTriggerSteps.heroReaderOpened).toContain('达到 5+');
         expect(hauntTriggerSteps.heroReaderOpened).toContain('你仍是英雄');
         expect(hauntTriggerSteps.heroReaderOpened).toContain('英雄开场过场');
         expect(hauntTriggerSteps.heroReaderOpened).toContain('不是剧本书目标页');
@@ -1658,6 +1685,7 @@ describe('Betrayal 教程配置', () => {
         expect(zhCNLocale.tutorial.mummyMonsterActions.steps.stealResult).toContain('被偷的英雄不扣减能力');
         const playerTutorialText = collectPlayerText(zhCNLocale.tutorial).join('\n');
         const englishTutorialText = collectPlayerText(enLocale.tutorial).join('\n');
+        expectNoCurrentPlayerDelegatesOtherSeat(playerTutorialText);
         expect(playerTutorialText).not.toMatch(/真实链路|运行态|不是动画|不是说明图层|不是教程按钮|E2E|正式验证|收口|收尾|终局页|房间焦点入口|对攻/);
         expect(playerTutorialText).not.toMatch(/不常驻|写满公式|业务公式|悬浮提示才|验收|测试|AI|HUD|为什么和|不是凭空出现|同一画面|同屏|同一次发现|结果面板|日志摘要|奖励条|行动槽|终幕报告|背景说明|为了演示|演示|面板会|面板|摘要|队列|待放置状态|主视区|动作区|结果区|横幅|提示条|底部动作|移动圆牌|读完骰盘|读完攻击骰盘|在这里|实现|运行态/);
         expect(englishTutorialText).not.toMatch(/same screen|same frame|result panel|summary|queue|for this .*demo|demo|placement preview|bottom actions|movement medallion|dice table|attack dice, bonus, and result|screen|panel|summary|queue|banner|implementation|runtime|here\./i);

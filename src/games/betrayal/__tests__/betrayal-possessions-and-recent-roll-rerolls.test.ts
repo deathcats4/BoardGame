@@ -371,7 +371,7 @@ it('兔脚会重掷刚刚事件检定的一颗骰子，并回写原事件分支�
         expect(core.recentRoll?.dice).toEqual([0, 0, 0]);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: -1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -393,7 +393,7 @@ it('兔脚会重掷刚刚事件检定的一颗骰子，并回写原事件分支�
         expect(core.recentRoll?.dice).toEqual([2, 0, 0]);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: -1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -478,7 +478,7 @@ it('兔脚重掷事件骰后，普通最终分支必须等待玩家确认新骰�
         expect(core.currentExplorer.traits.knowledge).toBe(3);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: -1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -500,7 +500,7 @@ it('兔脚重掷事件骰后，普通最终分支必须等待玩家确认新骰�
             playerId: '0',
             sourceTitle: '墙中低语',
             effect: { mode: 'trait', trait: 'knowledge', amount: -1, recommendedAction: 'endTurn' },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         };
@@ -524,7 +524,7 @@ it('兔脚重掷事件骰后，普通最终分支必须等待玩家确认新骰�
         expect(core.currentExplorer.traits.knowledge).toBe(3);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: 1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -609,7 +609,7 @@ it('恐怖玩偶重掷事件属性检定后，普通最终分支必须等待玩�
         expect(core.usedCardIdsThisTurn).toContain('scary-doll');
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: 1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -896,7 +896,7 @@ it('兔脚可以重掷刚刚事件固定投骰，并回写原事件分支结算'
         expect(core.recentRoll?.dice).toEqual([2, 0]);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'sanity', amount: -1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -969,7 +969,7 @@ it('兔脚可以重掷标本剥制力量检定，并在展示结束后只应用�
         expect(core.rooms.find((room) => room.id === 'ground-north')?.markerTokens ?? []).not.toContain('obstacle');
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'sanity', amount: 1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -1226,7 +1226,7 @@ it('兔脚重掷电话铃声时会在确认新骰面后应用新分支', () => {
         expect(core.currentExplorer.traits.sanity).toBe(4);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'trait', trait: 'knowledge', amount: 1 },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });
@@ -1299,7 +1299,7 @@ it('兔脚重掷小机器人时会在确认新骰面后应用新分支', () => {
         expect(core.currentExplorer.traits.speed).toBe(4);
         expect(core.pendingEventRollResolution).toMatchObject({
             effect: { mode: 'rolledDamage', dice: 1, damageKind: 'physical' },
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
         });

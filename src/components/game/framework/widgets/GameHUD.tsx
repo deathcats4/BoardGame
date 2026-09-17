@@ -111,8 +111,9 @@ interface GameHUDProps {
 const EMPTY_EMOTES: readonly EmoteDefinition[] = [];
 
 const MAGE_WARS_GAME_HUD_FAB_POSITION: FabMenuPosition = 'top-left';
-const MAGE_WARS_GAME_HUD_FAB_STORAGE_KEY = 'game_hud_fab_position:mage-wars';
+const MAGE_WARS_GAME_HUD_FAB_STORAGE_KEY = 'game_hud_fab_position:mage-wars:v2';
 const MAGE_WARS_GAME_HUD_FAB_LEGACY_OFFSET_STORAGE_KEY = 'game_hud_fab_offset:mage-wars';
+const MAGE_WARS_GAME_HUD_FAB_INITIAL_OFFSET = { left: 136 } as const;
 
 export const GameHUD = ({
     mode,
@@ -1200,6 +1201,7 @@ export const GameHUD = ({
                 isDark={true}
                 items={items}
                 position={fabMenuPosition}
+                initialOffset={_gameId === 'mage-wars' ? MAGE_WARS_GAME_HUD_FAB_INITIAL_OFFSET : undefined}
                 zIndex={GAME_HUD_FAB_Z_INDEX}
                 storageKey={fabMenuStorageKey}
                 legacyOffsetStorageKey={fabMenuLegacyOffsetStorageKey}

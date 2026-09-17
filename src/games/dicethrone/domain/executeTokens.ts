@@ -421,7 +421,7 @@ export function executeTokenCommand(
                     break;
                 }
                 const pendingAttack = state.pendingAttack;
-                if (!pendingAttack) {
+                if (!pendingAttack && !activeRollToken.requiresOpponentRollDice) {
                     console.warn('[DiceThrone] USE_TOKEN: missing pending attack for roll token');
                     break;
                 }
@@ -441,8 +441,8 @@ export function executeTokenCommand(
                     const targetId = activeRollToken.requiresOpponentRollDice
                         ? activeRollToken.currentRollContext.ownerPlayerId
                         : phase === 'defensiveRoll'
-                            ? pendingAttack.attackerId
-                            : (pendingAttack.defenderId ?? pendingAttack.attackerId);
+                            ? pendingAttack!.attackerId
+                            : (pendingAttack!.defenderId ?? pendingAttack!.attackerId);
                     const handler = getCustomActionHandler(tokenDef.activeUse.customActionId);
                     if (handler) {
                         events.push(...handler({

@@ -37,6 +37,7 @@ export type FabMenuPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'to
 interface FabMenuProps {
     items: FabAction[];
     position?: FabMenuPosition;
+    initialOffset?: { left?: number; top?: number };
     isDark?: boolean;
     /** 覆盖悬浮球整体层级（默认 UI_Z_INDEX.hud） */
     zIndex?: number;
@@ -122,6 +123,7 @@ export const areFabAnchorRectsEqual = (left: FabAnchorRect | null, right: FabAnc
 export const FabMenu = ({
     items,
     position: initialPosition = 'bottom-right',
+    initialOffset,
     isDark = true,
     zIndex = UI_Z_INDEX.hud,
     storageKey = HUD_FAB_POSITION_KEY,
@@ -222,11 +224,18 @@ export const FabMenu = ({
         const maxTop = Math.max(minTop, viewportHeight - dockedButtonSize - edgePadding - safeAreaInsets.bottom);
         // 默认位置往内偏移，不贴边
         const DEFAULT_INSET = Math.max(dockedButtonSize, 48);
-        if (initialPosition === 'bottom-right') return { left: maxLeft - DEFAULT_INSET, top: maxTop - DEFAULT_INSET };
-        if (initialPosition === 'bottom-left') return { left: minLeft + DEFAULT_INSET, top: maxTop - DEFAULT_INSET };
-        if (initialPosition === 'top-right') return { left: maxLeft - DEFAULT_INSET, top: minTop + DEFAULT_INSET };
-        return { left: minLeft + DEFAULT_INSET, top: minTop + DEFAULT_INSET };
-    }, [dockedButtonSize, edgePadding, initialPosition, safeAreaInsets.bottom, safeAreaInsets.left, safeAreaInsets.right, safeAreaInsets.top, viewportHeight, viewportWidth]);
+        const basePosition = initialPosition === 'bottom-right'
+            ? { left: maxLeft - DEFAULT_INSET, top: maxTop - DEFAULT_INSET }
+            : initialPosition === 'bottom-left'
+                ? { left: minLeft + DEFAULT_INSET, top: maxTop - DEFAULT_INSET }
+                : initialPosition === 'top-right'
+                    ? { left: maxLeft - DEFAULT_INSET, top: minTop + DEFAULT_INSET }
+                    : { left: minLeft + DEFAULT_INSET, top: minTop + DEFAULT_INSET };
+        return clampPosition({
+            left: basePosition.left + (initialOffset?.left ?? 0),
+            top: basePosition.top + (initialOffset?.top ?? 0),
+        }, { allowOverflow: false });
+    }, [clampPosition, dockedButtonSize, edgePadding, initialOffset?.left, initialOffset?.top, initialPosition, safeAreaInsets.bottom, safeAreaInsets.left, safeAreaInsets.right, safeAreaInsets.top, viewportHeight, viewportWidth]);
 
     // 加载保存的位置（支持百分比格式，兼容旧绝对坐标）
     useEffect(() => {

@@ -645,16 +645,19 @@ function MageWarsLifeToggle({
     );
 }
 
+const MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH = 'clamp(8.75rem, 8.5vw, 10.75rem)';
+
 function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
     const { t } = useTranslation('game-mage-wars');
     const currentIndex = Math.max(0, MAGE_WARS_PHASE_ORDER.indexOf(phase));
 
     return (
         <aside
-            className="pointer-events-none absolute z-20 w-[clamp(8.75rem,8.5vw,10.75rem)] rounded-[0.42rem] border border-amber-100/18 bg-stone-950/50 px-2 py-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
+            className="pointer-events-none absolute z-20 rounded-[0.42rem] border border-amber-100/18 bg-stone-950/50 px-2 py-2 text-amber-50 shadow-[0_10px_26px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
             style={{
                 left: 'var(--mage-wars-desktop-side-inset, 1rem)',
                 top: 'calc(var(--mage-wars-desktop-top-inset, 0.875rem) + 3.25rem)',
+                width: MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH,
             }}
             data-testid="mage-wars-phase-progress-indicator"
             data-tutorial-id="mw-phase-progress"
@@ -666,9 +669,6 @@ function MageWarsPhaseProgressIndicator({ phase }: { phase: MageWarsPhase }) {
             aria-label={t('ui.phaseProgressTitle')}
         >
             <div className="flex min-w-0 flex-col gap-1.5">
-                <div className="truncate pl-0.5 text-[0.68rem] font-black uppercase leading-none tracking-[0.12em] text-amber-100/78">
-                    {t('ui.phaseProgressTitle')}
-                </div>
                 <ol className="flex min-w-0 flex-col gap-1">
                     {MAGE_WARS_PHASE_ORDER.map((phaseId, index) => {
                         const active = phaseId === phase;
@@ -4929,8 +4929,8 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                     scaleTestId="mage-wars-arena-viewport-scale"
                     scaleBadgeVisibility="interaction"
                     scaleBadgeStyle={isLandscapeMobileViewport ? undefined : {
-                        left: 'calc(var(--mage-wars-desktop-side-inset, 1rem) + 3.5rem)',
-                        top: '1rem',
+                        left: `calc(var(--mage-wars-desktop-side-inset, 1rem) + ${MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH} + 3.5rem)`,
+                        top: 'var(--mage-wars-desktop-top-inset, 0.875rem)',
                     }}
                     className="flex h-full w-full items-center justify-center"
                     contentClassName="relative shrink-0"
@@ -5011,7 +5011,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                 pressed={showBoardLifeTotals}
                 onToggle={() => setShowBoardLifeTotals((value) => !value)}
                 style={isLandscapeMobileViewport ? undefined : {
-                    left: 'var(--mage-wars-desktop-side-inset, 1rem)',
+                    left: `calc(var(--mage-wars-desktop-side-inset, 1rem) + ${MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH} + 0.5rem)`,
                     top: 'var(--mage-wars-desktop-top-inset, 0.875rem)',
                 }}
                 className={isLandscapeMobileViewport ? 'left-4 top-4' : undefined}
@@ -5166,13 +5166,15 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                         />
                     ) : null}
                 </aside>
-                <aside className="pointer-events-none flex flex-col items-center gap-2 justify-self-end">
+                <aside className="pointer-events-none flex flex-col items-end gap-2 justify-self-end">
                     {publicViewPlayer ? (
-                        <DiscardPile
-                            player={publicViewPlayer}
-                            onInspectCard={handleInspectSpellCard}
-                            ownerRole={isOpponentPublicView ? 'opponent' : 'self'}
-                        />
+                        <div style={{ marginRight: 'clamp(1.375rem, 1.55vw, 1.875rem)' }}>
+                            <DiscardPile
+                                player={publicViewPlayer}
+                                onInspectCard={handleInspectSpellCard}
+                                ownerRole={isOpponentPublicView ? 'opponent' : 'self'}
+                            />
+                        </div>
                     ) : null}
                     <div className="pointer-events-auto">
                         <TurnStatusDock

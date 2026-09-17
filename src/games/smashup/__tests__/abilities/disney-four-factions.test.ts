@@ -1006,24 +1006,24 @@ describe('迪士尼四派系代表性玩法行为', () => {
         expect(allowedOwnerLow.finalState.core.bases[0].minions.map(minion => minion.uid)).toEqual(['owner-low']);
     });
 
-    it('冰雪奇缘：驯鹿的心地比人好必须选择己方角色，且斯文在场时改为 +4', () => {
-        const withoutSven = makeState({
+    it('冰雪奇缘：驯鹿的心地比人好可从牌库搜索力量 3 或更低的角色并立即额外打出', () => {
+        const core = makeState({
             players: {
-                '0': makePlayer('0'),
+                '0': makePlayer('0', {
+                    hand: [makeCard('other-low', 'frozen_snowgie', 'minion', '0')],
+                    deck: [
+                        makeCard('chosen-low', 'frozen_olaf', 'minion', '0'),
+                        makeCard('high', 'frozen_anna', 'minion', '0'),
+                    ],
+                }),
                 '1': makePlayer('1'),
             },
-            bases: [
-                makeBase('base_arendelle', [
-                    makeMinion('first-reindeer-target', 'frozen_snowgie', '0', 2),
-                    makeMinion('chosen-reindeer-target', 'frozen_olaf', '0', 3),
-                    makeMinion('enemy-target', 'pirate_saucy_wench', '1', 3),
-                ]),
-            ],
+            bases: [makeBase('base_arendelle')],
         });
 
-        const normal = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
-            state: withoutSven,
-            matchState: makeMatchState(withoutSven),
+        const searched = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
             playerId: '0',
             cardUid: 'reindeers',
             defId: 'frozen_reindeers_are_better_than_people',
@@ -1031,61 +1031,204 @@ describe('迪士尼四派系代表性玩法行为', () => {
             random: FIXED_RANDOM,
             now: 46,
         });
+        const searchPrompt = getSimpleChoicePrompt(searched.matchState!, 'disney_four_factions_prompt');
+        expect(getPromptOptions(searchPrompt).map(option => [option.value?.cardUid, option.value?.zone])).toEqual([
+            ['chosen-low', 'deck'],
+            ['high', 'deck'],
+        ]);
 
-        expect(normal.events.some(event => event.type === SU_EVENTS.TEMP_POWER_ADDED)).toBe(false);
-        const normalPrompt = getSimpleChoicePrompt(normal.matchState!, 'disney_four_factions_prompt');
-        expect(normalPrompt.autoResolveIfSingle).toBe(false);
-        expect(getPromptOptions(normalPrompt).map(option => option.value?.minionUid)).toEqual(['first-reindeer-target', 'chosen-reindeer-target']);
-        const normalResolved = respondToPromptOption(
-            normal.matchState!,
-            option => option.value?.minionUid === 'chosen-reindeer-target',
-            '驯鹿目标',
+        const selected = respondToPromptOption(
+            searched.matchState!,
+            option => option.value?.cardUid === 'chosen-low',
+            '驯鹿搜索牌库低力量角色',
             '0',
             FIXED_RANDOM,
         );
-        expect(normalResolved.success, normalResolved.error).toBe(true);
-        expect(normalResolved.events).toContainEqual(expect.objectContaining({
-            type: SU_EVENTS.TEMP_POWER_ADDED,
-            payload: expect.objectContaining({ minionUid: 'chosen-reindeer-target', amount: 2, reason: 'frozen_reindeers_are_better_than_people' }),
+        expect(selected.success, selected.error).toBe(true);
+        expect(selected.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.LIMIT_MODIFIED,
+            payload: expect.objectContaining({
+                playerId: '0',
+                limitType: 'minion',
+                playTiming: 'immediate',
+                specificCardUid: 'chosen-low',
+                powerMax: 3,
+            }),
         }));
-        expect(normalResolved.finalState.core.bases[0].minions.find(minion => minion.uid === 'first-reindeer-target')?.tempPowerModifier ?? 0).toBe(0);
-        expect(normalResolved.finalState.core.bases[0].minions.find(minion => minion.uid === 'chosen-reindeer-target')?.tempPowerModifier).toBe(2);
 
-        const withSven = makeState({
+        const extraPrompt = getSimpleChoicePrompt(selected.finalState, 'smashup_immediate_extra_minion');
+        expect(getPromptOptions(extraPrompt).map(option => option.value?.cardUid).filter(Boolean)).toEqual(['chosen-low']);
+        const chosenCard = respondToPromptOption(
+            selected.finalState,
+            option => option.value?.cardUid === 'chosen-low',
+            '驯鹿立即选择被搜索角色',
+            '0',
+            FIXED_RANDOM,
+        );
+        const played = respondToPromptOption(
+            chosenCard.finalState,
+            option => option.value?.baseIndex === 0,
+            '驯鹿额外角色选择基地',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(played.success, played.error).toBe(true);
+        expect(played.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.MINION_PLAYED,
+            payload: expect.objectContaining({ cardUid: 'chosen-low', fromDeck: true }),
+        }));
+        expect(played.finalState.core.bases[0].minions.map(minion => minion.uid)).toContain('chosen-low');
+        expect(played.finalState.core.players['0'].deck.map(card => card.uid)).not.toContain('chosen-low');
+        expect(played.finalState.core.players['0'].specificExtraMinionPlays).toBeUndefined();
+    });
+
+    it('冰雪奇缘：驯鹿的心地比人好可从弃牌堆搜索力量 3 或更低的角色并立即额外打出', () => {
+        const core = makeState({
             players: {
-                '0': makePlayer('0'),
+                '0': makePlayer('0', {
+                    deck: [makeCard('deck-action', 'frozen_lock_the_gates', 'action', '0')],
+                    discard: [
+                        makeCard('chosen-low-discard', 'frozen_snowgie', 'minion', '0'),
+                        makeCard('high-discard', 'frozen_anna', 'minion', '0'),
+                    ],
+                }),
                 '1': makePlayer('1'),
             },
-            bases: [
-                makeBase('base_arendelle', [
-                    makeMinion('sven', 'frozen_sven', '1', 3),
-                    makeMinion('boosted-by-sven', 'frozen_snowgie', '0', 2),
-                ]),
-            ],
+            bases: [makeBase('base_arendelle')],
         });
-        const boosted = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
-            state: withSven,
-            matchState: makeMatchState(withSven),
+
+        const searched = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
             playerId: '0',
-            cardUid: 'reindeers-with-sven',
+            cardUid: 'reindeers',
             defId: 'frozen_reindeers_are_better_than_people',
             baseIndex: 0,
             random: FIXED_RANDOM,
             now: 47,
         });
-        const boostedResolved = respondToPromptOption(
-            boosted.matchState!,
-            option => option.value?.minionUid === 'boosted-by-sven',
-            '有斯文时的驯鹿目标',
+        const selected = respondToPromptOption(
+            searched.matchState!,
+            option => option.value?.cardUid === 'chosen-low-discard',
+            '驯鹿搜索弃牌堆低力量角色',
             '0',
             FIXED_RANDOM,
         );
-        expect(boostedResolved.success, boostedResolved.error).toBe(true);
-        expect(boostedResolved.events).toContainEqual(expect.objectContaining({
-            type: SU_EVENTS.TEMP_POWER_ADDED,
-            payload: expect.objectContaining({ minionUid: 'boosted-by-sven', amount: 4, reason: 'frozen_reindeers_are_better_than_people' }),
+        expect(selected.success, selected.error).toBe(true);
+        expect(selected.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.LIMIT_MODIFIED,
+            payload: expect.objectContaining({
+                specificCardUid: 'chosen-low-discard',
+                allowFromDiscard: true,
+                playTiming: 'immediate',
+            }),
         }));
-        expect(boostedResolved.finalState.core.bases[0].minions.find(minion => minion.uid === 'boosted-by-sven')?.tempPowerModifier).toBe(4);
+
+        const chosenCard = respondToPromptOption(
+            selected.finalState,
+            option => option.value?.cardUid === 'chosen-low-discard',
+            '驯鹿立即选择弃牌堆角色',
+            '0',
+            FIXED_RANDOM,
+        );
+        const played = respondToPromptOption(
+            chosenCard.finalState,
+            option => option.value?.baseIndex === 0,
+            '驯鹿弃牌堆角色选择基地',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(played.success, played.error).toBe(true);
+        expect(played.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.MINION_PLAYED,
+            payload: expect.objectContaining({
+                cardUid: 'chosen-low-discard',
+                fromDiscard: true,
+                discardPlaySourceId: 'frozen_reindeers_are_better_than_people',
+                consumesNormalLimit: false,
+            }),
+        }));
+        expect(played.finalState.core.bases[0].minions.map(minion => minion.uid)).toContain('chosen-low-discard');
+        expect(played.finalState.core.players['0'].discard.map(card => card.uid)).not.toContain('chosen-low-discard');
+    });
+
+    it('冰雪奇缘：驯鹿的心地比人好选择牌库中力量超过 3 的角色后将其弃置', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    deck: [
+                        makeCard('high-deck', 'frozen_anna', 'minion', '0'),
+                        makeCard('low-deck', 'frozen_snowgie', 'minion', '0'),
+                    ],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_arendelle')],
+        });
+
+        const searched = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            cardUid: 'reindeers',
+            defId: 'frozen_reindeers_are_better_than_people',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 48,
+        });
+        const selected = respondToPromptOption(
+            searched.matchState!,
+            option => option.value?.cardUid === 'high-deck',
+            '驯鹿搜索牌库高力量角色',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(selected.success, selected.error).toBe(true);
+        expect(selected.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.CARDS_MILLED,
+            payload: expect.objectContaining({ playerId: '0', cardUids: ['high-deck'] }),
+        }));
+        expect(selected.finalState.core.players['0'].deck.map(card => card.uid)).toEqual(['low-deck']);
+        expect(selected.finalState.core.players['0'].discard.map(card => card.uid)).toEqual(['high-deck']);
+        expect(selected.finalState.sys.interaction?.current).toBeUndefined();
+    });
+
+    it('冰雪奇缘：驯鹿的心地比人好只允许额外打出刚搜索到的那一张角色', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    hand: [makeCard('other-low', 'frozen_snowgie', 'minion', '0')],
+                    deck: [makeCard('chosen-low', 'frozen_olaf', 'minion', '0')],
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase('base_arendelle')],
+        });
+
+        const searched = invokeRegisteredAbilityContract('frozen_reindeers_are_better_than_people', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            cardUid: 'reindeers',
+            defId: 'frozen_reindeers_are_better_than_people',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 49,
+        });
+        const selected = respondToPromptOption(
+            searched.matchState!,
+            option => option.value?.cardUid === 'chosen-low',
+            '驯鹿验证额外角色限制',
+            '0',
+            FIXED_RANDOM,
+        );
+        const extraPrompt = getSimpleChoicePrompt(selected.finalState, 'smashup_immediate_extra_minion');
+        const optionCardUids = getPromptOptions(extraPrompt).map(option => option.value?.cardUid).filter(Boolean);
+        expect(optionCardUids).toEqual(['chosen-low']);
+        expect(optionCardUids).not.toContain('other-low');
     });
 
     it('狮子王：木法沙在弃牌堆时触发弃牌条件，并让荣耀石给玩家额外力量', () => {

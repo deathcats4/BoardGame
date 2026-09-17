@@ -248,16 +248,16 @@ function handleTotalDemiseRoll({
     for (let index = 0; index < 5; index += 1) {
         const value = random.d(6);
         const face = getPlayerDieFace(state, attackerId, value) ?? '';
-        const isBloodDrop = face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP;
+        const isClaw = face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW;
         const die = createVampireLordBonusDie(
             state,
             attackerId,
             value,
             index,
-            isBloodDrop
+            isClaw
                 ? 'bonusDie.effect.vampireLordTotalDemiseDie'
                 : 'bonusDie.effect.vampireLordTotalDemiseOther',
-            { bonusDamage: isBloodDrop ? 1 : 0 },
+            { bonusDamage: isClaw ? 1 : 0 },
         );
         dice.push(die);
         events.push({
@@ -275,7 +275,7 @@ function handleTotalDemiseRoll({
         } as BonusDieRolledEvent);
     }
 
-    const bloodDropCount = dice.filter(die => die.face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP).length;
+    const clawCount = dice.filter(die => die.face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW).length;
     events.push(createDisplayOnlySettlement(
         sourceAbilityId,
         attackerId,
@@ -285,8 +285,8 @@ function handleTotalDemiseRoll({
         {
             summaryEffectKey: 'bonusDie.effect.vampireLordTotalDemiseResult',
             summaryEffectParams: {
-                bloodDropCount,
-                bonusDamage: bloodDropCount,
+                clawCount,
+                bonusDamage: clawCount,
             },
             customResolutionId: VAMPIRE_LORD_TOTAL_DEMISE_SETTLEMENT_ID,
             continuation: {
@@ -645,17 +645,17 @@ export function registerVampireLordCustomActions(): void {
     });
 
     registerBonusDiceSettlementHandler(VAMPIRE_LORD_TOTAL_DEMISE_SETTLEMENT_ID, ({ state, settlement, timestamp }) => {
-        const bloodDropCount = getPendingBonusSettlementDice(settlement)
-            .filter(die => die.face === VAMPIRE_LORD_DICE_FACE_IDS.BLOOD_DROP)
+        const clawCount = getPendingBonusSettlementDice(settlement)
+            .filter(die => die.face === VAMPIRE_LORD_DICE_FACE_IDS.CLAW)
             .length;
         const followupEvents: DiceThroneEvent[] = [];
 
-        if (bloodDropCount > 0) {
+        if (clawCount > 0) {
             followupEvents.push({
                 type: 'BONUS_DAMAGE_ADDED',
                 payload: {
                     playerId: settlement.attackerId,
-                    amount: bloodDropCount,
+                    amount: clawCount,
                     sourceCardId: settlement.sourceAbilityId,
                 },
                 sourceCommandType: 'BONUS_DICE_SETTLED',
@@ -663,7 +663,7 @@ export function registerVampireLordCustomActions(): void {
             } as BonusDamageAddedEvent);
         }
 
-        if (bloodDropCount >= 3) {
+        if (clawCount >= 3) {
             followupEvents.push(...buildStatusAppliedOrChoiceEvents({
                 state,
                 targetId: settlement.targetId,
@@ -676,7 +676,7 @@ export function registerVampireLordCustomActions(): void {
         }
 
         return {
-            totalDamage: bloodDropCount,
+            totalDamage: clawCount,
             followupEvents,
         };
     });

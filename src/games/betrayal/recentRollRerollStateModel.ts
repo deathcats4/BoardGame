@@ -1,7 +1,4 @@
 import {
-    eventRollResolutionNeedsSharedAcknowledgement,
-} from './acknowledgementReadModel';
-import {
     canDeferOrdinaryAttackDamageToDefender,
     isPendingDamageAllocationForAttackRoll,
     resolveAttackRerollOutcome,
@@ -247,23 +244,16 @@ function applyEventRecentRollRerollState(
                 effect: cloneUseEffect(nextEffect),
             }
             : undefined;
-        const acknowledgementContext = {
-            nextPendingEventChoice,
-            hauntRevealResolution: event.payload.eventRerollHaunt?.hauntRevealResolution,
-            hauntTraitorResolution: event.payload.eventRerollHaunt?.hauntTraitorResolution,
-            dustSetup: event.payload.eventRerollHaunt?.dustSetup,
-            magicCameraSetup: event.payload.eventRerollHaunt?.magicCameraSetup,
-            helpingHandsSetup: event.payload.eventRerollHaunt?.helpingHandsSetup,
-            uponReflectionSetup: event.payload.eventRerollHaunt?.uponReflectionSetup,
-        };
-        const requiresSharedAcknowledgement = eventRollResolutionNeedsSharedAcknowledgement(acknowledgementContext);
+        const configuredRequiredPlayerIds = pendingEventRoll.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
         nextRoll.latestLabel = nextBranch.label;
         core.recentRoll = nextRoll;
         core.pendingEventRollResolution = {
             ...pendingEventRoll,
-            requiredPlayerIds: requiresSharedAcknowledgement && core.playerIds.length > 0
-                ? [...core.playerIds]
-                : [pendingEventRoll.playerId],
+            requiredPlayerIds: configuredRequiredPlayerIds.length > 0
+                ? [...configuredRequiredPlayerIds]
+                : core.playerIds.length > 0
+                    ? [...core.playerIds]
+                    : [pendingEventRoll.playerId],
             acknowledgedPlayerIds: [],
             effect: cloneUseEffect(nextEffect),
             nextPendingEventChoice,

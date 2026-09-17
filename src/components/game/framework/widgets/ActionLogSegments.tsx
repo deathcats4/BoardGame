@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ActionLogSegment } from '../../../../engine/types';
+import type { ActionLogInteractiveParam, ActionLogSegment } from '../../../../engine/types';
 import { CardPreviewTooltip } from './CardPreviewTooltip';
 import { BreakdownTooltip } from '../../../common/overlays/BreakdownTooltip';
 import type { CardPreviewRef } from '../../../../core';
@@ -28,7 +28,8 @@ const I18nSegment: React.FC<{
     i18nKey: string;
     params?: Record<string, string | number>;
     paramI18nKeys?: string[];
-}> = ({ ns, i18nKey, params, paramI18nKeys }) => {
+    interactiveParams?: Record<string, ActionLogInteractiveParam>;
+}> = ({ ns, i18nKey, params, paramI18nKeys, interactiveParams }) => {
     const { t } = useTranslation(ns);
     // 先翻译 paramI18nKeys 中指定的参数值（它们本身是同 ns 下的 i18n key）
     const resolvedParams = { ...params };
@@ -40,7 +41,41 @@ const I18nSegment: React.FC<{
             }
         }
     }
-    return <span>{t(i18nKey, resolvedParams)}</span>;
+    const translatedText = t(i18nKey, resolvedParams);
+    let renderedParts: React.ReactNode[] = [translatedText];
+    for (const [paramKey, interactiveParam] of Object.entries(interactiveParams ?? {})) {
+        const targetText = String(resolvedParams[paramKey] ?? interactiveParam.text);
+        if (!targetText) {
+            continue;
+        }
+        const nextParts: React.ReactNode[] = [];
+        renderedParts.forEach((part, partIndex) => {
+            if (typeof part !== 'string') {
+                nextParts.push(part);
+                return;
+            }
+            const pieces = part.split(targetText);
+            pieces.forEach((piece, pieceIndex) => {
+                if (piece) {
+                    nextParts.push(piece);
+                }
+                if (pieceIndex < pieces.length - 1) {
+                    nextParts.push(
+                        <span
+                            key={`${paramKey}-${partIndex}-${pieceIndex}`}
+                            className="cursor-help underline decoration-dotted decoration-1 underline-offset-2"
+                            title={interactiveParam.tooltip ?? interactiveParam.text}
+                            aria-label={interactiveParam.tooltip ?? interactiveParam.text}
+                        >
+                            {targetText}
+                        </span>,
+                    );
+                }
+            });
+        });
+        renderedParts = nextParts;
+    }
+    return <span>{renderedParts}</span>;
 };
 
 /**
@@ -147,6 +182,7 @@ export const ActionLogSegments: React.FC<ActionLogSegmentsProps> = ({
                             i18nKey={segment.key}
                             params={segment.params}
                             paramI18nKeys={segment.paramI18nKeys}
+                            interactiveParams={segment.interactiveParams}
                         />
                     );
                 }

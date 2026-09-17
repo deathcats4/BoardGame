@@ -12450,6 +12450,24 @@
         }
       }
     },
+    "zh-CN/mage-wars/thumbnails/compressed/cover": {
+      "variants": {
+        "webp": {
+          "sha256": "d823beab60262d4d746c3735398bf55fabd66414a4090201642ae8787c099aa5",
+          "bytes": 324948,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/mage-wars/thumbnails/cover": {
+      "variants": {
+        "png": {
+          "sha256": "1d3b1fe0fa0363718399054c878fdb263099aef7fb96be004c7d4bd5a2be4bc3",
+          "bytes": 2757985,
+          "mime": "image/png"
+        }
+      }
+    },
     "zh-CN/mage-wars/tokens/action/action-marker-blue-back": {
       "variants": {
         "png": {

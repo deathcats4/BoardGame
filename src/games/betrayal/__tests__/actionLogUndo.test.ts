@@ -286,7 +286,10 @@ describe('小黑屋操作日志与撤回', () => {
         };
 
         const commandTypes = BETRAYAL_ACTION_LOG_ALLOWLIST.filter(
-            (type) => type !== BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL,
+            (type) => (
+                type !== BETRAYAL_COMMANDS.ROLL_EVENT
+                && type !== BETRAYAL_COMMANDS.FINALIZE_EVENT_ROLL
+            ),
         );
         const entries = commandTypes.map((type, index) => (
             formatBetrayalActionEntry({
@@ -394,6 +397,19 @@ describe('小黑屋操作日志与撤回', () => {
                 segments: [expect.objectContaining({
                     key: 'actionLog.exploreRoomEvent',
                     params: { playerId: '0', room: '厨房', event: '无线电广播' },
+                })],
+            }),
+            expect.objectContaining({
+                kind: BETRAYAL_COMMANDS.ROLL_EVENT,
+                segments: [expect.objectContaining({
+                    key: 'actionLog.eventRollResult',
+                    params: {
+                        playerId: '0',
+                        event: '无线电广播',
+                        roll: '投 2 颗骰子',
+                        total: 4,
+                        result: '获得 1 点知识',
+                    },
                 })],
             }),
         ]));
