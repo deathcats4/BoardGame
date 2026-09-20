@@ -327,7 +327,7 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
         await game.screenshot('mulan-mode-choice-draw-resolved', testInfo);
     });
 
-    test('冰雪奇缘艾莎天赋必须从真实页面进入基地选择并只压低所选基地对手角色', async ({ page, game }, testInfo) => {
+    test('冰雪奇缘艾莎天赋必须在真实页面提供额外打出雪宝/迷你雪人或取回棉花糖', async ({ page, game }, testInfo) => {
         test.setTimeout(90000);
 
         await game.openTestGame('smashup', {
@@ -343,9 +343,13 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
             phase: 'playCards',
             player0: {
                 factions: ['frozen', 'big_hero_6'],
-                hand: [],
+                hand: [
+                    { uid: 'elsa-snowgie-hand', defId: 'frozen_snowgie', type: 'minion', owner: '0' },
+                ],
                 deck: [],
-                discard: [],
+                discard: [
+                    { uid: 'elsa-marshmallow-discard', defId: 'frozen_marshmallow', type: 'minion', owner: '0' },
+                ],
                 minionsPlayed: 0,
                 minionLimit: 1,
                 actionsPlayed: 0,
@@ -362,23 +366,11 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
                     defId: 'base_arendelle',
                     minions: [
                         {
-                            uid: 'elsa-choice',
+                            uid: 'elsa-talent-source',
                             defId: 'frozen_elsa',
                             owner: '0',
                             controller: '0',
                             basePower: 5,
-                            powerCounters: 0,
-                            powerModifier: 0,
-                            tempPowerModifier: 0,
-                            talentUsed: false,
-                            attachedActions: [],
-                        },
-                        {
-                            uid: 'enemy-at-source',
-                            defId: 'frozen_snowgie',
-                            owner: '1',
-                            controller: '1',
-                            basePower: 2,
                             powerCounters: 0,
                             powerModifier: 0,
                             tempPowerModifier: 0,
@@ -390,75 +382,49 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
                 },
                 {
                     defId: 'base_ice_palace',
-                    minions: [
-                        {
-                            uid: 'ally-at-target',
-                            defId: 'frozen_olaf',
-                            owner: '0',
-                            controller: '0',
-                            basePower: 3,
-                            powerCounters: 0,
-                            powerModifier: 0,
-                            tempPowerModifier: 0,
-                            talentUsed: false,
-                            attachedActions: [],
-                        },
-                        {
-                            uid: 'enemy-at-target',
-                            defId: 'mulan_mushu',
-                            owner: '1',
-                            controller: '1',
-                            basePower: 2,
-                            powerCounters: 0,
-                            powerModifier: 0,
-                            tempPowerModifier: 0,
-                            talentUsed: false,
-                            attachedActions: [],
-                        },
-                        {
-                            uid: 'second-enemy-at-target',
-                            defId: 'lion_king_timon_and_pumbaa',
-                            owner: '1',
-                            controller: '1',
-                            basePower: 3,
-                            powerCounters: 0,
-                            powerModifier: 0,
-                            tempPowerModifier: 0,
-                            talentUsed: false,
-                            attachedActions: [],
-                        },
-                    ],
+                    minions: [],
                     ongoingActions: [],
                 },
             ],
         });
 
-        await expect(page.locator('[data-minion-uid="elsa-choice"]')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('[data-minion-uid="elsa-talent-source"]')).toBeVisible({ timeout: 15000 });
         await game.screenshot('frozen-elsa-talent-ready', testInfo);
 
-        await page.getByTestId('su-minion-frame-elsa-choice').click();
+        await page.getByTestId('su-minion-frame-elsa-talent-source').click();
         await game.waitForInteraction('disney_four_factions_prompt', 10000);
-        await expect(page.getByText('艾莎：选择基地')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('艾莎：选择天赋效果')).toBeVisible({ timeout: 10000 });
 
-        await page.waitForFunction(
-            () => {
-                const state = (window as SmashUpHarnessWindow).__BG_TEST_HARNESS__?.state?.get?.();
-                const current = state?.sys?.interaction?.current;
-                return current?.data?.sourceId === 'disney_four_factions_prompt'
-                    && current?.data?.targetType === 'base'
-                    && current?.data?.options?.some(option => option?.value?.baseIndex === 0)
-                    && current?.data?.options?.some(option => option?.value?.baseIndex === 1);
-            },
-            { timeout: 5000 },
+        const modeOptions = await game.getInteractionOptions() as InteractionOption[];
+        expect(modeOptions.map(option => option.value?.mode).sort()).toEqual([
+            'elsa_extra_minion',
+            'elsa_recover_marshmallow',
+        ]);
+        await game.screenshot('frozen-elsa-mode-choice-prompt', testInfo);
+
+        await game.selectInteractionOptionBy(
+            (option: InteractionOption) => option?.value?.mode === 'elsa_extra_minion',
+            '艾莎选择额外打出雪宝或迷你雪人',
         );
-        await game.screenshot('frozen-elsa-base-choice-prompt', testInfo);
+        await game.waitForInteraction('smashup_immediate_extra_minion', 10000);
+        await expect(page.getByText('选择一张额外打出的随从')).toBeVisible({ timeout: 10000 });
 
+        const extraMinionOptions = await game.getInteractionOptions() as InteractionOption[];
+        expect(extraMinionOptions.map(option => option.value?.cardUid)).toEqual(['elsa-snowgie-hand']);
+        await game.screenshot('frozen-elsa-extra-minion-choice', testInfo);
+
+        await game.selectInteractionOptionBy(
+            (option: InteractionOption) => option?.value?.cardUid === 'elsa-snowgie-hand',
+            '艾莎选择额外打出迷你雪人',
+        );
+        await game.waitForInteraction('smashup_immediate_extra_minion_base', 10000);
         const baseOptions = await game.getInteractionOptions() as InteractionOption[];
-        expect(baseOptions.map(option => option.value?.baseIndex).sort()).toEqual(expect.arrayContaining([0, 1]));
+        expect(baseOptions.map(option => option.value?.baseIndex)).toEqual([0, 1]);
+        await game.screenshot('frozen-elsa-extra-minion-base-choice', testInfo);
 
         await game.selectInteractionOptionBy(
             (option: InteractionOption) => option?.value?.baseIndex === 1,
-            '艾莎目标基地',
+            '艾莎选择第二基地打出迷你雪人',
         );
         await game.waitForNoInteraction(10000);
 
@@ -467,17 +433,15 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
             const sourceBase = state.core.bases[0];
             const targetBase = state.core.bases[1];
             return {
-                enemyAtSourcePenalty: sourceBase.minions.find(minion => minion.uid === 'enemy-at-source')?.tempPowerModifier ?? 0,
-                allyAtTargetPenalty: targetBase.minions.find(minion => minion.uid === 'ally-at-target')?.tempPowerModifier ?? 0,
-                enemyAtTargetPenalty: targetBase.minions.find(minion => minion.uid === 'enemy-at-target')?.tempPowerModifier ?? 0,
-                secondEnemyAtTargetPenalty: targetBase.minions.find(minion => minion.uid === 'second-enemy-at-target')?.tempPowerModifier ?? 0,
+                sourceMinionUids: sourceBase.minions.map(minion => minion.uid),
+                targetMinionUids: targetBase.minions.map(minion => minion.uid),
+                handUids: state.core.players['0'].hand.map(card => card.uid),
                 interactionOpen: Boolean(state.sys?.interaction?.current),
             };
         }, { timeout: 10000 }).toEqual({
-            enemyAtSourcePenalty: 0,
-            allyAtTargetPenalty: 0,
-            enemyAtTargetPenalty: -1,
-            secondEnemyAtTargetPenalty: -1,
+            sourceMinionUids: ['elsa-talent-source'],
+            targetMinionUids: ['elsa-snowgie-hand'],
+            handUids: [],
             interactionOpen: false,
         });
 
@@ -537,12 +501,12 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
         await expect(page.getByText('你想和我堆个雪人吗：选择要额外打出的角色')).toBeVisible({ timeout: 10000 });
 
         const options = await game.getInteractionOptions() as InteractionOption[];
-        expect(options.map(option => option.value?.minionUid)).toEqual(['snowman-snowgie', 'snowman-olaf']);
-        expect(options.some(option => option.value?.minionUid === 'snowman-anna')).toBe(false);
+        expect(options.map(option => option.value?.cardUid)).toEqual(['snowman-snowgie', 'snowman-olaf']);
+        expect(options.some(option => option.value?.cardUid === 'snowman-anna')).toBe(false);
         await game.screenshot('frozen-snowman-prompt', testInfo);
 
         await game.selectInteractionOptionBy(
-            (option: InteractionOption) => option?.value?.minionUid === 'snowman-snowgie',
+            (option: InteractionOption) => option?.value?.cardUid === 'snowman-snowgie',
             '堆雪人选择迷你雪人',
         );
         await game.waitForNoInteraction(10000);

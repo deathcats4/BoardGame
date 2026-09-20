@@ -444,6 +444,7 @@ export interface MageWarsArenaObjectTemporaryTraitsGainedEvent extends GameEvent
         vampiricNextMelee?: boolean;
         nextMeleePierceModifier?: number;
         nextMeleeUnavoidable?: boolean;
+        battleFuryRoundNumber?: number;
     };
 }
 

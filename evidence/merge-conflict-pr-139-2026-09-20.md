@@ -28,10 +28,20 @@
 - `npm run spec:lint` 在主工作树通过；合并工作树缺少宿主依赖的本地入口链接，临时补齐后通过，随后已恢复原工作树结构。
 - 普通/严格合并审计待创建双亲合并提交后运行。
 
+## 第二次主线同步
+
+- base：远端 `main`，当前提交 `bae9b809d083ee4eee37fc7743982c76de48fe63`
+- head：当前合并工作树提交 `af88ffc6ec341ea2b503191cb9564cd3e802825e`
+- 共同祖先：`0e4401d07c5fedf22c1938e1cc4ccbaf8371fafa`
+- 触发命令：`git merge origin/main --no-commit --no-ff`
+- 冲突文件：`src/games/mage-wars/__tests__/standard-starting-gap-batch.test.ts`
+- 裁决：保留主线新增的测试 facade 读取方式，同时保留 PR 对 3413 Banish 与 3416 Battle Fury 的覆盖；没有整份接受任一侧。
+- 合并后修补：为 Battle Fury 补齐 ChoiceRequest adapter 和中英文交互文案；修正同场地对象移动只移除不回插的问题，使 Banish 到期后目标及附着结界恢复到原区域。
+- 验证：`npx vitest run src/games/mage-wars/__tests__/standard-starting-gap-batch.test.ts` 通过 21/21；`npx tsc --noEmit` 通过；`npx eslint src/ --ext .ts,.tsx` 通过，0 个错误、1461 个既有 warning；`npm run i18n:check` 通过。
+
 ## 最终结果
 
 - 解决提交：当前双亲合并提交；最终哈希以 `git show -s --format=%H HEAD` 回查为准。
-- 普通合并审计：通过；冲突文件为混合结果，0 个单边覆盖。
-- 严格合并审计：通过；未发现完全等于任一父提交的冲突文件。
+- 普通/严格合并审计：待第二次双亲合并提交后重跑。
 - 推送目标：PR #139 原 head 分支 `deathcats4/BoardGame:codex/refactor-smashup-variant-binding-metadata`
 - 下一步：推送源分支，再回查并合并 PR。

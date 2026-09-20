@@ -170,6 +170,7 @@ function resolveDirectObjectSpellManaCost(
             return resolveMageWarsExplodeManaCostForTarget(targetObject);
         case 'bloodstrike':
         case 'banish':
+        case 'battle-fury':
         case 'charge-on':
         case 'tanglevine':
         case 'temporary-trait':

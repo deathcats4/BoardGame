@@ -823,7 +823,14 @@ describe('mage-wars standard starting spellbook implementation batch', () => {
             actionReady: false,
         });
         expect(zoneAfterCast.objectIds).not.toEqual(expect.arrayContaining([target.id, attached.id]));
-        expect(validateCommand(cast.state, {
+        expect(validateCommand({
+            ...cast.state,
+            core: {
+                ...cast.state.core,
+                currentPlayerId: '1',
+                phaseActorId: '1',
+            },
+        }, {
             type: MAGE_WARS_COMMANDS.MOVE_ARENA_OBJECT,
             playerId: '1',
             payload: { objectId: target.id, toZoneId: ARENA_ZONE_IDS.A2 },
@@ -898,6 +905,7 @@ describe('mage-wars standard starting spellbook implementation batch', () => {
             }),
         ]));
         const interaction = getSimpleChoicePrompt(attacked.state, 'mw.battle-fury.choice');
+        expect(interaction).toBeDefined();
         const promptOptions = getPromptOptions(attacked.state);
         expect(promptOptions).toEqual(expect.arrayContaining([
             expect.objectContaining({ id: 'pass' }),

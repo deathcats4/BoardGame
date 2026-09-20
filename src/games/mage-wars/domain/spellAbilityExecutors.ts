@@ -1093,6 +1093,32 @@ function executeBanishSpell(ctx: MageWarsSpellAbilityContext): AbilityResult<Mag
     };
 }
 
+function executeBattleFurySpell(ctx: MageWarsSpellAbilityContext): AbilityResult<MageWarsEvent> {
+    const targetObjectId = ctx.command.payload.targetObjectId;
+    if (!targetObjectId) return { events: [] };
+    const targetObject = getArenaObject(ctx.state.core, targetObjectId);
+    if (
+        !targetObject
+        || !isMageWarsCorporealCreatureArenaObject(targetObject)
+        || isMageWarsBanishedArenaObject(targetObject)
+        || targetObject.temporaryTraits?.battleFuryRoundNumber === ctx.state.core.turnNumber
+    ) return { events: [] };
+    return {
+        events: [{
+            type: MAGE_WARS_EVENTS.ARENA_OBJECT_TEMPORARY_TRAITS_GAINED,
+            payload: {
+                ownerId: targetObject.ownerId,
+                objectId: targetObject.id,
+                sourceAbilityId: ctx.sourceId,
+                spellCardId: ctx.spell.spellCardId,
+                battleFuryRoundNumber: ctx.state.core.turnNumber,
+            },
+            sourceCommandType: ctx.command.type,
+            timestamp: ctx.timestamp,
+        }],
+    };
+}
+
 function executeChargeOnSpell(ctx: MageWarsSpellAbilityContext): AbilityResult<MageWarsEvent> {
     const targetObjectId = ctx.command.payload.targetObjectId;
     if (!targetObjectId) return { events: [] };
@@ -1778,6 +1804,7 @@ const MAGE_WARS_SPELL_CAST_FAMILY_EXECUTORS: Readonly<Record<
     MageWarsSpellCastChoiceFamily,
     MageWarsSpellCastFamilyExecutor
 >> = {
+    'battle-fury': executeBattleFurySpell,
     banish: executeBanishSpell,
     bloodstrike: executeBloodstrikeSpell,
     'call-of-the-wild': executeCallOfTheWildSpell,
