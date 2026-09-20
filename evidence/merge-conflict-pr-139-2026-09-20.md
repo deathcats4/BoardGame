@@ -38,6 +38,8 @@
 - 裁决：保留主线新增的测试 facade 读取方式，同时保留 PR 对 3413 Banish 与 3416 Battle Fury 的覆盖；没有整份接受任一侧。
 - 合并后修补：为 Battle Fury 补齐 ChoiceRequest adapter 和中英文交互文案；修正同场地对象移动只移除不回插的问题，使 Banish 到期后目标及附着结界恢复到原区域。
 - 验证：`npx vitest run src/games/mage-wars/__tests__/standard-starting-gap-batch.test.ts` 通过 21/21；`npx tsc --noEmit` 通过；`npx eslint src/ --ext .ts,.tsx` 通过，0 个错误、1461 个既有 warning；`npm run i18n:check` 通过。
+- 首次 GitHub quality-gate 发现 `src/games/mage-wars/__tests__/ability-catalog.test.ts` 仍断言旧快照：已实现数量从 127 增至 129，待补代码从 26 降至 24；更新为当前目录事实，并补充 3413/3416 不再属于待补代码的断言。
+- 修补后复测：`npx vitest run src/games/mage-wars/__tests__/ability-catalog.test.ts` 通过 41/41；标准起始法术测试仍为 21/21。
 
 ## 最终结果
 
