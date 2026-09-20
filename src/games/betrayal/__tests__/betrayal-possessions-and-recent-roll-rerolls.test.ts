@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolvePendingEventRollResolutionRequiredPlayerIds } from '../acknowledgementReadModel';
 import { resolveBetrayalHauntSpecialActionStatus } from '../hauntSpecialActionReadModel';
 import {
     acknowledgePendingCardResolutions,
@@ -24,6 +25,7 @@ import {
     markRecentEventRollPendingFinalizationForTest,
     startFirstScenarioFromCharacterSelect,
     setNextDiscoverySymbolRoomsForAllFloors,
+    setDiscoveredTestRoom,
     setTestTraitTrack,
     setTestExplorerTraitsBelowCatalogStart,
     traitTrackPosition,
@@ -39,6 +41,26 @@ import {
 } from './helpers/firstScenarioRuntimeHarness';
 
 describe('Betrayal first scenario runtime - possessions and recent-roll rerolls', () => {
+it('事件结果确认只统计真人，不能被兔脚重投前遗留名单覆盖', () => {
+        const core = createStartedFirstScenarioCore();
+        core.seatControllers = {
+            '0': { type: 'human' },
+            '1': { type: 'local-ai' },
+            '2': { type: 'human' },
+        };
+        const resolution = {
+            rollId: 'event-roll-human-confirmation',
+            playerId: '0',
+            sourceTitle: '墙中低语',
+            effect: { mode: 'trait' as const, trait: 'knowledge' as const, amount: -1 },
+            requiredPlayerIds: [...core.playerIds],
+            acknowledgedPlayerIds: [],
+            requiresAcknowledgement: true,
+        };
+
+        expect(resolvePendingEventRollResolutionRequiredPlayerIds(core, resolution)).toEqual(['0', '2']);
+    });
+
 it('能在第三次恶兆且 haunt roll 达标后进入真实 haunt', () => {
         const core = createFirstScenarioHauntCore();
 
@@ -1144,7 +1166,7 @@ it('书本改骰后兔脚仍失败时，确认新骰面后进入固定物理伤�
         expect(core.recentRoll?.dice).toEqual([0, 0, 0, 0, 0]);
         expect(core.pendingEventRollResolution).toMatchObject({
             sourceTitle: '标本剥制',
-            requiredPlayerIds: ['0'],
+            requiredPlayerIds: core.playerIds,
             acknowledgedPlayerIds: [],
             requiresAcknowledgement: true,
             effect: expect.objectContaining({ mode: 'compound' }),
@@ -1749,6 +1771,11 @@ it('骨制钥匙可以穿过墙壁移动到已发现相邻板块，且不会作�
             }
             return room;
         });
+        setDiscoveredTestRoom(core, 'upper-west', {
+            name: '图书馆',
+            visualId: 'library',
+            discoveryReward: 'event',
+        });
 
         const normalMove = BetrayalDomain.validate(
             { core, sys: {} as never },
@@ -1797,6 +1824,11 @@ it('骨制钥匙穿墙投到空白会被埋葬，且不能用于发现新房间'
                 };
             }
             return room;
+        });
+        setDiscoveredTestRoom(core, 'upper-west', {
+            name: '图书馆',
+            visualId: 'library',
+            discoveryReward: 'event',
         });
 
         const undiscoveredMove = BetrayalDomain.validate(

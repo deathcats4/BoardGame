@@ -20,6 +20,7 @@ import { getBaseDef, getCardDef, getTitanDef } from '../data/cards';
 import { getAllCardDefs } from '../data/cards';
 import { isSameNameDefId, matchesDefId, mustUseBaseLimitedMinionQuota } from './utils';
 import { shouldGenerateSmashUpPodAlias } from './variantBindingRuntime';
+import { getEffectiveBaseAbilitySourceIds } from './effectiveBaseAbilities';
 import { buildValidatedOngoingDetachEvents, findLiveOngoingCardLocation } from './ongoingDetach';
 
 // ============================================================================
@@ -2491,7 +2492,7 @@ export function isSourceActiveOnBase(state: SmashUpCore, sourceDefId: string, ba
     const base = state.bases[baseIndex];
     if (!base) return false;
 
-    if (base.defId === sourceDefId) return true;
+    if (getEffectiveBaseAbilitySourceIds(state, baseIndex).includes(sourceDefId)) return true;
 
     if (base.ongoingActions.some(o => o.defId === sourceDefId)) return true;
 

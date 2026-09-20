@@ -48,6 +48,23 @@ describe('latest discovery presentation', () => {
     ).toEqual([]);
   });
 
+  it('无发现符号且没有房间效果时不生成发现弹窗', () => {
+    const core = {
+      latestDiscovery: {
+        kind: 'none',
+        title: '洗衣滑槽',
+        summary: '无发现符号',
+        detail: '没有事件、物品或预兆发现牌',
+        tone: 'neutral',
+        resolutionSteps: [],
+      },
+      latestDiscoveryOwnerPlayerId: '0',
+      activityLog: [{ id: 'room-log', text: '探索到洗衣滑槽', tone: 'neutral' }],
+    } as unknown as BetrayalCore;
+
+    expect(buildLatestDiscoveryDisplayEntry(core)).toBeNull();
+  });
+
   it('drops stale queued entries when the current discovery source is already dismissed', () => {
     const queued = [
       entry(

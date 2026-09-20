@@ -10,8 +10,17 @@ const asCore = (state: MatchState<unknown>): QidahenCore => state.core as Qidahe
 const basicOpeningStepValidator = (state: MatchState<unknown>, step: { id: string }): boolean => {
     const core = asCore(state);
     switch (step.id) {
+        case 'wheel-first':
+            return core.turnPhase === 'action-window'
+                && core.handLimitDiscardSelection == null
+                && core.wheelActionUsed === false;
+        case 'wheel-result':
+            return core.turnPhase === 'action-window'
+                && core.wheelActionUsed === true
+                && core.lastSeasonSummary?.title === '轮盘征兵/训练';
         case 'pick-action':
             return core.turnPhase === 'action-window'
+                && core.wheelActionUsed === true
                 && core.factionActionUsed === false;
         case 'choose-grant-pardon-target':
             return core.turnPhase === 'grant-pardon-choice'
@@ -23,8 +32,6 @@ const basicOpeningStepValidator = (state: MatchState<unknown>, step: { id: strin
                 && core.payment.required === 3
                 && core.grantPardonSelection == null;
         case 'action-result':
-        case 'morale-level':
-        case 'wheel-action':
         case 'finish':
             return core.lastSeasonSummary?.title === '赐印招安';
         default:
@@ -385,15 +392,6 @@ const QIDAHEN_BASIC_TUTORIAL: TutorialManifest = {
             showMask: true,
         },
         {
-            id: 'hand-limit',
-            content: 'game-qidahen:tutorial.basic.steps.handLimit',
-            highlightTarget: 'qidahen-hand-zone',
-            position: 'top',
-            requireAction: true,
-            allowedCommands: [INTERACTION_COMMANDS.RESPOND, QIDAHEN_COMMANDS.SELECT_HAND_LIMIT_DISCARD_CARD, QIDAHEN_COMMANDS.RESOLVE_HAND_LIMIT_DISCARD],
-            advanceOnEvents: [{ type: 'SYS_INTERACTION_RESOLVED', match: { sourceId: 'qidahen:hand-limit-discard' } }],
-        },
-        {
             id: 'wheel-first',
             content: 'game-qidahen:tutorial.basic.steps.wheelFirst',
             highlightTarget: 'qidahen-action-wheel',
@@ -411,17 +409,10 @@ const QIDAHEN_BASIC_TUTORIAL: TutorialManifest = {
             advanceOnEvents: [{ type: 'WHEEL_MOVE_EXECUTED', match: { moveId: 'move-1-free' } }],
         },
         {
-            id: 'after-wheel',
-            content: 'game-qidahen:tutorial.basic.steps.afterWheel',
-            highlightTarget: 'qidahen-actions-zone',
+            id: 'wheel-result',
+            content: 'game-qidahen:tutorial.basic.steps.wheelResult',
+            highlightTarget: 'qidahen-season-summary',
             position: 'right',
-            infoStep: true,
-        },
-        {
-            id: 'hand-resource',
-            content: 'game-qidahen:tutorial.basic.steps.handResource',
-            highlightTarget: 'qidahen-hand-zone',
-            position: 'top',
             infoStep: true,
         },
         {
@@ -457,20 +448,6 @@ const QIDAHEN_BASIC_TUTORIAL: TutorialManifest = {
             id: 'action-result',
             content: 'game-qidahen:tutorial.basic.steps.actionResult',
             highlightTarget: 'qidahen-map-layer',
-            position: 'top',
-            infoStep: true,
-        },
-        {
-            id: 'morale-level',
-            content: 'game-qidahen:tutorial.basic.steps.moraleLevel',
-            highlightTarget: 'qidahen-map-layer',
-            position: 'top',
-            infoStep: true,
-        },
-        {
-            id: 'wheel-action',
-            content: 'game-qidahen:tutorial.basic.steps.wheelAction',
-            highlightTarget: 'qidahen-turn-banner',
             position: 'top',
             infoStep: true,
         },
@@ -609,7 +586,7 @@ const QIDAHEN_SIEGE_TUTORIAL: TutorialManifest = {
         {
             id: 'besiege-choice',
             content: 'game-qidahen:tutorial.siege.steps.besiegeChoice',
-            highlightTarget: 'qidahen-post-battle-choice-besiege',
+            highlightTarget: 'qidahen-post-battle-choice-entry',
             position: 'left',
             requireAction: true,
             allowManualSkip: true,
@@ -1343,7 +1320,6 @@ const QIDAHEN_TUTORIALS: TutorialCollection = {
         'attack-and-battle': {
             titleKey: 'tutorial.attackAndBattle.title',
             descriptionKey: 'tutorial.attackAndBattle.description',
-            nextTutorialId: 'retreat-and-rout',
             manifest: QIDAHEN_ATTACK_AND_BATTLE_TUTORIAL,
         },
         'siege-and-occupation': {
@@ -1355,28 +1331,24 @@ const QIDAHEN_TUTORIALS: TutorialCollection = {
             titleKey: 'tutorial.retreatAndRout.title',
             descriptionKey: 'tutorial.retreatAndRout.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'cavalry-evasion',
             manifest: QIDAHEN_RETREAT_AND_ROUT_TUTORIAL,
         },
         'cavalry-evasion': {
             titleKey: 'tutorial.cavalryEvasion.title',
             descriptionKey: 'tutorial.cavalryEvasion.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'cavalry-plunder',
             manifest: QIDAHEN_CAVALRY_EVASION_TUTORIAL,
         },
         'cavalry-plunder': {
             titleKey: 'tutorial.cavalryPlunder.title',
             descriptionKey: 'tutorial.cavalryPlunder.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'neutral-invasion',
             manifest: QIDAHEN_CAVALRY_PLUNDER_TUTORIAL,
         },
         'neutral-invasion': {
             titleKey: 'tutorial.neutralInvasion.title',
             descriptionKey: 'tutorial.neutralInvasion.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'water-dispatch',
             manifest: QIDAHEN_NEUTRAL_INVASION_TUTORIAL,
         },
         'water-dispatch': {
@@ -1388,42 +1360,36 @@ const QIDAHEN_TUTORIALS: TutorialCollection = {
         'wheel-shared-cost': {
             titleKey: 'tutorial.wheelSharedCost.title',
             descriptionKey: 'tutorial.wheelSharedCost.description',
-            nextTutorialId: 'wheel-reclaim',
             manifest: QIDAHEN_WHEEL_SHARED_COST_TUTORIAL,
         },
         'wheel-reclaim': {
             titleKey: 'tutorial.wheelReclaim.title',
             descriptionKey: 'tutorial.wheelReclaim.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'wheel-military-farm',
             manifest: QIDAHEN_WHEEL_RECLAIM_TUTORIAL,
         },
         'wheel-military-farm': {
             titleKey: 'tutorial.wheelMilitaryFarm.title',
             descriptionKey: 'tutorial.wheelMilitaryFarm.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'wheel-recruit-train',
             manifest: QIDAHEN_WHEEL_MILITARY_FARM_TUTORIAL,
         },
         'wheel-recruit-train': {
             titleKey: 'tutorial.wheelRecruitTrain.title',
             descriptionKey: 'tutorial.wheelRecruitTrain.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'armament-upgrade',
             manifest: QIDAHEN_WHEEL_RECRUIT_TRAIN_TUTORIAL,
         },
         'armament-upgrade': {
             titleKey: 'tutorial.armamentUpgrade.title',
             descriptionKey: 'tutorial.armamentUpgrade.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'event-action',
             manifest: QIDAHEN_ARMAMENT_UPGRADE_TUTORIAL,
         },
         'event-action': {
             titleKey: 'tutorial.eventAction.title',
             descriptionKey: 'tutorial.eventAction.description',
             hiddenFromCatalog: true,
-            nextTutorialId: 'diplomacy-and-hire',
             manifest: QIDAHEN_EVENT_ACTION_TUTORIAL,
         },
         'diplomacy-and-hire': {

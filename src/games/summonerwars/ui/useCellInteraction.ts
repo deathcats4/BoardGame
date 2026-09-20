@@ -958,6 +958,7 @@ export function useCellInteraction({
     validAbilityPositions, validAbilityUnits, actionableUnitPositions, abilityReadyPositions,
     fireSacrificeSummonMode,
     validEventTargets: eventCardModes.validEventTargets,
+    zhongcaiObedienceHighlights: eventCardModes.zhongcaiObedienceHighlights,
     bloodSummonHighlights: eventCardModes.bloodSummonHighlights,
     annihilateHighlights: eventCardModes.annihilateHighlights,
     mindControlHighlights: eventCardModes.mindControlHighlights,

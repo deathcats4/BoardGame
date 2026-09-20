@@ -32,8 +32,8 @@ export type ScenarioReaderOpenMode =
 
 export type ScenarioReaderOpenPlan = {
   scope: ScenarioReaderScope;
-  spreadCount: number;
-  initialSpreadIndex: number;
+  bookSpreadCount: number;
+  initialBookSpreadIndex: number;
   includeOpeningStage: boolean;
   isPublicHauntRevealReader: boolean;
 };
@@ -329,14 +329,10 @@ export function resolveScenarioReaderOpenPlan(
     core.phase === "haunt" &&
     options.hasOpeningSection &&
     options.mode === "hauntReveal";
-  const spreadCount = Math.max(
-    1,
-    options.bookSpreadCount + (includeOpeningStage ? 1 : 0),
-  );
   return {
     scope,
-    spreadCount,
-    initialSpreadIndex: 0,
+    bookSpreadCount: Math.max(1, options.bookSpreadCount),
+    initialBookSpreadIndex: 0,
     includeOpeningStage,
     isPublicHauntRevealReader,
   };
@@ -419,14 +415,10 @@ export function buildScenarioReaderPages(
   });
 }
 
-export function resolveScenarioReaderSpreadPages(
+export function resolveScenarioBookSpreadPages(
   pages: ScenarioReaderPage[],
-  hasOpeningStage: boolean,
-  spreadIndex: number,
+  bookSpreadIndex: number,
 ): [ScenarioReaderPage | null, ScenarioReaderPage | null] {
-  const bookSpreadIndex = hasOpeningStage
-    ? Math.max(0, spreadIndex - 1)
-    : spreadIndex;
   return [
     pages[bookSpreadIndex * 2] ?? null,
     pages[bookSpreadIndex * 2 + 1] ?? null,

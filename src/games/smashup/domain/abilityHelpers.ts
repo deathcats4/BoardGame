@@ -1886,6 +1886,8 @@ export function grantExtraAction(
         restrictToCardDefId?: string;
         restrictToBaseModifier?: boolean;
         allowFromDiscard?: boolean;
+        allowSkip?: boolean;
+        destroyAttachedActionAtTurnEnd?: boolean;
     },
 ): LimitModifiedEvent {
     return {
@@ -1903,6 +1905,8 @@ export function grantExtraAction(
             ...(options?.restrictToCardDefId ? { restrictToCardDefId: options.restrictToCardDefId } : {}),
             ...(options?.restrictToBaseModifier ? { restrictToBaseModifier: true } : {}),
             ...(options?.allowFromDiscard ? { allowFromDiscard: true } : {}),
+            ...(options?.allowSkip !== undefined ? { allowSkip: options.allowSkip } : {}),
+            ...(options?.destroyAttachedActionAtTurnEnd ? { destroyAttachedActionAtTurnEnd: true } : {}),
         },
         timestamp: now,
     };
@@ -2023,6 +2027,8 @@ export function grantContextualExtraAction(
         restrictToCardDefId?: string;
         restrictToBaseModifier?: boolean;
         allowFromDiscard?: boolean;
+        allowSkip?: boolean;
+        destroyAttachedActionAtTurnEnd?: boolean;
     },
 ): LimitModifiedEvent {
     return grantExtraAction(ctx.playerId, reason, ctx.now, {
@@ -2033,6 +2039,8 @@ export function grantContextualExtraAction(
         restrictToCardDefId: options?.restrictToCardDefId,
         restrictToBaseModifier: options?.restrictToBaseModifier,
         allowFromDiscard: options?.allowFromDiscard,
+        allowSkip: options?.allowSkip,
+        destroyAttachedActionAtTurnEnd: options?.destroyAttachedActionAtTurnEnd,
     });
 }
 

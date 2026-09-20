@@ -5,8 +5,11 @@ import type {
     BetrayalPendingEventRollResolutionState,
     BetrayalRecentRollState,
 } from './game';
+import type { AiSeatController } from '../../engine/ai/types';
 
-type PlayerRoster = Pick<BetrayalCore, 'playerIds'>;
+type PlayerRoster = Pick<BetrayalCore, 'playerIds'> & {
+    seatControllers?: Record<string, AiSeatController>;
+};
 
 type RecentRollDecisionCore = PlayerRoster & Pick<
     BetrayalCore,
@@ -46,6 +49,18 @@ export function isPendingCardResolutionFullyAcknowledged(
     return requiredPlayerIds.every((playerId) => acknowledgedPlayerIds.includes(playerId));
 }
 
+export function resolveHumanAcknowledgementPlayerIds(core: PlayerRoster, fallbackPlayerId?: string): string[] {
+    const humanPlayerIds = core.playerIds.filter((playerId) => {
+        const controller = core.seatControllers?.[playerId];
+        return !controller || controller.type === 'human';
+    });
+    return humanPlayerIds.length > 0
+        ? humanPlayerIds
+        : fallbackPlayerId
+            ? [fallbackPlayerId]
+            : [...core.playerIds];
+}
+
 export function resolvePendingEventRollResolutionRequiredPlayerIds(
     core: PlayerRoster,
     resolution: BetrayalPendingEventRollResolutionState,
@@ -53,11 +68,7 @@ export function resolvePendingEventRollResolutionRequiredPlayerIds(
     if (resolution.requiresAcknowledgement === false) {
         return [resolution.playerId];
     }
-    const configuredPlayerIds = resolution.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
-    if (configuredPlayerIds.length > 0) {
-        return configuredPlayerIds;
-    }
-    return core.playerIds.length > 0 ? [...core.playerIds] : [resolution.playerId];
+    return resolveHumanAcknowledgementPlayerIds(core, resolution.playerId);
 }
 
 export function resolvePendingEventRollResolutionAcknowledgedPlayerIds(

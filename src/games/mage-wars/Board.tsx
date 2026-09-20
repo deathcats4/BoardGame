@@ -34,7 +34,6 @@ import {
 import { buildChoiceRequestFromOpportunity } from '../../engine/TimingOpportunity';
 import type { PlayerId } from '../../engine/types';
 import type { GameBoardProps } from '../../engine/transport/protocol';
-import { useRuntimeViewport } from '../../hooks/ui/useRuntimeViewport';
 import { useTouchInspectGesture } from '../../hooks/ui/useTouchInspectGesture';
 import { useEndgame } from '../../hooks/game/useEndgame';
 import { useToast } from '../../contexts/ToastContext';
@@ -167,9 +166,6 @@ const MAGE_WARS_REFERENCE_INSPECT_BUTTON_SIZE = 'clamp(28px, 18.5cqw, 34px)';
 const MAGE_WARS_REFERENCE_INSPECT_ICON_SIZE = 'clamp(15px, 10cqw, 19px)';
 const MAGE_WARS_HUD_HINT_CARD_HEIGHT_CSS_VAR = 'var(--mage-wars-desktop-hud-hint-card-height, calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem)))';
 const MAGE_WARS_HUD_COMPACT_HINT_CARD_HEIGHT_REM = 4.5;
-const MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET = 316;
-const MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO = 0.28;
-const MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO = 0.45;
 const MAGE_WARS_TUTORIAL_ARENA_TARGET_PREFIXES = [
     'mw-zone-',
     'mw-field-object-',
@@ -3682,24 +3678,7 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
     const [showBoardLifeTotals, setShowBoardLifeTotals] = useState(false);
     const [magnifiedPreview, setMagnifiedPreview] = useState<MageWarsMagnifiedPreview | null>(null);
     const [publicViewTargetPlayerId, setPublicViewTargetPlayerId] = useState<PlayerId | null>(null);
-    const viewport = useRuntimeViewport();
-    const isLandscapeMobileViewport = viewport.width <= 1023 && viewport.width > viewport.height;
-    const desktopBottomGap = isLandscapeMobileViewport ? 0 : MAGE_WARS_DESKTOP_BOTTOM_GAP_PX;
-    const cameraFitInsets = useMemo(() => {
-        if (!isLandscapeMobileViewport) {
-            return undefined;
-        }
-
-        return {
-            bottom: Math.min(
-                Math.max(
-                    MAGE_WARS_MIN_CAMERA_BOTTOM_UI_INSET,
-                    Math.round(viewport.height * MAGE_WARS_CAMERA_BOTTOM_UI_INSET_RATIO),
-                ),
-                Math.round(viewport.height * MAGE_WARS_MAX_CAMERA_BOTTOM_UI_INSET_RATIO),
-            ),
-        };
-    }, [isLandscapeMobileViewport, viewport.height]);
+    const desktopBottomGap = MAGE_WARS_DESKTOP_BOTTOM_GAP_PX;
     const phase = G.sys.phase ?? 'reset';
     const core = G.core;
     const players = core.playerOrder.map((id) => core.players[id]).filter(Boolean);
@@ -4860,36 +4839,33 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             mageId: player.mageId,
         });
     };
-    const shouldCompactPlayerHud = isLandscapeMobileViewport;
     const desktopUiScale = 1;
-    const desktopUiPlaneStyle: CSSProperties | undefined = isLandscapeMobileViewport
-        ? undefined
-        : {
-            inset: 0,
-            '--mage-wars-desktop-hud-width': 'clamp(18.25rem, 17vw, 21.5rem)',
-            '--mage-wars-desktop-self-hud-left': 'var(--mage-wars-desktop-side-inset, 1rem)',
-            '--mage-wars-hud-icon-size': 'clamp(3.75rem, 5vh, 4.25rem)',
-            '--mage-wars-hud-icon-gap': 'clamp(0.16rem, 0.22vh, 0.3rem)',
-            '--mage-wars-desktop-hud-hint-card-height': 'calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem))',
-            '--mage-wars-hud-icon-rail-gap': 'clamp(0.35rem, 0.48vw, 0.6rem)',
-            '--mage-wars-desktop-prepared-width': 'clamp(20.5rem, calc(25.9vw - 4.625rem), 39rem)',
-            '--mage-wars-desktop-prepared-card-height': 'var(--mage-wars-desktop-spellbook-card-height, clamp(13.75rem, min(29vh, 14.85vw), 24rem))',
-            '--mage-wars-desktop-card-height': 'var(--mage-wars-desktop-prepared-card-height, 14rem)',
-            '--mage-wars-desktop-spellbook-card-height': 'clamp(13.75rem, min(29vh, 14.85vw), 24rem)',
-            '--mage-wars-desktop-top-inset': 'clamp(0.625rem, 1vw, 0.875rem)',
-            '--mage-wars-desktop-side-inset': 'clamp(0.5rem, 1.17vw, 1rem)',
-            '--mage-wars-desktop-bottom-side-inset': 'clamp(0.5rem, calc(1.5vw - 0.8rem), 1rem)',
-            '--mage-wars-desktop-grid-gap': 'clamp(0.375rem, 0.45vw, 0.75rem)',
-            '--mage-wars-desktop-section-gap': 'clamp(0.5rem, calc(1.805vw - 1.041rem), 1.125rem)',
-            '--mage-wars-desktop-card-gap': 'clamp(0.375rem, calc(1.083vw - 0.551rem), 0.75rem)',
-            '--mage-wars-opponent-plan-mirror-width': '10.75rem',
-            '--mage-wars-spellbook-control-width': 'clamp(4.75rem, 4.7vw, 5.5rem)',
-            '--mage-wars-spellbook-page-rail-width': 'clamp(2.25rem, 2.5vw, 3rem)',
-            '--mage-wars-spellbook-page-button-size': 'clamp(2.25rem, 2.1vw, 2.5rem)',
-            '--mage-wars-prepared-card-gap': 'clamp(0.25rem, calc(1.083vw - 0.8rem), 0.875rem)',
-            '--mage-wars-prepared-row-padding-left': 'clamp(0rem, calc(4.333vw - 5rem), 1.5rem)',
-            '--mage-wars-prepared-row-padding-right': 'clamp(0rem, calc(1.083vw - 1.3rem), 0.375rem)',
-        } as CSSProperties;
+    const desktopUiPlaneStyle: CSSProperties = {
+        inset: 0,
+        '--mage-wars-desktop-hud-width': 'clamp(18.25rem, 17vw, 21.5rem)',
+        '--mage-wars-hud-icon-size': 'clamp(3.75rem, 5vh, 4.25rem)',
+        '--mage-wars-hud-icon-gap': 'clamp(0.16rem, 0.22vh, 0.3rem)',
+        '--mage-wars-desktop-hud-hint-card-height': 'calc(var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-size, 3.75rem) + var(--mage-wars-hud-icon-gap, 0.28rem) + var(--mage-wars-hud-icon-gap, 0.28rem))',
+        '--mage-wars-hud-icon-rail-gap': 'clamp(0.35rem, 0.48vw, 0.6rem)',
+        '--mage-wars-desktop-prepared-width': 'clamp(20.5rem, calc(25.9vw - 4.625rem), 39rem)',
+        '--mage-wars-desktop-prepared-card-height': 'var(--mage-wars-desktop-spellbook-card-height, clamp(13.75rem, min(29vh, 14.85vw), 24rem))',
+        '--mage-wars-desktop-card-height': 'var(--mage-wars-desktop-prepared-card-height, 14rem)',
+        '--mage-wars-desktop-spellbook-card-height': 'clamp(13.75rem, min(29vh, 14.85vw), 24rem)',
+        '--mage-wars-desktop-top-inset': 'clamp(0.625rem, 1vw, 0.875rem)',
+        '--mage-wars-desktop-side-inset': 'clamp(0.5rem, 1.17vw, 1rem)',
+        '--mage-wars-desktop-bottom-side-inset': 'clamp(0.5rem, calc(1.5vw - 0.8rem), 1rem)',
+        '--mage-wars-desktop-grid-gap': 'clamp(0.375rem, 0.45vw, 0.75rem)',
+        '--mage-wars-desktop-action-stack-gap': 'clamp(1.5rem, 3vh, 3rem)',
+        '--mage-wars-desktop-section-gap': 'clamp(0.5rem, calc(1.805vw - 1.041rem), 1.125rem)',
+        '--mage-wars-desktop-card-gap': 'clamp(0.375rem, calc(1.083vw - 0.551rem), 0.75rem)',
+        '--mage-wars-opponent-plan-mirror-width': '10.75rem',
+        '--mage-wars-spellbook-control-width': 'clamp(4.75rem, 4.7vw, 5.5rem)',
+        '--mage-wars-spellbook-page-rail-width': 'clamp(2.25rem, 2.5vw, 3rem)',
+        '--mage-wars-spellbook-page-button-size': 'clamp(2.25rem, 2.1vw, 2.5rem)',
+        '--mage-wars-prepared-card-gap': 'clamp(0.25rem, calc(1.083vw - 0.8rem), 0.875rem)',
+        '--mage-wars-prepared-row-padding-left': 'clamp(0rem, calc(4.333vw - 5rem), 1.5rem)',
+        '--mage-wars-prepared-row-padding-right': 'clamp(0rem, calc(1.083vw - 1.3rem), 0.375rem)',
+    } as CSSProperties;
     const spellbookVisibleCardCount = MAGE_WARS_SPELLBOOK_VISIBLE_CARD_COUNT;
     return (
         <div
@@ -4917,18 +4893,17 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                 data-tutorial-id="mw-stage"
             >
                 <ZoomPanViewport
-                    initialScale={isLandscapeMobileViewport ? 1 : 0.6}
-                    minScale={isLandscapeMobileViewport ? 1 : 0.6}
+                    initialScale={0.6}
+                    minScale={0.6}
                     maxScale={2.6}
-                    baseScaleMode={isLandscapeMobileViewport ? 'contain' : 'cover'}
+                    baseScaleMode="cover"
                     panBoundsMode="free"
-                    fitInsets={cameraFitInsets}
                     panToTarget={tutorialArenaPanTarget}
                     containerTestId="mage-wars-arena-viewport"
                     contentTestId="mage-wars-arena-viewport-content"
                     scaleTestId="mage-wars-arena-viewport-scale"
                     scaleBadgeVisibility="interaction"
-                    scaleBadgeStyle={isLandscapeMobileViewport ? undefined : {
+                    scaleBadgeStyle={{
                         left: `calc(var(--mage-wars-desktop-side-inset, 1rem) + ${MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH} + 3.5rem)`,
                         top: 'var(--mage-wars-desktop-top-inset, 0.875rem)',
                     }}
@@ -4995,8 +4970,8 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             </div>
             <div
                 className="pointer-events-none absolute inset-0 z-20"
-                data-testid={isLandscapeMobileViewport ? 'mage-wars-mobile-desktop-mirror-layer' : 'mage-wars-hud-anchor-layer'}
-                data-mage-wars-layout-source={isLandscapeMobileViewport ? 'desktop-mirror' : 'viewport-anchored'}
+                data-testid="mage-wars-hud-anchor-layer"
+                data-mage-wars-layout-source="viewport-anchored"
             >
             <div
                 className="pointer-events-none absolute inset-0"
@@ -5010,15 +4985,12 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
             <MageWarsLifeToggle
                 pressed={showBoardLifeTotals}
                 onToggle={() => setShowBoardLifeTotals((value) => !value)}
-                style={isLandscapeMobileViewport ? undefined : {
+                style={{
                     left: `calc(var(--mage-wars-desktop-side-inset, 1rem) + ${MAGE_WARS_PHASE_PROGRESS_RAIL_WIDTH} + 0.5rem)`,
                     top: 'var(--mage-wars-desktop-top-inset, 0.875rem)',
                 }}
-                className={isLandscapeMobileViewport ? 'left-4 top-4' : undefined}
             />
-            {!isLandscapeMobileViewport ? (
-                <MageWarsPhaseProgressIndicator phase={phase} />
-            ) : null}
+            <MageWarsPhaseProgressIndicator phase={phase} />
 
             <MageWarsInteractionDock
                 interaction={G.sys.interaction?.current}
@@ -5066,7 +5038,6 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                             player={viewingPlayer}
                             current={viewingPlayer.id === phaseActorId}
                             self
-                            compact={shouldCompactPlayerHud}
                             visualDamage={getVisualPlayerDamage(viewingPlayer)}
                             onInspect={() => handleInspectMage(viewingPlayer)}
                         />
@@ -5088,7 +5059,6 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                             player={opponent}
                             current={opponent.id === phaseActorId}
                             self={false}
-                            compact={shouldCompactPlayerHud}
                             visualDamage={getVisualPlayerDamage(opponent)}
                             onInspect={() => handleInspectMage(opponent)}
                             onObserve={() => togglePublicViewTarget(opponent.id)}
@@ -5166,7 +5136,11 @@ export default function MageWarsBoard({ G, playerID, dispatch, reset, matchData,
                         />
                     ) : null}
                 </aside>
-                <aside className="pointer-events-none flex flex-col items-end gap-2 justify-self-end">
+                <aside
+                    className="pointer-events-none flex flex-col items-end justify-self-end"
+                    style={{ rowGap: 'var(--mage-wars-desktop-action-stack-gap, 1.25rem)' }}
+                    data-layout-position="right-action-stack"
+                >
                     {publicViewPlayer ? (
                         <div style={{ marginRight: 'clamp(1.375rem, 1.55vw, 1.875rem)' }}>
                             <DiscardPile

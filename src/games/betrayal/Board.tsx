@@ -92,7 +92,7 @@ import { type BetrayalScenarioCardId } from "./scenarioConfig";
 import {
   SCENARIO_BOOK_TURN_DURATION_MS,
   resolveScenarioReaderOpenPlan,
-  resolveScenarioReaderSpreadPages,
+  resolveScenarioBookSpreadPages,
   type ScenarioBookTurnSnapshot,
 } from "./scenarioReader";
 import { resolveBetrayalScenarioReaderPresentation } from "./scenarioReaderPresentation";
@@ -427,11 +427,17 @@ export default function BetrayalBoard({
   const [scenarioReaderOpen, setScenarioReaderOpen] = React.useState(false);
   const [referenceSide, setReferenceSide] =
     React.useState<ReferencePageId>("front");
-  const [referenceScenarioSpreadIndex, setReferenceScenarioSpreadIndex] =
-    React.useState(0);
+  const [
+    referenceScenarioBookSpreadIndex,
+    setReferenceScenarioBookSpreadIndex,
+  ] = React.useState(0);
   const [
     referenceScenarioOpeningStageActive,
     setReferenceScenarioOpeningStageActive,
+  ] = React.useState(false);
+  const [
+    referenceScenarioOpeningStageIncluded,
+    setReferenceScenarioOpeningStageIncluded,
   ] = React.useState(false);
   const [referenceScenarioTurnDirection, setReferenceScenarioTurnDirection] =
     React.useState<"back" | "forward" | null>(null);
@@ -761,7 +767,8 @@ export default function BetrayalBoard({
         core,
         viewerPlayerId,
         referenceScenarioOpeningStageActive,
-        referenceScenarioSpreadIndex,
+        referenceScenarioOpeningStageIncluded,
+        referenceScenarioBookSpreadIndex,
         scenarioStartOpeningCinematicKey,
         dismissedScenarioStartOpeningCinematicKey,
         text: t,
@@ -770,7 +777,8 @@ export default function BetrayalBoard({
       core,
       dismissedScenarioStartOpeningCinematicKey,
       referenceScenarioOpeningStageActive,
-      referenceScenarioSpreadIndex,
+      referenceScenarioOpeningStageIncluded,
+      referenceScenarioBookSpreadIndex,
       scenarioStartOpeningCinematicKey,
       t,
       viewerPlayerId,
@@ -790,9 +798,8 @@ export default function BetrayalBoard({
     shouldShowScenarioStartOpening,
     referenceScenarioPages,
     referenceScenarioBookSpreadCount,
-    referenceScenarioHasOpeningStage,
-    referenceScenarioSpreadCount,
     isReferenceScenarioOpeningStage,
+    referenceScenarioReaderProgressLabel,
     referenceScenarioLeftPage,
     referenceScenarioRightPage,
     canTurnReferenceScenarioBack,
@@ -833,8 +840,9 @@ export default function BetrayalBoard({
     }
   }, [referencePages, referenceSide]);
   React.useEffect(() => {
-    setReferenceScenarioSpreadIndex(0);
+    setReferenceScenarioBookSpreadIndex(0);
     setReferenceScenarioOpeningStageActive(false);
+    setReferenceScenarioOpeningStageIncluded(false);
   }, [activeHauntDossier.id]);
   React.useEffect(() => {
     const previousPhase = previousBoardPhaseRef.current;
@@ -918,11 +926,11 @@ export default function BetrayalBoard({
       hasOpeningSection: Boolean(referenceScenarioOpeningSection),
       bookSpreadCount: referenceScenarioBookSpreadCount,
     });
-    const initialScenarioSpreadIndex =
+    const initialScenarioBookSpreadIndex =
       tutorialScenarioStepId === "jack-spirit-objective" ||
       tutorialScenarioStepId === "traitor-objective"
-        ? Math.min(1, openPlan.spreadCount - 1)
-        : openPlan.initialSpreadIndex;
+        ? Math.min(1, openPlan.bookSpreadCount - 1)
+        : openPlan.initialBookSpreadIndex;
     const hauntRevealKey = openPlan.isPublicHauntRevealReader
       ? buildLatestDiscoveryKey(core)
       : null;
@@ -950,7 +958,8 @@ export default function BetrayalBoard({
         }));
       }
     }
-    setReferenceScenarioSpreadIndex(initialScenarioSpreadIndex);
+    setReferenceScenarioBookSpreadIndex(initialScenarioBookSpreadIndex);
+    setReferenceScenarioOpeningStageIncluded(openPlan.includeOpeningStage);
     setReferenceScenarioOpeningStageActive(openPlan.includeOpeningStage);
     setReferenceScenarioTurnDirection(null);
     setReferenceScenarioTurnSnapshot(null);
@@ -984,6 +993,7 @@ export default function BetrayalBoard({
     setReferenceOpen(false);
     setScenarioReaderOpen(false);
     setReferenceScenarioOpeningStageActive(false);
+    setReferenceScenarioOpeningStageIncluded(false);
     clearPendingScenarioTurnTutorialAdvance();
     if (shouldAdvanceScenarioReaderCloseTutorial) {
       nextStep("auto");
@@ -3082,7 +3092,8 @@ export default function BetrayalBoard({
       bookSpreadCount: referenceScenarioBookSpreadCount,
     });
     setDismissedHauntRevealDiscoveryKey(hauntRevealDiscoveryKey);
-    setReferenceScenarioSpreadIndex(openPlan.initialSpreadIndex);
+    setReferenceScenarioBookSpreadIndex(openPlan.initialBookSpreadIndex);
+    setReferenceScenarioOpeningStageIncluded(openPlan.includeOpeningStage);
     setReferenceScenarioOpeningStageActive(openPlan.includeOpeningStage);
     setReferenceScenarioTurnDirection(null);
     setReferenceScenarioTurnSnapshot(null);
@@ -3732,24 +3743,34 @@ export default function BetrayalBoard({
       isTutorialActive &&
       direction === "forward" &&
       tutorialStep?.id === "haunt-hero-reader-turn-page";
-    setReferenceScenarioSpreadIndex((previousIndex) => {
+    const isEnteringScenarioBook =
+      referenceScenarioOpeningStageActive && direction === "forward";
+    setReferenceScenarioBookSpreadIndex((previousIndex) => {
       const nextIndex =
-        direction === "back"
-          ? Math.max(0, previousIndex - 1)
-          : Math.min(referenceScenarioSpreadCount - 1, previousIndex + 1);
-      if (nextIndex !== previousIndex) {
+        isEnteringScenarioBook
+          ? previousIndex
+          : direction === "back"
+            ? Math.max(0, previousIndex - 1)
+            : Math.min(
+                referenceScenarioBookSpreadCount - 1,
+                previousIndex + 1,
+              );
+      if (isEnteringScenarioBook || nextIndex !== previousIndex) {
         setReferenceScenarioTurnSnapshot({
-          fromPages: resolveScenarioReaderSpreadPages(
+          fromPages: isEnteringScenarioBook
+            ? [null, null]
+            : resolveScenarioBookSpreadPages(
+                referenceScenarioPages,
+                previousIndex,
+              ),
+          toPages: resolveScenarioBookSpreadPages(
             referenceScenarioPages,
-            referenceScenarioHasOpeningStage,
-            previousIndex,
-          ),
-          toPages: resolveScenarioReaderSpreadPages(
-            referenceScenarioPages,
-            referenceScenarioHasOpeningStage,
             nextIndex,
           ),
         });
+        if (isEnteringScenarioBook) {
+          setReferenceScenarioOpeningStageActive(false);
+        }
         playSound(BETRAYAL_SCENARIO_PAGE_TURN_KEY);
         setReferenceScenarioTurnDirection(direction);
         if (shouldAdvanceScenarioTurnTutorial) {
@@ -5920,7 +5941,7 @@ export default function BetrayalBoard({
               </div>
             ) : null}
 
-            {shouldShowHauntRevealCue ? (
+            {shouldShowHauntRevealCue && !scenarioReaderOpen ? (
               <BetrayalHauntRevealCue
                 revealProtocol={hauntRevealProtocol}
                 scenarioRuntime={core.scenarioRuntime}
@@ -7050,8 +7071,10 @@ export default function BetrayalBoard({
             scenarioReaderScopeLabel={scenarioReaderScopeLabel}
             activeHauntCaseLabel={activeHauntCaseLabel}
             activeHauntTitle={activeHauntTitle}
-            referenceScenarioSpreadIndex={referenceScenarioSpreadIndex}
-            referenceScenarioSpreadCount={referenceScenarioSpreadCount}
+            referenceScenarioBookSpreadCount={referenceScenarioBookSpreadCount}
+            referenceScenarioReaderProgressLabel={
+              referenceScenarioReaderProgressLabel
+            }
             referenceScenarioOpeningSection={referenceScenarioOpeningSection}
             referenceScenarioTurnDirection={referenceScenarioTurnDirection}
             referenceScenarioTurnSnapshot={referenceScenarioTurnSnapshot}

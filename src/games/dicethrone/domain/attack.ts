@@ -11,6 +11,73 @@ import { getPlayerAbilityEffects } from './abilityLookup';
 import { applyEvents, getPendingAttackExpectedDamage } from './utils';
 import { reduce } from './reducer';
 import { hasPendingBonusDiceSettlement } from './rules';
+import { STATUS_IDS } from './ids';
+import { getCustomActionMeta } from './effects';
+import type { PendingAttackUpdatedEvent, StatusRemovedEvent } from './types';
+
+const pendingAttackHasAttackScopedDamage = (state: DiceThroneCore): boolean => {
+    const pending = state.pendingAttack;
+    if (!pending?.sourceAbilityId) return false;
+    const effects = getPlayerAbilityEffects(state, pending.attackerId, pending.sourceAbilityId);
+    return effects.some(effect => {
+        const action = effect.action;
+        if (!action) return false;
+        if (action.type === 'damage') {
+            return (action.damageScope ?? 'attack') === 'attack'
+                && (action.damageOrigin ?? 'ability') === 'ability';
+        }
+        if (action.type === 'custom' && action.customActionId) {
+            return (action.damageOrigin ?? 'ability') === 'ability'
+                && (getCustomActionMeta(action.customActionId)?.categories.includes('damage') ?? false);
+        }
+        return false;
+    });
+};
+
+const buildZhizhuxiaWebbedTriggerEvents = (
+    state: DiceThroneCore,
+    timestamp: number,
+): DiceThroneEvent[] => {
+    const pending = state.pendingAttack;
+    if (
+        !pending
+        || !pending.defenderId
+        || pending.zhizhuxiaWebbedTriggeredThisAttack
+        || !pendingAttackHasAttackScopedDamage(state)
+    ) {
+        return [];
+    }
+
+    const defender = state.players[pending.defenderId];
+    const webbedStacks = defender?.statusEffects[STATUS_IDS.WEBBED] ?? 0;
+    if (webbedStacks <= 0) return [];
+
+    return [
+        {
+            type: 'PENDING_ATTACK_UPDATED',
+            payload: {
+                attackerId: pending.attackerId,
+                patch: {
+                    isDefendable: false,
+                    zhizhuxiaWebbedTriggeredThisAttack: true,
+                    zhizhuxiaWebbedWasPresentAtStart: true,
+                },
+            },
+            sourceCommandType: 'ABILITY_EFFECT',
+            timestamp,
+        } as PendingAttackUpdatedEvent,
+        {
+            type: 'STATUS_REMOVED',
+            payload: {
+                targetId: pending.defenderId,
+                statusId: STATUS_IDS.WEBBED,
+                stacks: webbedStacks,
+            },
+            sourceCommandType: 'ABILITY_EFFECT',
+            timestamp: timestamp + 0.001,
+        } as StatusRemovedEvent,
+    ];
+};
 
 const isBlockingInteractionEvent = (event: DiceThroneEvent): boolean =>
     event.type === 'CHOICE_REQUESTED'
@@ -79,6 +146,7 @@ export const resolveOffensivePreDefenseEffects = (
     };
 
     const events: DiceThroneEvent[] = [];
+    events.push(...buildZhizhuxiaWebbedTriggerEvents(state, timestamp));
     events.push(...resolveEffectsToEvents(effects, 'preDefense', ctx, { random }));
     if (events.some(isBlockingInteractionEvent) || events.some(isInteractiveBonusDiceRerollEvent)) {
         // 记录已完成的前置位置，但不能继续进入防御或主伤害。

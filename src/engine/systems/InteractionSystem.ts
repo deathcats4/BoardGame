@@ -955,14 +955,14 @@ export function createMultistepChoice<TStep, TResult>(
 export function queueInteraction<TCore>(
     state: MatchState<TCore>,
     interaction: InteractionDescriptor,
-    options?: { urgent?: boolean }, // 新增：urgent 标志
+    options?: { urgent?: boolean; forceQueue?: boolean },
 ): MatchState<TCore> {
     if (!interaction) return state;
     interaction = bindInteractionToResolutionFrame(state, interaction);
 
     const { current, queue } = state.sys.interaction;
 
-    if (!current) {
+    if (!current && !options?.forceQueue) {
         // 如果当前没有交互，新交互立即成为 current
         // 如果有选项生成器，立即基于当前状态生成选项
         if (interaction.kind === 'simple-choice') {

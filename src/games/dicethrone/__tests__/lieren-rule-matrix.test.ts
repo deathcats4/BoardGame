@@ -492,7 +492,7 @@ describe('DiceThrone 女猎手规则矩阵', () => {
             payload: expect.objectContaining({ amount: 5 }),
         }));
 
-        activeState.core.players['0'].companion!.hp = 0;
+        activeState.core.players['0'].companion = { id: 'nyra', hp: 0, maxHp: 7, active: false };
         const inactiveEvents = resolve(activeState, 'nyra-inactive-test', [attackEffect], 'withDamage', []);
         expect(inactiveEvents).toContainEqual(expect.objectContaining({
             type: 'DAMAGE_DEALT',
@@ -636,6 +636,37 @@ describe('DiceThrone 女猎手规则矩阵', () => {
             }),
         }));
         expect(revived.players['0'].companion).toMatchObject({ hp: 5, active: true });
+    });
+
+    it('妮拉倒下为 0 血时，只在女猎手自己的维持阶段恢复 1 血且保持倒下', () => {
+        const state = createLierenState();
+        state.core.players['0'].companion = { id: 'nyra', hp: 0, maxHp: 7, active: false };
+
+        const ownUpkeepEvents = enterUpkeep(state.core, []);
+        const afterOwnUpkeep = applyEvents(state.core, ownUpkeepEvents);
+        expect(ownUpkeepEvents).toContainEqual(expect.objectContaining({
+            type: 'COMPANION_HEALTH_CHANGED',
+            payload: expect.objectContaining({
+                playerId: '0',
+                companionId: 'nyra',
+                delta: 1,
+                active: false,
+            }),
+        }));
+        expect(afterOwnUpkeep.players['0'].companion).toMatchObject({ hp: 1, active: false });
+
+        const opponentUpkeepCore = {
+            ...state.core,
+            activePlayerId: '1',
+        };
+        const opponentUpkeepEvents = enterUpkeep(opponentUpkeepCore, []);
+        expect(opponentUpkeepEvents).not.toContainEqual(expect.objectContaining({
+            type: 'COMPANION_HEALTH_CHANGED',
+            payload: expect.objectContaining({
+                playerId: '0',
+                companionId: 'nyra',
+            }),
+        }));
     });
 
     it('妮拉承伤只扣伙伴生命，终极攻击不允许转移', () => {

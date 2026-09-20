@@ -644,35 +644,22 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(next.passiveActionUsedThisTurn?.['0']?.['vampire-lord-blood-power-draw']).toBe(true);
     });
 
-    it('鲜血之力 4 档要求当前攻击已造成伤害，并按已造成伤害治疗自己', () => {
+    it('鲜血之力 4 档读取本回合最近一次正式攻击伤害，并在主要阶段 2 治疗自己', () => {
         const blocked = createBloodPowerPassiveState(4);
-        blocked.sys.phase = 'offensiveRoll';
-        blocked.core.pendingAttack = {
-            attackerId: '0',
-            defenderId: '1',
-            sourceAbilityId: 'blood-thirst',
-            settlementStage: 'preDamage',
-            isDefendable: true,
-            resolvedDamage: 0,
-        };
-        expect(validateCommand(blocked.core, useBloodPower(3), 'offensiveRoll').valid).toBe(false);
+        blocked.sys.phase = 'main2';
+        blocked.core.pendingAttack = null;
+        expect(validateCommand(blocked.core, useBloodPower(3), 'main2').valid).toBe(false);
         expect(execute(blocked, useBloodPower(3), fixedRandom)).toHaveLength(0);
 
         const state = createBloodPowerPassiveState(4);
-        state.sys.phase = 'offensiveRoll';
+        state.sys.phase = 'main2';
         state.core.players['0'].resources[RESOURCE_IDS.HP] = INITIAL_HEALTH - 12;
-        state.core.pendingAttack = {
-            attackerId: '0',
-            defenderId: '1',
-            sourceAbilityId: 'blood-thirst',
-            settlementStage: 'postDamagePending',
-            isDefendable: true,
-            resolvedDamage: 7,
-            damageResolved: false,
-        };
+        state.core.pendingAttack = null;
+        state.core.lastResolvedAttackDamage = 7;
 
         const passiveCommand = useBloodPower(3);
-        expect(validateCommand(state.core, passiveCommand, 'offensiveRoll').valid).toBe(true);
+        expect(validateCommand(state.core, passiveCommand, 'main1').valid).toBe(false);
+        expect(validateCommand(state.core, passiveCommand, 'main2').valid).toBe(true);
 
         const events = execute(state, passiveCommand, fixedRandom);
         const next = applyEvents(state.core, events);
@@ -694,10 +681,10 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(validateCommand(next, useBloodPower(0), 'offensiveRoll').valid).toBe(false);
         expect(validateCommand(next, useBloodPower(1), 'main1').valid).toBe(false);
         expect(validateCommand(next, useBloodPower(2), 'main1').valid).toBe(false);
-        expect(validateCommand(next, useBloodPower(3), 'offensiveRoll').valid).toBe(false);
+        expect(validateCommand(next, useBloodPower(3), 'main2').valid).toBe(false);
     });
 
-    it('自然攻击造成伤害后先暂停，让鲜血之力 4 档可被玩家使用', () => {
+    it('自然攻击造成伤害后自动进入主要阶段 2，并让常驻按钮读取伤害记录', () => {
         const state = createBloodPowerPassiveState(4);
         state.sys.phase = 'offensiveRoll';
         state.core.activePlayerId = '0';
@@ -724,38 +711,28 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             random: fixedRandom,
         } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
         const exitEvents = (Array.isArray(exitResult) ? exitResult : exitResult?.events ?? []) as DiceThroneEvent[];
-        const paused = applyEvents(state.core, exitEvents);
+        const next = applyEvents(state.core, exitEvents);
 
-        expect(Array.isArray(exitResult) ? undefined : exitResult?.halt).toBe(true);
+        expect(Array.isArray(exitResult) ? undefined : exitResult?.halt).not.toBe(true);
+        expect(Array.isArray(exitResult) ? undefined : exitResult?.overrideNextPhase).toBe('main2');
         expect(eventsOfType(exitEvents, 'DAMAGE_DEALT')[0]?.payload).toMatchObject({
             targetId: '1',
             amount: 5,
             actualDamage: 5,
             sourceAbilityId: 'blood-thirst',
         });
-        expect(eventsOfType(exitEvents, 'ATTACK_RESOLVED')).toHaveLength(0);
-        expect(paused.pendingAttack?.settlementStage).toBe('postDamagePending');
-        expect(paused.pendingAttack?.resolvedDamage).toBe(5);
-        expect(validateCommand(paused, useBloodPower(3), 'offensiveRoll').valid).toBe(true);
-
-        const skipResult = diceThroneFlowHooks.onPhaseExit?.({
-            state: { core: paused, sys: state.sys },
-            from: 'offensiveRoll',
-            to: 'main2',
-            command: command('ADVANCE_PHASE', '0'),
-            random: fixedRandom,
-        } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
-        const skipEvents = (Array.isArray(skipResult) ? skipResult : skipResult?.events ?? []) as DiceThroneEvent[];
-        expect(Array.isArray(skipResult) ? undefined : skipResult?.overrideNextPhase).toBe('main2');
-        expect(eventsOfType(skipEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+        expect(eventsOfType(exitEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
             attackerId: '0',
             defenderId: '1',
             sourceAbilityId: 'blood-thirst',
             totalDamage: 5,
         });
+        expect(next.pendingAttack).toBeNull();
+        expect(next.lastResolvedAttackDamage).toBe(5);
+        expect(validateCommand(next, useBloodPower(3), 'main2').valid).toBe(true);
     });
 
-    it('已造成伤害但只剩攻击收口时仍先暂停一次，让鲜血之力 4 档可被玩家使用', () => {
+    it('攻击收口完成后不再打开强制吸血弹窗，主要阶段 2 仍可主动使用', () => {
         const state = createBloodPowerPassiveState(4);
         state.sys.phase = 'defensiveRoll';
         state.core.activePlayerId = '0';
@@ -779,33 +756,19 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             random: fixedRandom,
         } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
         const firstExitEvents = (Array.isArray(firstExitResult) ? firstExitResult : firstExitResult?.events ?? []) as DiceThroneEvent[];
-        const paused = applyEvents(state.core, firstExitEvents);
+        const next = applyEvents(state.core, firstExitEvents);
 
-        expect(Array.isArray(firstExitResult) ? undefined : firstExitResult?.halt).toBe(true);
-        expect(eventsOfType(firstExitEvents, 'ATTACK_RESOLVED')).toHaveLength(0);
-        expect(eventsOfType(firstExitEvents, 'PENDING_ATTACK_UPDATED')[0]?.payload.patch).toMatchObject({
-            postDamagePassiveActionOpportunityOffered: true,
-        });
-        expect(paused.pendingAttack?.settlementStage).toBe('postDamagePending');
-        expect(paused.pendingAttack?.resolvedDamage).toBe(6);
-        expect(validateCommand(paused, useBloodPower(3), 'defensiveRoll').valid).toBe(true);
-
-        const secondExitResult = diceThroneFlowHooks.onPhaseExit?.({
-            state: { core: paused, sys: state.sys },
-            from: 'defensiveRoll',
-            to: 'main2',
-            command: command('ADVANCE_PHASE', '0'),
-            random: fixedRandom,
-        } as Parameters<NonNullable<typeof diceThroneFlowHooks.onPhaseExit>>[0]);
-        const secondExitEvents = (Array.isArray(secondExitResult) ? secondExitResult : secondExitResult?.events ?? []) as DiceThroneEvent[];
-
-        expect(Array.isArray(secondExitResult) ? undefined : secondExitResult?.overrideNextPhase).toBe('main2');
-        expect(eventsOfType(secondExitEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
+        expect(Array.isArray(firstExitResult) ? undefined : firstExitResult?.halt).not.toBe(true);
+        expect(Array.isArray(firstExitResult) ? undefined : firstExitResult?.overrideNextPhase).toBe('main2');
+        expect(eventsOfType(firstExitEvents, 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
             attackerId: '0',
             defenderId: '1',
             sourceAbilityId: 'blood-thirst',
             totalDamage: 6,
         });
+        expect(next.pendingAttack).toBeNull();
+        expect(next.lastResolvedAttackDamage).toBe(6);
+        expect(validateCommand(next, useBloodPower(3), 'main2').valid).toBe(true);
     });
 
     it('攻击成功伤害到 2 层流血对手后，回合结束获得 1 个鲜血之力', () => {
@@ -1609,7 +1572,7 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(next.pendingAttack?.isDefendable).toBe(false);
     });
 
-    it('基础魅惑之力造成不可防御伤害后仍暂停，让鲜血之力 4 档吸血', () => {
+    it('基础魅惑之力造成不可防御伤害后进入主要阶段 2，让鲜血之力 4 档主动吸血', () => {
         const state = createBloodPowerPassiveState(4);
         state.sys.phase = 'offensiveRoll';
         state.core.activePlayerId = '0';
@@ -1648,20 +1611,16 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             actualDamage: 4,
             sourceAbilityId: 'mesmerize-power',
         });
-        expect(eventsOfType(advancedEvents, 'ATTACK_RESOLVED')).toHaveLength(0);
-        expect(eventsOfType(advancedEvents, 'PENDING_ATTACK_UPDATED').some(event => (
-            event.payload.patch.postDamagePassiveActionOpportunityOffered === true
-        ))).toBe(true);
-        expect(advanced.state.sys.phase).toBe('offensiveRoll');
-        expect(advanced.state.sys.flowHalted).toBe(true);
-        expect(advanced.state.core.pendingAttack?.settlementStage).toBe('postDamagePending');
-        expect(advanced.state.core.pendingAttack?.resolvedDamage).toBe(4);
-        expect(advanced.state.core.pendingAttack?.damageResolved).toBe(true);
-        expect(advanced.state.core.pendingAttack?.postDamagePassiveActionOpportunityOffered).toBe(true);
+        expect(eventsOfType(advancedEvents, 'ATTACK_RESOLVED')).toHaveLength(1);
+        expect(eventsOfType(advancedEvents, 'PENDING_ATTACK_UPDATED')).toHaveLength(0);
+        expect(advanced.state.sys.phase).toBe('main2');
+        expect(advanced.state.sys.flowHalted).toBe(false);
+        expect(advanced.state.core.pendingAttack).toBeNull();
+        expect(advanced.state.core.lastResolvedAttackDamage).toBe(4);
         expect(advanced.state.core.players['0'].resources[RESOURCE_IDS.CP]).toBe(11);
         expect(advanced.state.core.players['0'].tokens[TOKEN_IDS.MESMERIZE]).toBe(1);
         expect(advanced.state.core.players['1'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH - 4);
-        expect(validateCommand(advanced.state.core, useBloodPower(3), 'offensiveRoll').valid).toBe(true);
+        expect(validateCommand(advanced.state.core, useBloodPower(3), 'main2').valid).toBe(true);
 
         const healed = executePipeline(
             pipelineConfig,
@@ -1680,24 +1639,78 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         });
         expect(healed.state.core.players['0'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH - 6);
         expect(healed.state.core.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(0);
+        expect(healed.state.sys.phase).toBe('main2');
+        expect(healed.state.core.pendingAttack).toBeNull();
+        expect(healed.state.core.lastResolvedAttackDamage).toBe(4);
+    });
 
-        const finished = executePipeline(
+    it('血色杀戮终极攻击造成伤害后仍允许花费 4 个鲜血之力吸血', () => {
+        const state = createBloodPowerPassiveState(2);
+        state.sys.phase = 'offensiveRoll';
+        state.core.activePlayerId = '0';
+        state.core.rollCount = 1;
+        state.core.rollDiceCount = 5;
+        state.core.rollConfirmed = true;
+        state.core.players['0'].resources[RESOURCE_IDS.HP] = INITIAL_HEALTH - 10;
+        setVampireDice(state.core, [6, 6, 6, 6, 6]);
+
+        const pipelineConfig = { domain: DiceThroneDomain, systems: testSystems };
+        const selected = executePipeline(
             pipelineConfig,
-            healed.state,
+            state,
+            command('SELECT_ABILITY', '0', { abilityId: 'bloody-slaughter' }),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(selected.success).toBe(true);
+        if (!selected.success) return;
+
+        const advanced = executePipeline(
+            pipelineConfig,
+            selected.state,
             command('ADVANCE_PHASE', '0'),
             fixedRandom,
             ['0', '1'],
         );
-        expect(finished.success).toBe(true);
-        if (!finished.success) return;
-        expect(finished.state.sys.phase).toBe('main2');
-        expect(finished.state.core.pendingAttack).toBeNull();
-        expect(eventsOfType(finished.events as DiceThroneEvent[], 'ATTACK_RESOLVED')[0]?.payload).toMatchObject({
-            attackerId: '0',
-            defenderId: '1',
-            sourceAbilityId: 'mesmerize-power',
-            totalDamage: 4,
-        });
+        expect(advanced.success).toBe(true);
+        if (!advanced.success) return;
+
+        expect(advanced.state.sys.phase).toBe('offensiveRoll');
+        expect(advanced.state.sys.flowHalted).toBe(true);
+        expect(advanced.state.sys.interaction?.current?.kind).toBe('dt:card-interaction');
+        const selectedDeckCardId = advanced.state.core.players['0'].deck[0]?.id;
+        expect(selectedDeckCardId).toBeDefined();
+        if (!selectedDeckCardId) return;
+
+        const searched = executePipeline(
+            pipelineConfig,
+            advanced.state,
+            command('RESOLVE_INTERACTION', '0', { selectedCardIds: [selectedDeckCardId] }),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(searched.success).toBe(true);
+        if (!searched.success) return;
+
+        expect(searched.state.sys.interaction?.current).toBeUndefined();
+        expect(searched.state.sys.phase).toBe('main2');
+        expect(searched.state.core.pendingAttack).toBeNull();
+        expect(searched.state.core.lastResolvedAttackDamage).toBe(10);
+        expect(validateCommand(searched.state.core, useBloodPower(3), 'main2').valid).toBe(true);
+
+        const healed = executePipeline(
+            pipelineConfig,
+            searched.state,
+            useBloodPower(3),
+            fixedRandom,
+            ['0', '1'],
+        );
+        expect(healed.success).toBe(true);
+        if (!healed.success) return;
+
+        expect(healed.state.core.players['0'].resources[RESOURCE_IDS.HP]).toBe(INITIAL_HEALTH);
+        expect(healed.state.core.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(0);
+        expect(healed.state.core.lastResolvedAttackDamage).toBe(10);
     });
 
     it('不死之身 I / II 按最终防御骰结算流血、鲜血之力和偷取生命', () => {
@@ -1804,7 +1817,7 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
         expect(next.players['0'].discard.map(card => card.id)).toEqual(['card-vampire-lord-bloodstone']);
     });
 
-    it('血流如注直接获得 1 鲜血之力和 1 催眠，并进入弃牌堆', () => {
+    it('血流如注直接获得 1 鲜血之力和 1 CP，并进入弃牌堆', () => {
         const cardId = 'card-vampire-lord-gushing-blood';
         const { events, next } = playVampireLordCard(cardId, { cp: 10 });
 
@@ -1813,9 +1826,15 @@ describe('DiceThrone 吸血鬼领主机制实现矩阵', () => {
             cardId,
             cpCost: 0,
         });
-        expect(next.players['0'].resources[RESOURCE_IDS.CP]).toBe(10);
+        expect(eventsOfType(events, 'CP_CHANGED')[0]?.payload).toMatchObject({
+            playerId: '0',
+            delta: 1,
+            newValue: 11,
+            sourceAbilityId: cardId,
+        });
+        expect(next.players['0'].resources[RESOURCE_IDS.CP]).toBe(11);
         expect(next.players['0'].tokens[TOKEN_IDS.BLOOD_POWER]).toBe(1);
-        expect(next.players['0'].tokens[TOKEN_IDS.MESMERIZE]).toBe(1);
+        expect(next.players['0'].tokens[TOKEN_IDS.MESMERIZE] ?? 0).toBe(0);
         expect(next.players['0'].hand).toHaveLength(0);
         expect(next.players['0'].discard.map(card => card.id)).toEqual([cardId]);
     });

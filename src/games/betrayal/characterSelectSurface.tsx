@@ -1,22 +1,24 @@
 import React from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { HudPortal, UI_Z_INDEX } from "../../core";
 import { OptimizedImage } from "../../components/common/media/OptimizedImage";
 import type { MatchPlayerInfo } from "../../engine/transport/protocol";
 import { playSound } from "../../lib/audio/useGameAudio";
-import { EXPLORER_CATALOG, type BetrayalCore, type BetrayalTraitKey } from "./game";
+import {
+  EXPLORER_CATALOG,
+  type BetrayalCore,
+  type BetrayalTraitKey,
+} from "./game";
 import { BETRAYAL_SCENARIO_PAGE_TURN_KEY } from "./audio.config";
 import { BETRAYAL_TITLE_BANNER_ASSET } from "./uiAssets";
-import { CinematicNarrationPanel } from "./cinematicNarrationSurface";
 import {
   SCENARIO_BOOK_TURN_DURATION_MS,
   buildScenarioReaderPages,
   formatScenarioCardSummary,
   formatScenarioCardTitle,
-  isScenarioReaderCinematicSection,
   resolveScenarioCardDossier,
-  resolveScenarioReaderSpreadPages,
+  resolveScenarioBookSpreadPages,
   type ScenarioBookTurnSnapshot,
 } from "./scenarioReader";
 import {
@@ -24,7 +26,7 @@ import {
   resolveImplementedScenarioIdForCard,
   type BetrayalScenarioCardId,
 } from "./scenarioConfig";
-import { ScenarioBookTurnSheet } from "./scenarioBookTurnSurface";
+import { BetrayalReferenceOverlaySurface } from "./referenceOverlaySurface";
 import { TRAIT_LABEL_LOCAL, TRAIT_TONE_CLASS } from "./traitTrackSurface";
 import { BETRAYAL_TRAIT_MARKER_ASSETS } from "./traitAssets";
 import { resolvePlayerName } from "./playerPresentation";
@@ -226,8 +228,9 @@ export function CharacterSelectScreen({
     setScenarioCardConfirmationSettling,
   ] = React.useState(false);
   const scenarioCardConfirmationSettlingRef = React.useRef(false);
-  const scenarioCardConfirmationSettlingTimerRef =
-    React.useRef<number | null>(null);
+  const scenarioCardConfirmationSettlingTimerRef = React.useRef<number | null>(
+    null,
+  );
   const primaryActionDisabled =
     isReady &&
     scenarioCardConfirmed &&
@@ -240,14 +243,16 @@ export function CharacterSelectScreen({
       ? t("board.characterSelect.confirmScenarioCard")
       : !scenarioAllParticipantsConfirmed
         ? t("board.characterSelect.scenarioConfirmed")
-      : proposedScenarioIsPlayable
-        ? t("board.characterSelect.startScenario")
-        : t("board.characterSelect.cannotStartPendingScenario");
+        : proposedScenarioIsPlayable
+          ? t("board.characterSelect.startScenario")
+          : t("board.characterSelect.cannotStartPendingScenario");
   const [scenarioSelectionOpen, setScenarioSelectionOpen] =
     React.useState(false);
   const [scenarioDetailsOpen, setScenarioDetailsOpen] = React.useState(false);
-  const [scenarioReaderSpreadIndex, setScenarioReaderSpreadIndex] =
-    React.useState(0);
+  const [
+    scenarioReaderBookSpreadIndex,
+    setScenarioReaderBookSpreadIndex,
+  ] = React.useState(0);
   const [scenarioReaderTurnDirection, setScenarioReaderTurnDirection] =
     React.useState<"back" | "forward" | null>(null);
   const [scenarioReaderTurnSnapshot, setScenarioReaderTurnSnapshot] =
@@ -257,7 +262,7 @@ export function CharacterSelectScreen({
     if (!isReady) {
       setScenarioSelectionOpen(false);
       setScenarioDetailsOpen(false);
-      setScenarioReaderSpreadIndex(0);
+      setScenarioReaderBookSpreadIndex(0);
       setScenarioReaderTurnSnapshot(null);
     }
   }, [isReady]);
@@ -282,11 +287,14 @@ export function CharacterSelectScreen({
         window.clearTimeout(scenarioCardConfirmationSettlingTimerRef.current);
       }
       onConfirmScenarioCard();
-      scenarioCardConfirmationSettlingTimerRef.current = window.setTimeout(() => {
-        scenarioCardConfirmationSettlingRef.current = false;
-        setScenarioCardConfirmationSettling(false);
-        scenarioCardConfirmationSettlingTimerRef.current = null;
-      }, 350);
+      scenarioCardConfirmationSettlingTimerRef.current = window.setTimeout(
+        () => {
+          scenarioCardConfirmationSettlingRef.current = false;
+          setScenarioCardConfirmationSettling(false);
+          scenarioCardConfirmationSettlingTimerRef.current = null;
+        },
+        350,
+      );
       return;
     }
     if (scenarioCardConfirmationSettlingRef.current) {
@@ -305,7 +313,7 @@ export function CharacterSelectScreen({
     (candidateId: BetrayalScenarioCardId) => {
       onProposeScenarioCard(candidateId);
       setScenarioDetailsOpen(false);
-      setScenarioReaderSpreadIndex(0);
+      setScenarioReaderBookSpreadIndex(0);
       setScenarioReaderTurnSnapshot(null);
     },
     [onProposeScenarioCard],
@@ -317,13 +325,13 @@ export function CharacterSelectScreen({
       window.setTimeout(() => {
         setScenarioSelectionOpen(false);
         setScenarioDetailsOpen(false);
-        setScenarioReaderSpreadIndex(0);
+        setScenarioReaderBookSpreadIndex(0);
         setScenarioReaderTurnSnapshot(null);
       }, 0);
     },
     [
       setScenarioDetailsOpen,
-      setScenarioReaderSpreadIndex,
+      setScenarioReaderBookSpreadIndex,
       setScenarioSelectionOpen,
     ],
   );
@@ -331,7 +339,7 @@ export function CharacterSelectScreen({
     (event?: React.SyntheticEvent) => {
       event?.stopPropagation();
       setScenarioDetailsOpen(false);
-      setScenarioReaderSpreadIndex(0);
+      setScenarioReaderBookSpreadIndex(0);
       setScenarioReaderTurnSnapshot(null);
     },
     [],
@@ -343,9 +351,8 @@ export function CharacterSelectScreen({
     },
     [],
   );
-  const scenarioReaderDossier = resolveScenarioCardDossier(
-    proposedScenarioCard,
-  );
+  const scenarioReaderDossier =
+    resolveScenarioCardDossier(proposedScenarioCard);
   const scenarioReaderTitle = t(scenarioReaderDossier.titleKey);
   // 角色选择阶段只是阅读剧本预览，不属于进入游戏后的开局剧情幕。
   // 开局黑幕只由 preHaunt 的真实开始流程负责展示。
@@ -358,46 +365,37 @@ export function CharacterSelectScreen({
     1,
     Math.ceil(scenarioReaderPages.length / 2),
   );
-  const scenarioReaderHasOpeningStage = false;
-  const scenarioReaderSpreadCount =
-    scenarioReaderBookSpreadCount + (scenarioReaderHasOpeningStage ? 1 : 0);
-  const isScenarioReaderOpeningStage =
-    scenarioReaderHasOpeningStage && scenarioReaderSpreadIndex === 0;
-  const scenarioReaderBookSpreadIndex = scenarioReaderHasOpeningStage
-    ? Math.max(0, scenarioReaderSpreadIndex - 1)
-    : scenarioReaderSpreadIndex;
   const scenarioReaderLeftPage =
     scenarioReaderPages[scenarioReaderBookSpreadIndex * 2] ?? null;
   const scenarioReaderRightPage =
     scenarioReaderPages[scenarioReaderBookSpreadIndex * 2 + 1] ?? null;
-  const canTurnScenarioReaderBack = scenarioReaderSpreadIndex > 0;
+  const canTurnScenarioReaderBack = scenarioReaderBookSpreadIndex > 0;
   const canTurnScenarioReaderForward =
-    scenarioReaderSpreadIndex < scenarioReaderSpreadCount - 1;
+    scenarioReaderBookSpreadIndex < scenarioReaderBookSpreadCount - 1;
   const handleScenarioReaderTurn = (direction: "back" | "forward") => {
-    const nextSpreadIndex =
+    const nextBookSpreadIndex =
       direction === "back"
-        ? Math.max(0, scenarioReaderSpreadIndex - 1)
+        ? Math.max(0, scenarioReaderBookSpreadIndex - 1)
         : Math.min(
-            scenarioReaderSpreadCount - 1,
-            scenarioReaderSpreadIndex + 1,
+            scenarioReaderBookSpreadCount - 1,
+            scenarioReaderBookSpreadIndex + 1,
           );
-    const didTurn = nextSpreadIndex !== scenarioReaderSpreadIndex;
+    const didTurn =
+      nextBookSpreadIndex !== scenarioReaderBookSpreadIndex;
     if (!didTurn) return;
     setScenarioReaderTurnSnapshot({
-      fromPages: resolveScenarioReaderSpreadPages(
+      fromPages: resolveScenarioBookSpreadPages(
         scenarioReaderPages,
-        scenarioReaderHasOpeningStage,
-        scenarioReaderSpreadIndex,
+        scenarioReaderBookSpreadIndex,
       ),
-      toPages: resolveScenarioReaderSpreadPages(
+      toPages: resolveScenarioBookSpreadPages(
         scenarioReaderPages,
-        scenarioReaderHasOpeningStage,
-        nextSpreadIndex,
+        nextBookSpreadIndex,
       ),
     });
     playSound(BETRAYAL_SCENARIO_PAGE_TURN_KEY);
     setScenarioReaderTurnDirection(direction);
-    setScenarioReaderSpreadIndex(nextSpreadIndex);
+    setScenarioReaderBookSpreadIndex(nextBookSpreadIndex);
     window.setTimeout(() => {
       setScenarioReaderTurnDirection(null);
       setScenarioReaderTurnSnapshot(null);
@@ -868,7 +866,9 @@ export function CharacterSelectScreen({
                         key={candidate.id}
                         type="button"
                         data-testid={`betrayal-scenario-option-${candidate.id}`}
-                        data-scenario-card-status={candidate.implementationStatus}
+                        data-scenario-card-status={
+                          candidate.implementationStatus
+                        }
                         aria-pressed={isProposed}
                         onClick={() => handleScenarioCardPropose(candidate.id)}
                         className={`group relative w-full border p-3 text-left shadow-[inset_0_0_0_1px_rgba(255,240,184,0.08)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e2c57e] lg:p-4 ${
@@ -985,6 +985,8 @@ export function CharacterSelectScreen({
               </div>
             </div>
             {scenarioDetailsOpen ? (
+              <>
+                {/*
               <div
                 role="dialog"
                 aria-modal="true"
@@ -1008,26 +1010,11 @@ export function CharacterSelectScreen({
                 >
                   <div className="pointer-events-none absolute inset-2 border border-[rgba(214,191,129,0.14)]" />
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_5%,rgba(216,171,88,0.16),transparent_34%)]" />
-                  {isScenarioReaderOpeningStage ? null : (
-                    <button
-                      type="button"
-                      data-testid="betrayal-scenario-reader-close"
-                      onClick={handleScenarioReaderClose}
-                      aria-label={t("board.characterSelect.hideScenarioDetails")}
-                      className={`${isPhoneLandscapeLayout ? "relative ml-auto mr-2 mt-2 h-11 w-11 px-0" : "absolute right-3 top-3 min-h-11 min-w-11 px-3"} z-20 inline-flex cursor-pointer items-center justify-center border border-[rgba(214,191,129,0.42)] bg-[rgba(18,23,18,0.82)] text-[12px] font-semibold uppercase tracking-[0.12em] text-[#e2c57e] shadow-[0_8px_24px_rgba(0,0,0,0.38)] transition hover:border-[#e2c57e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e2c57e]`}
-                    >
-                      {isPhoneLandscapeLayout ? (
-                        <X size={18} aria-hidden="true" />
-                      ) : (
-                        t("board.characterSelect.hideScenarioDetails")
-                      )}
-                    </button>
-                  )}
                   <div
                     className={`relative min-h-0 ${
                       isScenarioReaderOpeningStage
                         ? "h-full p-0"
-                        : `px-2 ${isPhoneLandscapeLayout ? "pb-2" : "py-2 lg:px-3 lg:py-3"}`
+                        : "h-full p-0"
                     }`}
                   >
                     <div
@@ -1039,7 +1026,7 @@ export function CharacterSelectScreen({
                       className={`relative mx-auto w-full overflow-hidden ${
                         isScenarioReaderOpeningStage
                           ? "h-full max-w-none bg-transparent"
-                          : "grid grid-cols-2 border border-[#5a371a] bg-[#2a170d] shadow-[0_26px_62px_rgba(0,0,0,0.58),inset_0_0_0_1px_rgba(236,196,117,0.18)]"
+                          : "relative flex h-full min-h-0 flex-col border border-[#5a371a] bg-[#2a170d] shadow-[0_26px_62px_rgba(0,0,0,0.58),inset_0_0_0_1px_rgba(236,196,117,0.18)]"
                       } ${
                         isScenarioReaderOpeningStage
                           ? "min-h-full p-0"
@@ -1048,6 +1035,40 @@ export function CharacterSelectScreen({
                             : "h-[min(84vh,760px)] min-h-[360px] p-[7px] lg:h-[min(86vh,780px)]"
                       }`}
                     >
+                      {!isScenarioReaderOpeningStage ? (
+                        <div
+                          className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-3 p-2 sm:p-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#c9a35e] drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]">
+                              {proposedScenarioCardTitle}
+                            </div>
+                            <div
+                              aria-hidden="true"
+                              className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9f8d6e] drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]"
+                            >
+                              {t("board.scenario.readerScopePublic")}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            data-testid="betrayal-scenario-reader-close"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleScenarioReaderClose();
+                            }}
+                            aria-label={t(
+                              "board.characterSelect.hideScenarioDetails",
+                            )}
+                            title={t(
+                              "board.characterSelect.hideScenarioDetails",
+                            )}
+                            className="pointer-events-auto inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center border border-[rgba(214,191,129,0.42)] bg-[rgba(18,23,18,0.88)] text-[#e2c57e] shadow-[0_8px_24px_rgba(0,0,0,0.38)] transition hover:border-[#e2c57e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e2c57e]"
+                          >
+                            <X size={18} aria-hidden="true" />
+                          </button>
+                        </div>
+                      ) : null}
                       {isScenarioReaderOpeningStage &&
                       scenarioReaderOpeningSection ? (
                         <CinematicNarrationPanel
@@ -1077,212 +1098,281 @@ export function CharacterSelectScreen({
                         />
                       ) : (
                         <>
-                          <div className="pointer-events-none absolute inset-[7px] bg-[linear-gradient(90deg,rgba(53,30,14,0)_0%,rgba(52,30,15,0)_47%,rgba(52,30,15,0.74)_50%,rgba(255,236,187,0.10)_51%,rgba(52,30,15,0)_54%,rgba(52,30,15,0)_100%)]" />
-                          <ScenarioBookTurnSheet
-                            direction={scenarioReaderTurnDirection}
-                            fromPages={
-                              scenarioReaderTurnSnapshot?.fromPages ?? [null, null]
-                            }
-                            toPages={
-                              scenarioReaderTurnSnapshot?.toPages ?? [null, null]
-                            }
-                            title={scenarioReaderTitle}
-                            isPhoneLandscapeLayout={isPhoneLandscapeLayout}
-                          />
-                          {[scenarioReaderLeftPage, scenarioReaderRightPage].map(
-                        (page, sideIndex) => {
-                          if (!page) {
-                            return (
-                              <div
-                                key={`blank-${sideIndex}`}
-                                className="relative hidden overflow-hidden border border-[#c7a06b] bg-[linear-gradient(135deg,#ead3a8,#d9b77b)] shadow-[inset_0_0_38px_rgba(96,55,22,0.24)] sm:block"
-                              />
-                            );
-                          }
-
-                          const pageSideClassName =
-                            sideIndex === 0
-                              ? "mr-[5px] border-r-0 sm:mr-[8px]"
-                              : "ml-[5px] border-l-0 sm:ml-[8px]";
-
-                          return (
-                            <section
-                              key={page.id}
-                              data-testid={
-                                page.type === "cover"
-                                  ? "betrayal-scenario-book-cover-page"
-                                  : `betrayal-scenario-book-page-${page.id}`
+                          <div className="absolute inset-2 grid grid-cols-2 p-[5px] sm:p-2">
+                            <div className="pointer-events-none absolute inset-[7px] bg-[linear-gradient(90deg,rgba(53,30,14,0)_0%,rgba(52,30,15,0)_47%,rgba(52,30,15,0.74)_50%,rgba(255,236,187,0.10)_51%,rgba(52,30,15,0)_54%,rgba(52,30,15,0)_100%)]" />
+                            <ScenarioBookTurnSheet
+                              direction={scenarioReaderTurnDirection}
+                              fromPages={
+                                scenarioReaderTurnSnapshot?.fromPages ?? [
+                                  null,
+                                  null,
+                                ]
                               }
-                              className={`relative min-h-0 overflow-hidden border border-[#c7a06b] bg-[radial-gradient(circle_at_48%_18%,rgba(255,243,204,0.92),rgba(229,200,151,0.98)_58%,rgba(205,164,102,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(255,246,215,0.36),inset_0_0_42px_rgba(95,54,19,0.18)] ${isPhoneLandscapeLayout ? "p-2" : "p-3 sm:p-4 lg:p-6"} ${pageSideClassName}`}
-                            >
-                              <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:repeating-linear-gradient(0deg,rgba(92,55,24,0.08)_0_1px,transparent_1px_8px),radial-gradient(circle_at_18%_22%,rgba(88,49,18,0.12),transparent_18%),radial-gradient(circle_at_80%_70%,rgba(96,55,21,0.10),transparent_22%)]" />
-                              <div className="pointer-events-none absolute inset-[10px] border border-[#b98343]/40" />
-                              <div
-                                data-testid={
-                                  sideIndex === 0
-                                    ? "betrayal-scenario-reader-page-label-desktop-left"
-                                    : "betrayal-scenario-reader-page-label-desktop-right"
-                                }
-                                aria-hidden={sideIndex !== 0}
-                                className="sr-only"
-                              >
-                                {String(page.pageNumber).padStart(2, "0")}
-                              </div>
-                              {page.type === "cover" ? (
-                                <div className="relative flex h-full flex-col justify-between">
-                                  <div>
-                                    <h2 className="mt-3 text-[32px] font-black leading-none tracking-[0.08em] text-[#402411] lg:text-[46px]">
-                                      {scenarioReaderTitle}
-                                    </h2>
-                                    <div className="mt-3 h-px w-28 bg-[#8f5a22]" />
-                                    <p className="mt-4 text-[15px] font-semibold leading-7 text-[#57361f] lg:text-[17px] lg:leading-8">
-                                      {t("board.scenario.readerLead")}
-                                    </p>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2 text-[12px] uppercase tracking-[0.1em] text-[#6b4727]">
-                                    <div className="border border-[#b98343]/46 bg-[rgba(255,239,199,0.24)] p-2">
-                                      <div>
-                                        {t("board.scenario.readerCaseLabel")}
-                                      </div>
-                                      <div className="mt-1 font-bold text-[#402411]">
-                                        {t(
-                                          "board.characterSelect.scenarioCaseNo",
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="border border-[#607f3a]/42 bg-[rgba(236,245,193,0.20)] p-2">
-                                      <div>
-                                        {t("board.scenario.readerStatusLabel")}
-                                      </div>
-                                      <div className="mt-1 font-bold text-[#425421]">
-                                        {t(
-                                          "board.characterSelect.scenarioOnly",
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-right text-[12px] font-semibold uppercase tracking-[0.14em] text-[#86643f]">
+                              toPages={
+                                scenarioReaderTurnSnapshot?.toPages ?? [
+                                  null,
+                                  null,
+                                ]
+                              }
+                              title={scenarioReaderTitle}
+                              isPhoneLandscapeLayout={isPhoneLandscapeLayout}
+                            />
+                            {[
+                              scenarioReaderLeftPage,
+                              scenarioReaderRightPage,
+                            ].map((page, sideIndex) => {
+                              if (!page) {
+                                return (
+                                  <div
+                                    key={`blank-${sideIndex}`}
+                                    className="relative hidden overflow-hidden border border-[#c7a06b] bg-[linear-gradient(135deg,#ead3a8,#d9b77b)] shadow-[inset_0_0_38px_rgba(96,55,22,0.24)] sm:block"
+                                  />
+                                );
+                              }
+
+                              const pageSideClassName =
+                                sideIndex === 0
+                                  ? "mr-[5px] border-r-0 sm:mr-[8px]"
+                                  : "ml-[5px] border-l-0 sm:ml-[8px]";
+
+                              return (
+                                <section
+                                  key={page.id}
+                                  data-testid={
+                                    page.type === "cover"
+                                      ? "betrayal-scenario-book-cover-page"
+                                      : `betrayal-scenario-book-page-${page.id}`
+                                  }
+                                  className={`relative min-h-0 overflow-hidden border border-[#c7a06b] bg-[radial-gradient(circle_at_48%_18%,rgba(255,243,204,0.92),rgba(229,200,151,0.98)_58%,rgba(205,164,102,0.98)_100%)] shadow-[inset_0_0_0_1px_rgba(255,246,215,0.36),inset_0_0_42px_rgba(95,54,19,0.18)] ${isPhoneLandscapeLayout ? "p-2" : "p-3 sm:p-4 lg:p-6"} ${pageSideClassName}`}
+                                >
+                                  <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:repeating-linear-gradient(0deg,rgba(92,55,24,0.08)_0_1px,transparent_1px_8px),radial-gradient(circle_at_18%_22%,rgba(88,49,18,0.12),transparent_18%),radial-gradient(circle_at_80%_70%,rgba(96,55,21,0.10),transparent_22%)]" />
+                                  <div className="pointer-events-none absolute inset-[10px] border border-[#b98343]/40" />
+                                  <div
+                                    data-testid={
+                                      sideIndex === 0
+                                        ? "betrayal-scenario-reader-page-label-desktop-left"
+                                        : "betrayal-scenario-reader-page-label-desktop-right"
+                                    }
+                                    aria-hidden={sideIndex !== 0}
+                                    className="sr-only"
+                                  >
                                     {String(page.pageNumber).padStart(2, "0")}
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="relative flex h-full flex-col">
-                                  <div
-                                    data-testid="betrayal-scenario-reader-body-scroll"
-                                    className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1"
-                                  >
-                                    <div
-                                      className={`grid ${isPhoneLandscapeLayout ? "gap-2" : "gap-4 lg:gap-5"}`}
-                                    >
-                                      {(page.sections ?? []).map((section) => {
-                                          const isCinematicSection =
-                                            isScenarioReaderCinematicSection(
-                                              section.id,
-                                            );
-
-                                          return (
-                                            <section
-                                              key={section.id}
-                                              data-testid={`betrayal-scenario-book-section-${section.id}`}
-                                              data-cinematic-narration={
-                                                isCinematicSection
-                                                  ? "opening"
-                                                  : undefined
-                                              }
-                                              className={
-                                                isCinematicSection
-                                                  ? "min-h-[260px]"
-                                                  : `border-l-4 ${isPhoneLandscapeLayout ? "pl-2" : "pl-3"} ${section.accentClass}`
-                                              }
-                                            >
-                                              {isCinematicSection ? (
-                                                <CinematicNarrationPanel
-                                                  label={t(section.labelKey)}
-                                                  text={t(section.bodyKey)}
-                                                  variant="opening"
-                                                  compact={isPhoneLandscapeLayout}
-                                                  className={
-                                                    isPhoneLandscapeLayout
-                                                      ? "min-h-[248px]"
-                                                      : "min-h-[410px]"
-                                                }
-                                              />
-                                              ) : (
-                                                <>
-                                                  <div
-                                                    className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#7d5129]"
-                                                    aria-hidden="true"
-                                                  >
-                                                    {String(
-                                                      page.pageNumber,
-                                                    ).padStart(2, "0")}
-                                                  </div>
-                                                  <h3
-                                                    className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[14px]" : "mt-1 text-[21px] lg:text-[25px]"} font-black tracking-[0.05em] text-[#3b2211]`}
-                                                  >
-                                                    {t(section.labelKey)}
-                                                  </h3>
-                                                  <p
-                                                    className={`${isPhoneLandscapeLayout ? "mt-1 text-[12px] leading-[1.45]" : "mt-2 text-[14px] leading-[1.6] lg:text-[15px] lg:leading-[1.65]"} whitespace-pre-line font-medium text-[#4e321c]`}
-                                                  >
-                                                    {t(section.bodyKey)}
-                                                  </p>
-                                                </>
-                                              )}
-                                            </section>
-                                          );
-                                        },
-                                      )}
+                                  {page.type === "cover" ? (
+                                    <div className="relative flex h-full flex-col justify-between">
+                                      <div>
+                                        <h2 className="mt-3 text-[32px] font-black leading-none tracking-[0.08em] text-[#402411] lg:text-[46px]">
+                                          {scenarioReaderTitle}
+                                        </h2>
+                                        <div className="mt-3 h-px w-28 bg-[#8f5a22]" />
+                                        <p className="mt-4 text-[15px] font-semibold leading-7 text-[#57361f] lg:text-[17px] lg:leading-8">
+                                          {t("board.scenario.readerLead")}
+                                        </p>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 text-[12px] uppercase tracking-[0.1em] text-[#6b4727]">
+                                        <div className="border border-[#b98343]/46 bg-[rgba(255,239,199,0.24)] p-2">
+                                          <div>
+                                            {t(
+                                              "board.scenario.readerCaseLabel",
+                                            )}
+                                          </div>
+                                          <div className="mt-1 font-bold text-[#402411]">
+                                            {t(
+                                              "board.characterSelect.scenarioCaseNo",
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="border border-[#607f3a]/42 bg-[rgba(236,245,193,0.20)] p-2">
+                                          <div>
+                                            {t(
+                                              "board.scenario.readerStatusLabel",
+                                            )}
+                                          </div>
+                                          <div className="mt-1 font-bold text-[#425421]">
+                                            {t(
+                                              "board.characterSelect.scenarioOnly",
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="text-right text-[12px] font-semibold uppercase tracking-[0.14em] text-[#86643f]">
+                                        {String(page.pageNumber).padStart(
+                                          2,
+                                          "0",
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div
-                                    className={`${isPhoneLandscapeLayout ? "mt-1 pt-1" : "mt-3 pt-2"} flex items-center justify-between border-t border-[#b98343]/36 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#86643f]`}
-                                  >
-                                    <span>
-                                      {scenarioReaderTitle}
-                                    </span>
-                                    <span>
-                                      {String(page.pageNumber).padStart(2, "0")}
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-                            </section>
-                          );
-                        },
-                      )}
+                                  ) : (
+                                    <div className="relative flex h-full flex-col">
+                                      <div
+                                        data-testid="betrayal-scenario-reader-body-scroll"
+                                        className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-1"
+                                      >
+                                        <div
+                                          className={`grid ${isPhoneLandscapeLayout ? "gap-2" : "gap-4 lg:gap-5"}`}
+                                        >
+                                          {(page.sections ?? []).map(
+                                            (section) => {
+                                              const isCinematicSection =
+                                                isScenarioReaderCinematicSection(
+                                                  section.id,
+                                                );
+
+                                              return (
+                                                <section
+                                                  key={section.id}
+                                                  data-testid={`betrayal-scenario-book-section-${section.id}`}
+                                                  data-cinematic-narration={
+                                                    isCinematicSection
+                                                      ? "opening"
+                                                      : undefined
+                                                  }
+                                                  className={
+                                                    isCinematicSection
+                                                      ? "min-h-[260px]"
+                                                      : `border-l-4 ${isPhoneLandscapeLayout ? "pl-2" : "pl-3"} ${section.accentClass}`
+                                                  }
+                                                >
+                                                  {isCinematicSection ? (
+                                                    <CinematicNarrationPanel
+                                                      label={t(
+                                                        section.labelKey,
+                                                      )}
+                                                      text={t(section.bodyKey)}
+                                                      variant="opening"
+                                                      compact={
+                                                        isPhoneLandscapeLayout
+                                                      }
+                                                      className={
+                                                        isPhoneLandscapeLayout
+                                                          ? "min-h-[248px]"
+                                                          : "min-h-[410px]"
+                                                      }
+                                                    />
+                                                  ) : (
+                                                    <>
+                                                      <div
+                                                        className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#7d5129]"
+                                                        aria-hidden="true"
+                                                      >
+                                                        {String(
+                                                          page.pageNumber,
+                                                        ).padStart(2, "0")}
+                                                      </div>
+                                                      <h3
+                                                        className={`${isPhoneLandscapeLayout ? "mt-0.5 text-[14px]" : "mt-1 text-[21px] lg:text-[25px]"} font-black tracking-[0.05em] text-[#3b2211]`}
+                                                      >
+                                                        {t(section.labelKey)}
+                                                      </h3>
+                                                      <p
+                                                        className={`${isPhoneLandscapeLayout ? "mt-1 text-[12px] leading-[1.45]" : "mt-2 text-[14px] leading-[1.6] lg:text-[15px] lg:leading-[1.65]"} whitespace-pre-line font-medium text-[#4e321c]`}
+                                                      >
+                                                        {t(section.bodyKey)}
+                                                      </p>
+                                                    </>
+                                                  )}
+                                                </section>
+                                              );
+                                            },
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div
+                                        className={`${isPhoneLandscapeLayout ? "mt-1 pt-1" : "mt-3 pt-2"} flex items-center justify-between border-t border-[#b98343]/36 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#86643f]`}
+                                      >
+                                        <span>{scenarioReaderTitle}</span>
+                                        <span>
+                                          {String(page.pageNumber).padStart(
+                                            2,
+                                            "0",
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </section>
+                              );
+                            })}
+                          </div>
+                          <div
+                            className="pointer-events-none absolute inset-x-0 top-1/2 z-40 flex -translate-y-1/2 items-center justify-between px-1"
+                          >
+                            <button
+                              type="button"
+                              data-testid="betrayal-scenario-reader-prev-zone"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleScenarioReaderTurn("back");
+                              }}
+                              disabled={!canTurnScenarioReaderBack}
+                              aria-label={t("board.scenario.readerPrev")}
+                              title={t("board.scenario.readerPrev")}
+                              className="pointer-events-auto inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center border border-[rgba(214,191,129,0.42)] bg-[rgba(18,23,18,0.82)] text-[#e2c57e] shadow-[0_8px_18px_rgba(0,0,0,0.32)] transition hover:border-[#e2c57e] disabled:pointer-events-none disabled:opacity-35"
+                            >
+                              <ChevronRight
+                                size={16}
+                                aria-hidden="true"
+                                className="rotate-180"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              data-testid="betrayal-scenario-reader-next-zone"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleScenarioReaderTurn("forward");
+                              }}
+                              disabled={!canTurnScenarioReaderForward}
+                              aria-label={t("board.scenario.readerNext")}
+                              title={t("board.scenario.readerNext")}
+                              className="pointer-events-auto inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center border border-[rgba(214,191,129,0.42)] bg-[rgba(18,23,18,0.82)] text-[#e2c57e] shadow-[0_8px_18px_rgba(0,0,0,0.32)] transition hover:border-[#e2c57e] disabled:pointer-events-none disabled:opacity-35"
+                            >
+                              <ChevronRight size={16} aria-hidden="true" />
+                            </button>
+                          </div>
+                          <span
+                            aria-hidden="true"
+                            className="pointer-events-none absolute bottom-2 left-1/2 z-40 -translate-x-1/2 rounded-full border border-[rgba(214,191,129,0.34)] bg-[rgba(18,23,18,0.84)] px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.14em] text-[#86643f] shadow-[0_8px_18px_rgba(0,0,0,0.32)]"
+                          >
+                            {scenarioReaderBookSpreadIndex + 1}/
+                            {scenarioReaderBookSpreadCount}
+                          </span>
                         </>
                       )}
                     </div>
-                    {isScenarioReaderOpeningStage ? null : (
-                      <button
-                        type="button"
-                        data-testid="betrayal-scenario-reader-prev-zone"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleScenarioReaderTurn("back");
-                        }}
-                        disabled={!canTurnScenarioReaderBack}
-                        aria-label={t("board.scenario.readerPrev")}
-                        className="absolute bottom-3 left-3 top-3 z-10 w-[calc(50%_-_12px)] cursor-w-resize bg-transparent disabled:pointer-events-none"
-                      />
-                    )}
-                    {isScenarioReaderOpeningStage ? null : (
-                      <button
-                        type="button"
-                        data-testid="betrayal-scenario-reader-next-zone"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleScenarioReaderTurn("forward");
-                        }}
-                        disabled={!canTurnScenarioReaderForward}
-                        aria-label={t("board.scenario.readerNext")}
-                        className="absolute bottom-3 right-3 top-3 z-10 w-[calc(50%_-_12px)] cursor-e-resize bg-transparent disabled:pointer-events-none"
-                      />
-                    )}
                   </div>
                 </article>
               </div>
+                */}
+              </>
+            ) : null}
+            {scenarioDetailsOpen ? (
+              <BetrayalReferenceOverlaySurface
+                referenceOpen={false}
+                scenarioReaderOpen
+                isReferenceScenarioOpeningStage={false}
+                isPhoneLandscapeLayout={isPhoneLandscapeLayout}
+                effectiveLocale={effectiveLocale}
+                scenarioReaderScope="all"
+                scenarioReaderScopeLabel={t(
+                  "board.scenario.readerStatusPublicBook",
+                )}
+                activeHauntCaseLabel={t(
+                  "board.characterSelect.scenarioCaseNo",
+                )}
+                activeHauntTitle={scenarioReaderTitle}
+                referenceScenarioReaderProgressLabel={`${scenarioReaderBookSpreadIndex + 1}/${scenarioReaderBookSpreadCount}`}
+                referenceScenarioBookSpreadCount={scenarioReaderBookSpreadCount}
+                referenceScenarioOpeningSection={scenarioReaderOpeningSection}
+                referenceScenarioTurnDirection={scenarioReaderTurnDirection}
+                referenceScenarioTurnSnapshot={scenarioReaderTurnSnapshot}
+                referenceScenarioLeftPage={scenarioReaderLeftPage}
+                referenceScenarioRightPage={scenarioReaderRightPage}
+                canTurnReferenceScenarioBack={canTurnScenarioReaderBack}
+                canTurnReferenceScenarioForward={canTurnScenarioReaderForward}
+                onClose={handleScenarioReaderClose}
+                onReferenceScenarioTurn={handleScenarioReaderTurn}
+              />
             ) : null}
           </div>
         </HudPortal>

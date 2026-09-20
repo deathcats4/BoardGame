@@ -41,6 +41,7 @@ import { artificerDiceDefinition } from '../heroes/artificer/diceConfig';
 import { tianshiDiceDefinition } from '../heroes/tianshi/diceConfig';
 import { lierenDiceDefinition } from '../heroes/lieren/diceConfig';
 import { vampireLordDiceDefinition } from '../heroes/vampire_lord/diceConfig';
+import { zhizhuxiaDiceDefinition } from '../heroes/zhizhuxia/diceConfig';
 
 // 注册 DiceThrone 游戏特定条件（骰子组合、顺子等）
 registerDiceThroneConditions();
@@ -62,6 +63,7 @@ registerDiceDefinition(artificerDiceDefinition);
 registerDiceDefinition(tianshiDiceDefinition);
 registerDiceDefinition(lierenDiceDefinition);
 registerDiceDefinition(vampireLordDiceDefinition);
+registerDiceDefinition(zhizhuxiaDiceDefinition);
 monkResourceDefinitions.forEach(def => resourceSystem.registerDefinition(def));
 barbarianResourceDefinitions.forEach(def => resourceSystem.registerDefinition(def));
 pyromancerResourceDefinitions.forEach(def => resourceSystem.registerDefinition(def));
@@ -377,7 +379,8 @@ function inferLegacyNyraActive(
     companion: NonNullable<HeroState['companion']>,
     eventStreamEntries: readonly { id: number; event: unknown }[] | undefined,
 ): boolean {
-    // 没有完整事件流时只能保留旧版“血量大于 0 即可用”的语义，避免误杀正常受伤的旧对局。
+    // 这里只处理旧存档迁移；正式运行时不再从血量推断激活态。
+    // 没有完整事件流时无法可靠知道妮拉是否曾倒下，只能保留旧版语义。
     if (!eventStreamEntries || eventStreamEntries.length === 0 || eventStreamEntries[0]?.id !== 1) {
         return companion.hp > 0;
     }

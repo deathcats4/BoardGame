@@ -1406,6 +1406,7 @@ export const BaseZone: React.FC<{
                                             armOrActivate={armOrActivate}
                                             isMobileViewport={isMobileViewport}
                                             layout={layout}
+                                            renderStoredCardsUnderHost={renderStoredCardsUnderHost}
                                             turnOrder={turnOrder}
                                             isCoarsePointer={isCoarsePointer}
                                             shouldAnimateEntry={enteringMinionUidsByController[pid]?.has(m.uid) ?? false}
@@ -1575,12 +1576,13 @@ const MinionCard: React.FC<{
     isMobileViewport?: boolean;
     /** 响应式布局配置 */
     layout: ReturnType<typeof getLayoutConfig>;
+    renderStoredCardsUnderHost: (hostUid: string, compact?: boolean) => React.ReactNode;
     /** 玩家回合顺序（用于判断是否是最右边玩家） */
     turnOrder: string[];
     isCoarsePointer: boolean;
     /** 该随从是否是本次状态变更中新进入基地的实体 */
     shouldAnimateEntry?: boolean;
-}> = ({ minion, effectivePower, core, index, pid, baseIndex, dispatch, isMinionSelectMode, isMultiSelected, isSelected, isDuelParticipant = false, isDimmed, onMinionSelect, onView, onViewAction, selectableOngoingUids, selectedOngoingUids, multiSelectedOngoingUids, onOngoingSelect, usableMinionTalentUids, usableSpecialMinionUids, usableOngoingTalentUids, isExpanded, onToggleExpanded, onExpandMinion, onAttachedOverlayVisibilityChange, isActivationArmed, clearArmedActivation, armOrActivate, isMobileViewport: _isMobileViewport = false, layout, turnOrder, isCoarsePointer, shouldAnimateEntry = false }) => {
+}> = ({ minion, effectivePower, core, index, pid, baseIndex, dispatch, isMinionSelectMode, isMultiSelected, isSelected, isDuelParticipant = false, isDimmed, onMinionSelect, onView, onViewAction, selectableOngoingUids, selectedOngoingUids, multiSelectedOngoingUids, onOngoingSelect, usableMinionTalentUids, usableSpecialMinionUids, usableOngoingTalentUids, isExpanded, onToggleExpanded, onExpandMinion, onAttachedOverlayVisibilityChange, isActivationArmed, clearArmedActivation, armOrActivate, isMobileViewport: _isMobileViewport = false, layout, renderStoredCardsUnderHost, turnOrder, isCoarsePointer, shouldAnimateEntry = false }) => {
     const { t } = useTranslation('game-smashup');
     // 兼容融合卡：Wolf Pact 这类作为随从打出时仍使用融合卡定义的图与文案
     const minionDef = getMinionDef(minion.defId);
@@ -1974,6 +1976,8 @@ const MinionCard: React.FC<{
                         testId={`su-minion-extra-talent-badge-${minion.uid}`}
                     />
                 )}
+
+                {renderStoredCardsUnderHost(minion.uid)}
 
                 {showTouchActivationHint && (
                     <div

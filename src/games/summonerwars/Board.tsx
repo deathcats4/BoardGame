@@ -1228,6 +1228,7 @@ export const SummonerWarsBoard: React.FC<Props> = ({
                         validMovePositions={interaction.validMovePositions}
                         validAttackPositions={interaction.validAttackPositions}
                         validEventTargets={interaction.validEventTargets}
+                        zhongcaiObedienceHighlights={interaction.zhongcaiObedienceHighlights}
                         validAbilityPositions={interaction.validAbilityPositions}
                         validAbilityUnits={interaction.validAbilityUnits}
                         actionableUnitPositions={interaction.actionableUnitPositions}

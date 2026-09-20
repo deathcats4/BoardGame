@@ -40,6 +40,7 @@
     "shouren": "Tundra Orcs",
     "yongheng": "Eternal Council",
     "shadow": "Shadow Elves"
+    ,"zhongcai": "Arbiters"
   },
   "configReview": {
     "eyebrow": "Config review table",
@@ -280,6 +281,8 @@
     "feedBeastSelfDestroy": "Self-destruct",
     "moguParasiteConsumeCharge": "Spend 1 Charge",
     "moguParasiteTakeDamage": "Take 1 Damage",
+    "zhongcaiDecreeDiscard": "Spend 1 charge and discard",
+    "zhongcaiDecreeKeep": "Keep ongoing effect",
     "chargeSelf": "Charge Self",
     "playEvent": "Play",
     "discardForMagic": "Discard",
@@ -867,6 +870,9 @@
       "eventTarget": "Choose an event target",
       "magicEventChoice": "Magic phase: choose to play or discard",
       "funeralPyre": "Funeral Pyre: choose a unit to heal",
+      "zhongcaiObedienceUnit": "Obedience: choose a friendly soldier within 3 spaces",
+      "zhongcaiObediencePosition": "Obedience: choose an empty space adjacent to your summoner",
+      "zhongcaiDecree": "Arbiter decree: choose whether to spend a charge and discard",
       "bloodSummonTarget": "Blood Summon: choose the ally that takes damage",
       "bloodSummonCard": "Blood Summon: choose a unit card to summon",
       "bloodSummonPosition": "Blood Summon: choose a summon position",
@@ -1474,6 +1480,42 @@
     "shadow_sudden_assault": {
       "name": "Sudden Assault",
       "description": "After summoning this unit, you may push or pull it 1 space."
+    },
+    "zhongcai_word": {
+      "name": "Holy Word",
+      "description": "After this unit moves or attacks, it may target a friendly soldier within 2 spaces and push or pull it 1 space."
+    },
+    "zhongcai_high_gate": {
+      "name": "High Gate",
+      "description": "Whenever an enemy unit moves or is pushed/pulled away from this unit, deal 2 damage to it."
+    },
+    "zhongcai_radiant_healing": {
+      "name": "Radiant Healing",
+      "description": "At the end of your Attack phase, remove 1 damage from each friendly soldier within 2 spaces of this unit."
+    },
+    "zhongcai_erase": {
+      "name": "Erase",
+      "description": "At the start of your Move phase, you may target a friendly soldier within 3 spaces. That unit loses all abilities until end of turn."
+    },
+    "zhongcai_repentance": {
+      "name": "Repentance",
+      "description": "After this unit attacks and deals damage, deal 1 damage to this unit."
+    },
+    "zhongcai_sturdy": {
+      "name": "Sturdy",
+      "description": "The first attack against this unit each turn deals 1 less damage."
+    },
+    "zhongcai_support": {
+      "name": "Support",
+      "description": "Your Arbiter soldiers may be summoned into empty spaces adjacent to this unit."
+    },
+    "zhongcai_inspire": {
+      "name": "Inspire",
+      "description": "After summoning this unit, you may remove 1 damage from an adjacent friendly soldier."
+    },
+    "zhongcai_strong": {
+      "name": "Strong",
+      "description": "This unit gains +1 strength."
     }
   },
   "buffs": {

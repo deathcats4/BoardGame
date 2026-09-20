@@ -942,6 +942,11 @@ const getBestAvailableDiceTargetPlan = (
     if (plans.length === 0) return null;
 
     return [...plans].sort((left, right) => {
+        const leftIsUltimate = isUltimateDiceTargetPlan(state, playerId, left);
+        const rightIsUltimate = isUltimateDiceTargetPlan(state, playerId, right);
+        if (leftIsUltimate !== rightIsUltimate) {
+            return Number(rightIsUltimate) - Number(leftIsUltimate);
+        }
         const leftScore = scoreDiceTargetPlan(state, phase, left);
         const rightScore = scoreDiceTargetPlan(state, phase, right);
         if (rightScore !== leftScore) return rightScore - leftScore;
@@ -989,6 +994,25 @@ const getBestStableDiceTargetPlan = (
         return right.strategicScore - left.strategicScore;
     })[0] ?? null;
 };
+
+const isUltimateAbilityId = (
+    state: DiceThroneState,
+    playerId: PlayerId,
+    abilityId: string | null | undefined,
+): boolean => {
+    if (!abilityId) return false;
+    const match = findPlayerAbility(state.core, playerId, abilityId);
+    return Boolean(
+        match?.ability.tags?.includes('ultimate')
+        || match?.variant?.tags?.includes('ultimate'),
+    );
+};
+
+const isUltimateDiceTargetPlan = (
+    state: DiceThroneState,
+    playerId: PlayerId,
+    plan: DiceTargetPlan | null | undefined,
+): boolean => isUltimateAbilityId(state, playerId, plan?.abilityId);
 
 const estimateDiceChaseProbability = (
     plan: DiceTargetPlan,
@@ -3368,6 +3392,49 @@ const abilityValueScorer: LocalAiActionScorer = {
     },
 };
 
+const ultimateCommitmentScorer: LocalAiActionScorer = {
+    id: 'ultimate-commitment',
+    score(context, action) {
+        const phase = getContextPhase(context);
+        if (phase !== 'offensiveRoll') return null;
+
+        const state = context.visibleState as DiceThroneState;
+        const readyPlan = getBestAvailableDiceTargetPlan(state, context.playerId, phase);
+        if (!isUltimateDiceTargetPlan(state, context.playerId, readyPlan)) return null;
+
+        if (action.kind === 'select-ability') {
+            const abilityId = typeof action.metadata?.abilityId === 'string'
+                ? action.metadata.abilityId
+                : null;
+            if (!abilityId) return null;
+
+            return abilityId === readyPlan?.abilityId
+                ? {
+                    score: 900,
+                    reason: `当前骰面已经成终极 ${readyPlan.abilityId}，应立即选择终极而不是继续玩其它路线`,
+                }
+                : {
+                    score: -900,
+                    reason: `当前骰面已经成终极 ${readyPlan?.abilityId}，不应改选其它技能`,
+                };
+        }
+
+        if (
+            action.kind === 'play-card'
+            || action.kind === 'play-upgrade-card'
+            || action.kind === 'toggle-die-lock'
+            || action.kind === 'roll-dice'
+        ) {
+            return {
+                score: -900,
+                reason: `当前骰面已经成终极 ${readyPlan?.abilityId}，不应继续出牌、锁骰或重投`,
+            };
+        }
+
+        return null;
+    },
+};
+
 const cardValueScorer: LocalAiActionScorer = {
     id: 'card-value',
     score(context, action) {
@@ -3404,6 +3471,16 @@ const cardValueScorer: LocalAiActionScorer = {
             if (diceInteractionValue) {
                 score += diceInteractionValue.score;
                 reason = diceInteractionValue.reason;
+                if (
+                    phase === 'offensiveRoll'
+                    && context.playerId === getRollerId(state.core, phase)
+                    && diceInteractionValue.projectedPlanId
+                    && diceInteractionValue.projectedPlanAvailable === true
+                    && isUltimateAbilityId(state, context.playerId, diceInteractionValue.projectedPlanId)
+                ) {
+                    score += 760;
+                    reason = `这张牌能把当前骰面直接推成终极 ${diceInteractionValue.projectedPlanId}，应优先完成终极路线`;
+                }
             }
 
             if (drawCount > 0) {
@@ -4692,6 +4769,8 @@ type DiceProjectionSummary = {
     planDelta: number;
     currentPlanId: string | null;
     projectedPlanId: string | null;
+    projectedPlanAvailable?: boolean;
+    projectedUltimatePlanId?: string | null;
 };
 
 const buildProjectedDice = (
@@ -4760,6 +4839,19 @@ const evaluateDiceProjection = (
     const projectedPlan = useConfirmedOpponentThreat
         ? getBestAvailableDiceTargetPlan(state, anchorPlayerId, phase, projectedDice)
         : getBestDiceTargetPlan(state, anchorPlayerId, phase, projectedDice);
+    const projectedAvailablePlan = getBestAvailableDiceTargetPlan(
+        state,
+        anchorPlayerId,
+        phase,
+        projectedDice,
+    );
+    const projectedUltimatePlan = isUltimateDiceTargetPlan(
+        state,
+        anchorPlayerId,
+        projectedAvailablePlan,
+    )
+        ? projectedAvailablePlan
+        : null;
     const currentPlanScore = currentPlan ? scoreDiceTargetPlan(state, phase, currentPlan) : 0;
     const projectedPlanScore = projectedPlan ? scoreDiceTargetPlan(state, phase, projectedPlan) : 0;
     const rawDelta = getDiceProjectionRawDelta(currentDice, projectedDice, targetOpponentDice);
@@ -4773,6 +4865,8 @@ const evaluateDiceProjection = (
         planDelta,
         currentPlanId: currentPlan?.abilityId ?? null,
         projectedPlanId: projectedPlan?.abilityId ?? null,
+        projectedPlanAvailable: projectedPlan?.available ?? false,
+        projectedUltimatePlanId: projectedUltimatePlan?.abilityId ?? null,
     };
 };
 
@@ -4786,6 +4880,12 @@ const evaluateBestProjectedDice = (
     let best: DiceProjectionSummary | null = null;
     for (const projectedDice of projectedDiceList) {
         const candidate = evaluateDiceProjection(state, playerId, phase, targetOpponentDice, projectedDice);
+        const candidateHasUltimate = !targetOpponentDice && Boolean(candidate.projectedUltimatePlanId);
+        const bestHasUltimate = !targetOpponentDice && Boolean(best?.projectedUltimatePlanId);
+        if (candidateHasUltimate !== bestHasUltimate) {
+            if (candidateHasUltimate) best = candidate;
+            continue;
+        }
         if (!best || candidate.score > best.score) {
             best = candidate;
         }
@@ -5027,12 +5127,19 @@ const mergeDiceInterferenceResponseGate = (
     };
 };
 
+type DiceInterferenceCardValue = {
+    score: number;
+    reason: string;
+    projectedPlanId?: string | null;
+    projectedPlanAvailable?: boolean;
+};
+
 const estimateDiceInterferenceCardValue = (
     state: DiceThroneState,
     playerId: PlayerId,
     card: AbilityCard,
     phase: TurnPhase,
-): { score: number; reason: string } | null => {
+): DiceInterferenceCardValue | null => {
     const activeDice = getAiActiveDice(state, phase);
     const diceValues = activeDice.map((die) => die.value);
     if (diceValues.length === 0) return null;
@@ -5067,13 +5174,14 @@ const estimateDiceInterferenceCardValue = (
             case 'modify-die-any-1':
             case 'modify-die-any-2':
             case 'modify-die-adjust-1':
+            {
                 if ((modifyProjection?.score ?? Number.NEGATIVE_INFINITY) <= 0 && delta <= 0) {
                     return {
                         score: -260,
                         reason: '当前没有可产生实际变化的改骰收益，不该白白浪费这张牌',
                     };
                 }
-                return mergeDiceInterferenceResponseGate(
+                const modifyResult = mergeDiceInterferenceResponseGate(
                     Math.max(delta * 32 + (targetOpponentDice ? 24 : 18), modifyProjection?.score ?? 0),
                     modifyProjection && modifyProjection.planDelta > 0
                         ? (targetOpponentDice
@@ -5092,16 +5200,27 @@ const estimateDiceInterferenceCardValue = (
                         cardCpCost: card.cpCost,
                     }),
                 );
+                return {
+                    ...modifyResult,
+                    projectedPlanId: modifyProjection?.projectedUltimatePlanId
+                        ?? modifyProjection?.projectedPlanId
+                        ?? null,
+                    projectedPlanAvailable: modifyProjection?.projectedUltimatePlanId
+                        ? true
+                        : (modifyProjection?.projectedPlanAvailable ?? false),
+                };
+            }
             case 'reroll-opponent-die-1':
             case 'reroll-die-2':
             case 'reroll-die-5':
+            {
                 if ((rerollProjection?.score ?? Number.NEGATIVE_INFINITY) <= 0 && rerollDelta <= 0) {
                     return {
                         score: -220,
                         reason: '当前重掷预期没有正收益，不该为了出牌而出牌',
                     };
                 }
-                return mergeDiceInterferenceResponseGate(
+                const rerollResult = mergeDiceInterferenceResponseGate(
                     Math.max(rerollDelta * 28 + (targetOpponentDice ? 20 : 12), rerollProjection?.score ?? 0),
                     rerollProjection && rerollProjection.planDelta > 0
                         ? (targetOpponentDice
@@ -5120,6 +5239,12 @@ const estimateDiceInterferenceCardValue = (
                         cardCpCost: card.cpCost,
                     }),
                 );
+                return {
+                    ...rerollResult,
+                    projectedPlanId: rerollProjection?.projectedPlanId ?? null,
+                    projectedPlanAvailable: rerollProjection?.projectedPlanAvailable ?? false,
+                };
+            }
             default:
                 break;
         }
@@ -5340,6 +5465,7 @@ const diceThroneLocalPolicyScorers: LocalAiActionScorer[] = [
     setupCharacterProfileScorer,
     setupCharacterRandomScorer,
     abilityValueScorer,
+    ultimateCommitmentScorer,
     cardValueScorer,
     statusCardOutcomeScorer,
     interactionValueScorer,

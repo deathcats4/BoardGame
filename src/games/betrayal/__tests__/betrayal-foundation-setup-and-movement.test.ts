@@ -33,6 +33,7 @@ import {
     setTestRoomDiscoveryDeck,
     setNextDiscoverySymbolRoomsForAllFloors,
     setTestTraitTrack,
+    setDiscoveredTestRoom,
     acknowledgeAnyPendingCardResolutions,
     createOpenFrontierHauntTestCore,
     type BetrayalCore,
@@ -240,17 +241,16 @@ it('正式开始剧本后只从共享开局和所选角色配置装配探索者'
         expect(core.turnStartInventoryCardIds).toEqual([]);
         expect(core.deckCounts).toMatchObject(BETRAYAL_INITIAL_DECK_COUNTS);
         expect(core.rooms.find((room) => room.id === 'upper-west')).toMatchObject({
-            name: '图书馆',
-            state: 'discovered',
-            visualId: 'library',
-            discoveryReward: null,
-            connectedRoomIds: expect.arrayContaining(['upper-landing']),
-            doorways: expect.arrayContaining([
+            name: '未探索',
+            state: 'unexplored',
+            visualId: 'backUpper',
+            connectedRoomIds: ['upper-landing'],
+            doorways: [
                 expect.objectContaining({ edge: 'east', connectsToRoomId: 'upper-landing' }),
-            ]),
+            ],
         });
-        expect(core.roomDiscoveryDeck.some((entry) => entry.room.visualId === 'library')).toBe(false);
-        expect(core.roomDiscoveryOrderByFloor.upper.some((room) => room.visualId === 'library')).toBe(false);
+        expect(core.roomDiscoveryDeck.some((entry) => entry.room.visualId === 'library')).toBe(true);
+        expect(core.roomDiscoveryOrderByFloor.upper.some((room) => room.visualId === 'library')).toBe(true);
         expect(resolveBetrayalOmenCount(core)).toBe(0);
     });
 
@@ -350,6 +350,15 @@ it('普通移动不能直接进入未翻开房间，旁路执行也不能生成�
 
 it('基础视线只覆盖同楼层同一直线的连续已发现房间', () => {
         const core = createStartedFirstScenarioCore();
+        setDiscoveredTestRoom(core, 'upper-west', {
+            name: '图书馆',
+            visualId: 'library',
+            tags: ['知识', '调查'],
+        });
+        setTestRoomDiscoveryDeck(
+            core,
+            core.roomDiscoveryDeck.filter((entry) => entry.room.visualId !== 'library'),
+        );
 
         expect(isBetrayalRoomInLineOfSight(core, 'grand-staircase', 'hallway')).toBe(true);
         expect(isBetrayalRoomInLineOfSight(core, 'grand-staircase', 'entrance-hall')).toBe(true);
@@ -643,6 +652,15 @@ it('房间堆搜索预览会标出命中候选和重洗后果', () => {
 
 it('房间堆搜索预览会在目标已在屋内时阻止重复搜索', () => {
         const core = createStartedFirstScenarioCore();
+        setDiscoveredTestRoom(core, 'upper-west', {
+            name: '图书馆',
+            visualId: 'library',
+            tags: ['知识', '调查'],
+        });
+        setTestRoomDiscoveryDeck(
+            core,
+            core.roomDiscoveryDeck.filter((entry) => entry.room.visualId !== 'library'),
+        );
 
         const preview = resolveBetrayalTileStackSearchPreview(core, {
             roomName: '图书馆',

@@ -1294,6 +1294,8 @@ export class GameTestContext {
             targetMinionUid?: string;
         }
     ): Promise<void> {
+        await this.dismissRevealOverlayIfPresent();
+
         // 1. 找到手牌中的卡牌
         const cardUid = await this.page.evaluate((defId) => {
             const harness = (window as any).__BG_TEST_HARNESS__;

@@ -615,7 +615,7 @@ test.describe('七大恨 Board 地图交互与 HUD 布局', () => {
         await expect(page.locator('[data-testid="qidahen-draw-pile"]')).toContainText('大明抽牌');
         await expect(page.locator('[data-testid="qidahen-draw-pile"]')).toContainText('20');
         await expect(page.locator('[data-testid="qidahen-hand-zone"]')).toBeVisible();
-        await expect(page.locator('[data-testid^="qidahen-hand-card-"]:not([data-testid^="qidahen-hand-card-kind-"]):not([data-testid^="qidahen-hand-card-magnify-"])')).toHaveCount(4);
+        await expect(page.locator('[data-testid^="qidahen-hand-card-"]:not([data-testid^="qidahen-hand-card-kind-"]):not([data-testid^="qidahen-hand-card-magnify-"])')).toHaveCount(3);
         await expect(page.locator('[data-testid="qidahen-discard-pile"]')).toBeVisible();
         await expect(page.locator('[data-testid="qidahen-discard-pile"]')).toContainText('大明弃牌');
         await expect(page.locator('[data-testid="qidahen-discard-pile"]')).toContainText('7');
@@ -627,7 +627,7 @@ test.describe('七大恨 Board 地图交互与 HUD 布局', () => {
         expect(initialState.core.currentPlayer).toBe('0');
         expect(initialState.core.turnPhase).toBe('action-window');
         expect(initialState.core.selectedRegionId).toBe('song-jin');
-        expect(initialMingHandCards).toHaveLength(4);
+        expect(initialMingHandCards).toHaveLength(3);
         expect(initialSongJin?.troops).toBe(2);
 
         await expect(page.locator('[data-testid="qidahen-action-wheel-asset"] svg')).toBeVisible();

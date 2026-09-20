@@ -22,9 +22,13 @@ export function resolveRuntimeSeatControllers(args: {
     state: MatchState<unknown> | undefined;
     seatControllers: Record<string, AiSeatController>;
 }): Record<string, AiSeatController> {
+    const stateSeatControllers = extractStateSeatControllers(args.state);
+    if (!stateSeatControllers || Object.keys(stateSeatControllers).length === 0) {
+        return args.seatControllers;
+    }
     return {
         ...args.seatControllers,
-        ...(extractStateSeatControllers(args.state) ?? {}),
+        ...stateSeatControllers,
     };
 }
 

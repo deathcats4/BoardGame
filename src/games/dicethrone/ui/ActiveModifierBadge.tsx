@@ -34,10 +34,11 @@ export const ActiveModifierBadge: React.FC<ActiveModifierBadgeProps> = ({ modifi
     const tooltipContent = modifiers.map((mod) => {
         const name = t(mod.nameKey);
         const desc = mod.descriptionKey ? t(mod.descriptionKey) : '';
+        const displayDesc = desc.replace(/^(?:攻击修正\s*[：:]\s*|attack modifier\s*:\s*)/i, '');
         return (
             <span key={mod.cardId + mod.timestamp}>
                 <span className="text-amber-300 font-semibold">{name}</span>
-                {desc && <span className="text-slate-400"> — {desc}</span>}
+                {displayDesc && <span className="text-slate-400"> — {displayDesc}</span>}
             </span>
         );
     });
@@ -77,7 +78,7 @@ export const ActiveModifierBadge: React.FC<ActiveModifierBadgeProps> = ({ modifi
                     </div>
                 </div>
                 <InfoTooltip
-                    title={t('modifierActive.tooltip')}
+                    title={null}
                     content={tooltipContent}
                     isVisible={isHovered}
                     position="left"

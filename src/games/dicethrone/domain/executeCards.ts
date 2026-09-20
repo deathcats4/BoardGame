@@ -234,6 +234,7 @@ export function executeCardCommand(
                     state,
                     damageDealt: 0,
                     timestamp,
+                    damageOrigin: 'card',
                 };
                 const effectEvents = resolveEffectsToEvents(card.effects, 'immediate', effectCtx, { random });
                 events.push(...effectEvents);
@@ -314,6 +315,7 @@ export function executeCardCommand(
                         state,
                         damageDealt: 0,
                         timestamp,
+                        damageOrigin: 'card',
                     };
                     effectEvents.push(...resolveEffectsToEvents(card.effects, 'immediate', effectCtx, { random }));
                 }

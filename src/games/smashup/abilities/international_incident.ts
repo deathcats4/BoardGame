@@ -15,6 +15,7 @@ import {
     buildAbilityFeedback,
     buildBaseTargetOptions,
     buildMinionTargetOptions,
+    buildPlayerTargetOptions,
     buildStandardDrawEvents,
     buildStandardDrawEventsFromRuntimeContext,
     buildValidatedControlChangeEvents,
@@ -27,6 +28,7 @@ import {
     queueMinionPlayEffect,
     recoverCardsFromDiscard,
 } from '../domain/abilityHelpers';
+import { getPlayerLabel } from '../domain/utils';
 import {
     registerCardAbilitySuppression,
     registerProtection,
@@ -168,6 +170,7 @@ type MoveDestinationContext = PromptContext & {
     reason: string;
     tempPowerAfter?: number;
     drawAfter?: number;
+    extraActionAfter?: boolean;
     fixedToBaseIndex?: number;
     allowedToBaseIndices?: number[];
 };
@@ -180,8 +183,10 @@ type MoveMinionContext = PromptContext & {
     reason: string;
     tempPowerAfter?: number;
     drawAfter?: number;
+    extraActionAfter?: boolean;
     fixedToBaseIndex?: number;
     allowedToBaseIndices?: number[];
+    allowSkip?: boolean;
 };
 
 type NorthernMoverTargetContext = PromptContext & {
@@ -237,6 +242,15 @@ type ReversalDestroyActionsContext = PromptContext & {
 
 type SumoHeadButtContext = PromptContext & {
     candidates: BoardActionCandidate[];
+};
+
+type BodySlamBaseContext = PromptContext & {
+    targetPlayerId: PlayerId;
+};
+
+type BodySlamDestinationContext = PromptContext & {
+    targetPlayerId: PlayerId;
+    fromBaseIndex: number;
 };
 
 type OngoingActionChoice = {
@@ -638,7 +652,6 @@ function isActionThatDirectlyAffectsMinion(defId?: string): boolean {
     if (!def || def.type !== 'action') return false;
     return def.playNeedsMinion === true
         || def.ongoingTarget === 'minion'
-        || def.specialNeedsBase === true
         || def.specialTiming === 'beforeScoring';
 }
 
@@ -781,11 +794,8 @@ function runMinionEffect(
     candidates: MinionTargetCandidate[],
     config: Omit<MinionEffectContext, 'matchState' | 'playerId' | 'now' | 'candidates'>,
 ): AbilityResult {
-    const drawEvents = config.drawAfter
-        ? buildStandardDrawEvents(ctx.state, ctx.playerId, config.drawAfter, ctx.random, ctx.now)
-        : [];
     if (candidates.length === 0) {
-        return { events: drawEvents.length ? drawEvents : [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+        return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
     }
     const targetFromCommand = ctx.targetMinionUid
         ? candidates.find(candidate => (
@@ -794,8 +804,11 @@ function runMinionEffect(
         ))
         : undefined;
     if (ctx.targetMinionUid && !targetFromCommand) {
-        return { events: drawEvents.length ? drawEvents : [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+        return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
     }
+    const drawEvents = config.drawAfter
+        ? buildStandardDrawEvents(ctx.state, ctx.playerId, config.drawAfter, ctx.random, ctx.now)
+        : [];
     if (targetFromCommand && !config.multiMax) {
         return {
             events: [
@@ -921,26 +934,41 @@ const moveDestinationPrompt = createPromptProgram<MoveDestinationContext, SmashU
         if (moveEvents.length > 0 && context.drawAfter) {
             events.push(...buildStandardDrawEventsFromRuntimeContext({ ...args, state: state.core }, context.playerId, context.drawAfter));
         }
+        if (moveEvents.length > 0 && context.extraActionAfter) {
+            events.push(grantContextualExtraAction(
+                { playerId: context.playerId, now: timestamp, matchState: context.matchState },
+                context.sourceDefId,
+            ));
+        }
         return { events };
     },
 });
 
 const moveMinionPrompt = createPromptProgram<MoveMinionContext, SmashUpCore, SmashUpEvent>({
     sourceId: 'international_incident_move_minion',
-    buildInteraction: (context) => createAbilityRuntimeSimpleChoice(
-        `${context.sourceId}_${context.now}`,
-        context.playerId,
-        context.title,
-        buildMinionTargetOptions(context.candidates, {
+    buildInteraction: (context) => {
+        const minionOptions = buildMinionTargetOptions(context.candidates, {
             state: context.matchState.core,
             sourcePlayerId: context.playerId,
             sourceDefId: context.sourceDefId,
             effectType: 'move',
-        }),
-        { sourceId: context.sourceId, targetType: 'minion', autoResolveIfSingle: false },
-    ),
+        });
+        return createAbilityRuntimeSimpleChoice(
+            `${context.sourceId}_${context.now}`,
+            context.playerId,
+            context.title,
+            [
+                ...(context.allowSkip
+                    ? [createSkipOption('跳过（不移动随从）', 'ui.international_incident_skip_move_minion_option')]
+                    : []),
+                ...minionOptions,
+            ],
+            { sourceId: context.sourceId, targetType: 'minion', autoResolveIfSingle: false },
+        );
+    },
     onResolve: ({ context, value, timestamp }) => {
         const selected = value as MinionChoice;
+        if (selected.skip) return { events: [] };
         if (!selected.minionUid || selected.baseIndex === undefined || !selected.defId) {
             return { events: [] };
         }
@@ -958,10 +986,153 @@ const moveMinionPrompt = createPromptProgram<MoveMinionContext, SmashUpCore, Sma
                 reason: context.reason,
                 tempPowerAfter: context.tempPowerAfter,
                 drawAfter: context.drawAfter,
+                extraActionAfter: context.extraActionAfter,
                 fixedToBaseIndex: context.fixedToBaseIndex,
                 allowedToBaseIndices: context.allowedToBaseIndices,
             } satisfies MoveDestinationContext,
             nextProgram: moveDestinationPrompt,
+        };
+    },
+});
+
+const bodySlamPlayerPrompt = createPromptProgram<PromptContext, SmashUpCore, SmashUpEvent>({
+    sourceId: 'sumo_wrestlers_body_slam_player',
+    buildInteraction: (context) => {
+        const candidates = Object.keys(context.matchState.core.players)
+            .filter(targetPlayerId => targetPlayerId !== context.playerId)
+            .filter(targetPlayerId => context.matchState.core.bases.some((base, baseIndex) => (
+                canSeeOwnMinionOnBase(context.matchState.core, context.playerId, baseIndex)
+                && base.minions.some(minion => minion.controller === targetPlayerId)
+            )))
+            .map(targetPlayerId => ({
+                label: getPlayerLabel(targetPlayerId),
+                targetPlayerId,
+            }));
+        return createAbilityRuntimeSimpleChoice(
+            `sumo_wrestlers_body_slam_player_${context.now}`,
+            context.playerId,
+            'ui.sumo_wrestlers_body_slam_player_title',
+            buildPlayerTargetOptions(candidates, {
+                state: context.matchState.core,
+                sourcePlayerId: context.playerId,
+                effectIntent: 'move',
+            }),
+            {
+                sourceId: 'sumo_wrestlers_body_slam_player',
+                targetType: 'player',
+                autoResolveIfSingle: false,
+                responseValidationMode: 'live',
+                titleKey: 'ui.sumo_wrestlers_body_slam_player_title',
+            },
+        );
+    },
+    onResolve: ({ state, context, value, timestamp }) => {
+        const selected = value as { targetPlayerId?: PlayerId };
+        if (!selected.targetPlayerId || selected.targetPlayerId === context.playerId) return { events: [] };
+        const hasValidBase = state.core.bases.some((base, baseIndex) => (
+            canSeeOwnMinionOnBase(state.core, context.playerId, baseIndex)
+            && base.minions.some(minion => minion.controller === selected.targetPlayerId)
+        ));
+        if (!hasValidBase) return { events: [] };
+        return {
+            events: [],
+            context: {
+                matchState: state,
+                playerId: context.playerId,
+                now: timestamp,
+                targetPlayerId: selected.targetPlayerId,
+            } satisfies BodySlamBaseContext,
+            nextProgram: bodySlamBasePrompt,
+        };
+    },
+});
+
+const bodySlamBasePrompt = createPromptProgram<BodySlamBaseContext, SmashUpCore, SmashUpEvent>({
+    sourceId: 'sumo_wrestlers_body_slam_base',
+    buildInteraction: (context) => {
+        const candidates = context.matchState.core.bases
+            .map((_base, baseIndex) => ({ baseIndex, label: getBaseLabel(context.matchState.core, baseIndex) }))
+            .filter(({ baseIndex }) => (
+                canSeeOwnMinionOnBase(context.matchState.core, context.playerId, baseIndex)
+                && context.matchState.core.bases[baseIndex].minions.some(minion => minion.controller === context.targetPlayerId)
+            ));
+        return createAbilityRuntimeSimpleChoice(
+            `sumo_wrestlers_body_slam_base_${context.now}`,
+            context.playerId,
+            'ui.sumo_wrestlers_body_slam_base_title',
+            buildBaseTargetOptions(candidates, context.matchState.core),
+            {
+                sourceId: 'sumo_wrestlers_body_slam_base',
+                targetType: 'base',
+                autoResolveIfSingle: false,
+                responseValidationMode: 'live',
+                titleKey: 'ui.sumo_wrestlers_body_slam_base_title',
+            },
+        );
+    },
+    onResolve: ({ state, context, value, timestamp }) => {
+        const selected = value as BaseChoice;
+        if (selected.baseIndex === undefined) return { events: [] };
+        const base = state.core.bases[selected.baseIndex];
+        if (!base
+            || !base.minions.some(minion => minion.controller === context.playerId)
+            || !base.minions.some(minion => minion.controller === context.targetPlayerId)) {
+            return { events: [] };
+        }
+        return {
+            events: [],
+            context: {
+                matchState: state,
+                playerId: context.playerId,
+                now: timestamp,
+                targetPlayerId: context.targetPlayerId,
+                fromBaseIndex: selected.baseIndex,
+            } satisfies BodySlamDestinationContext,
+            nextProgram: bodySlamDestinationPrompt,
+        };
+    },
+});
+
+const bodySlamDestinationPrompt = createPromptProgram<BodySlamDestinationContext, SmashUpCore, SmashUpEvent>({
+    sourceId: 'sumo_wrestlers_body_slam_destination',
+    buildInteraction: (context) => {
+        const candidates = context.matchState.core.bases
+            .map((_base, baseIndex) => ({ baseIndex, label: getBaseLabel(context.matchState.core, baseIndex) }))
+            .filter(({ baseIndex }) => baseIndex !== context.fromBaseIndex);
+        return createAbilityRuntimeSimpleChoice(
+            `sumo_wrestlers_body_slam_destination_${context.now}`,
+            context.playerId,
+            'ui.sumo_wrestlers_body_slam_destination_title',
+            buildBaseTargetOptions(candidates, context.matchState.core),
+            {
+                sourceId: 'sumo_wrestlers_body_slam_destination',
+                targetType: 'base',
+                autoResolveIfSingle: false,
+                responseValidationMode: 'live',
+                titleKey: 'ui.sumo_wrestlers_body_slam_destination_title',
+            },
+        );
+    },
+    onResolve: ({ state, context, value, timestamp }) => {
+        const selected = value as BaseChoice;
+        if (selected.baseIndex === undefined || selected.baseIndex === context.fromBaseIndex) return { events: [] };
+        const base = state.core.bases[context.fromBaseIndex];
+        if (!base || !state.core.bases[selected.baseIndex]) return { events: [] };
+        const minionsToMove = base.minions.filter(minion => minion.controller === context.targetPlayerId);
+        return {
+            events: minionsToMove.flatMap(minion => buildValidatedMoveEvents(state.core, {
+                minionUid: minion.uid,
+                minionDefId: minion.defId,
+                fromBaseIndex: context.fromBaseIndex,
+                toBaseIndex: selected.baseIndex!,
+                reason: 'sumo_wrestlers_body_slam',
+                now: timestamp,
+                sourcePlayerId: context.playerId,
+                sourceDefId: 'sumo_wrestlers_body_slam',
+                sourceControllerId: context.playerId,
+                sourceBaseIndex: context.fromBaseIndex,
+                sourceKind: 'action',
+            })),
         };
     },
 });
@@ -1558,30 +1729,19 @@ function sumoBulkingStew(ctx: AbilityContext): AbilityResult {
 }
 
 function sumoBodySlam(ctx: AbilityContext): AbilityResult {
-    for (let baseIndex = 0; baseIndex < ctx.state.bases.length; baseIndex += 1) {
-        if (!canSeeOwnMinionOnBase(ctx.state, ctx.playerId, baseIndex)) continue;
-        const opponentId = ctx.state.bases[baseIndex]?.minions.find(minion => minion.controller !== ctx.playerId)?.controller;
-        if (!opponentId) continue;
-        const toBaseIndex = getFirstOtherBaseIndex(ctx.state, baseIndex);
-        if (toBaseIndex === undefined || toBaseIndex < 0) continue;
-        const minionsToMove = ctx.state.bases[baseIndex].minions.filter(minion => minion.controller === opponentId);
-        return {
-            events: minionsToMove.flatMap(minion => buildValidatedMoveEvents(ctx.state, {
-                minionUid: minion.uid,
-                minionDefId: minion.defId,
-                fromBaseIndex: baseIndex,
-                toBaseIndex,
-                reason: 'sumo_wrestlers_body_slam',
-                now: ctx.now,
-                sourcePlayerId: ctx.playerId,
-                sourceDefId: 'sumo_wrestlers_body_slam',
-                sourceControllerId: ctx.playerId,
-                sourceBaseIndex: baseIndex,
-                sourceKind: 'action',
-            })),
-        };
+    const hasValidTarget = ctx.state.bases.some((base, baseIndex) => (
+        canSeeOwnMinionOnBase(ctx.state, ctx.playerId, baseIndex)
+        && base.minions.some(minion => minion.controller !== ctx.playerId)
+        && ctx.state.bases.some((_candidate, destinationIndex) => destinationIndex !== baseIndex)
+    ));
+    if (!hasValidTarget || !ctx.matchState) {
+        return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
     }
-    return { events: [buildAbilityFeedback(ctx.playerId, 'feedback.no_valid_targets', ctx.now)] };
+    return runtimeToAbilityResult(executeAbilityProgram(bodySlamPlayerPrompt, createPromptContext(
+        ctx.matchState,
+        ctx.playerId,
+        ctx.now,
+    )));
 }
 
 function sumoChikaraMizu(ctx: AbilityContext): AbilityResult {
@@ -1611,7 +1771,6 @@ function sumoGraspTheBelt(ctx: AbilityContext): AbilityResult {
 }
 
 function sumoThirdTierTalent(ctx: AbilityContext): AbilityResult {
-    const toBaseIndex = getFirstOtherBaseIndex(ctx.state, ctx.baseIndex);
     const candidates = collectOtherPlayersMinionsOnBase(ctx.state, ctx.playerId, ctx.baseIndex)
         .filter(candidate => {
             const minion = ctx.state.bases[candidate.baseIndex]?.minions.find(entry => entry.uid === candidate.uid);
@@ -1623,7 +1782,7 @@ function sumoThirdTierTalent(ctx: AbilityContext): AbilityResult {
         title: '关胁：选择这里力量 3 或以下的其他玩家随从',
         reason: 'sumo_wrestlers_third_tier',
         drawAfter: 1,
-        fixedToBaseIndex: toBaseIndex !== undefined && toBaseIndex >= 0 ? toBaseIndex : undefined,
+        allowSkip: true,
     });
 }
 
@@ -1687,7 +1846,10 @@ const rookieSumoDiscardPrompt = createPromptProgram<RookieSumoDiscardContext, Sm
         `sumo_wrestlers_rookie_sumo_discard_${context.now}`,
         context.playerId,
         '相扑新人：选择要弃掉的手牌',
-        buildHandCardOptions(context.matchState.core.players[context.playerId]?.hand ?? []),
+        [
+            createSkipOption('跳过（不弃牌）', 'ui.international_incident_skip_discard_option'),
+            ...buildHandCardOptions(context.matchState.core.players[context.playerId]?.hand ?? []),
+        ],
         {
             sourceId: 'sumo_wrestlers_rookie_sumo_discard',
             targetType: 'hand',
@@ -1697,6 +1859,7 @@ const rookieSumoDiscardPrompt = createPromptProgram<RookieSumoDiscardContext, Sm
     ),
     onResolve: ({ state, context, value, timestamp }) => {
         const selected = value as CardChoice;
+        if (selected.skip) return { events: [] };
         if (!selected.cardUid) return { events: [] };
         const selectedCard = state.core.players[context.playerId]?.hand.find(card => card.uid === selected.cardUid);
         if (!selectedCard) return { events: [] };
@@ -1739,6 +1902,7 @@ function musketeersEnGarde(ctx: AbilityContext): AbilityResult {
         amount: 1,
         reason: 'musketeers_en_garde',
         drawAfter: 1,
+        extraActionAfter: true,
     });
 }
 
@@ -1777,13 +1941,13 @@ function musketeersToBattle(ctx: AbilityContext): AbilityResult {
 }
 
 function musketeersMakeWay(ctx: AbilityContext): AbilityResult {
-    const result = runMoveMinion(ctx, collectOwnMinions(ctx.state, ctx.playerId), {
+    return runMoveMinion(ctx, collectOwnMinions(ctx.state, ctx.playerId), {
         sourceId: 'musketeers_make_way',
         sourceDefId: 'musketeers_make_way',
         title: '让路：选择你的一个随从移动',
         reason: 'musketeers_make_way',
+        extraActionAfter: true,
     });
-    return { events: [...result.events, grantContextualExtraAction(ctx, 'musketeers_make_way')], matchState: result.matchState };
 }
 
 function musketeersOneForAll(ctx: AbilityContext): AbilityResult {

@@ -84,6 +84,21 @@ const appendRetryParam = (url: string, retry: number) => {
     return `${url}${sep}retry=${retry}`;
 };
 
+const isImageBoundToSource = (image: HTMLImageElement, expectedSrc: string): boolean => {
+    if (!expectedSrc) return false;
+    const attributeSrc = image.getAttribute('src');
+    if (attributeSrc === expectedSrc) return true;
+
+    const actualSrc = image.currentSrc || image.src;
+    if (!actualSrc) return false;
+
+    try {
+        return actualSrc === new URL(expectedSrc, document.baseURI).href;
+    } catch {
+        return actualSrc === expectedSrc;
+    }
+};
+
 const getCandidateTimeoutMs = (url: string) => (
     isRemoteUrl(url) ? REMOTE_CANDIDATE_TIMEOUT_MS : LOCAL_CANDIDATE_TIMEOUT_MS
 );
@@ -295,7 +310,11 @@ export const OptimizedImage = ({
         const settleFromDom = () => {
             if (cancelled) return;
             const img = imgRef.current;
-            if (img?.complete && img.naturalWidth > 0) {
+            if (
+                img?.complete
+                && img.naturalWidth > 0
+                && isImageBoundToSource(img, renderedSrc)
+            ) {
                 rememberEarlierCandidateFailures(currentSrc);
                 markImageLoaded(currentSrc, undefined, img, currentSrc);
                 markImageLoaded(src, effectiveLocale, img, currentSrc);
@@ -315,6 +334,9 @@ export const OptimizedImage = ({
     }, [currentCandidate, currentSrc, effectiveLocale, errored, loaded, rememberEarlierCandidateFailures, renderedSrc, src]);
 
     const handleLoad: React.ReactEventHandler<HTMLImageElement> = (event) => {
+        if (!isImageBoundToSource(event.currentTarget, renderedSrc)) {
+            return;
+        }
         setLoaded(true);
         autoRetryRef.current = 0; // 加载成功，重置重试计数
         rememberEarlierCandidateFailures(currentSrc);

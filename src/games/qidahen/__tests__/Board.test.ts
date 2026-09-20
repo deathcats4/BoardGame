@@ -840,6 +840,14 @@ describe('Qidahen Board 结构门禁', () => {
         expect(boardSource).toContain('className="mx-auto flex min-w-max items-end justify-center px-2" data-testid="qidahen-hand-row"');
         expect(boardSource).toContain('data-testid={`qidahen-hand-card-magnify-${card.id}`}');
         expect(boardSource).toContain('onMagnifyCard?.({');
+        expect(boardSource).toContain('data-qidahen-hand-card-touch-inspect="long-press"');
+        expect(boardSource).toContain("event.pointerType !== 'touch'");
+        expect(boardSource).toContain('window.setTimeout(() => {');
+        expect(boardSource).toContain('onPointerUp={handlePointerEnd}');
+        expect(boardSource).toContain('onPointerCancel={handlePointerEnd}');
+        expect(boardSource).toContain('onPointerLeave={handlePointerEnd}');
+        expect(boardSource).toContain('longPressActivatedRef.current = false;');
+        expect(boardSource).toContain('event.stopPropagation();');
         expect(boardSource).toContain('hover:-translate-y-[18px]');
         expect(boardSource).toContain('data-qidahen-hand-card-selected');
         expect(boardSource).toContain('selected={selected}');
@@ -855,6 +863,7 @@ describe('Qidahen Board 结构门禁', () => {
         expect(boardSource).toContain('data-testid="qidahen-card-magnify-content"');
         expect(boardSource).toContain('<QidahenCardMagnifyOverlay target={magnifyTarget} locale={locale} onClose={() => setMagnifyTarget(null)} />');
         expect(boardSource).toContain('onMagnify={setMagnifyTarget}');
+        expect(boardSource).toContain('zIndex={UI_Z_INDEX.cardPreviewTooltip}');
         expect(boardSource).toContain('closeLabel="关闭查看"');
     });
 

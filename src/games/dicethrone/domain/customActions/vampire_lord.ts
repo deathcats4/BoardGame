@@ -369,10 +369,7 @@ function handleBloodPowerHealAttackDamage({
     state,
     timestamp,
 }: CustomActionContext): DiceThroneEvent[] {
-    const pendingAttack = state.pendingAttack;
-    if (!pendingAttack || pendingAttack.attackerId !== attackerId) return [];
-
-    const amount = Math.max(0, pendingAttack.resolvedDamage ?? 0);
+    const amount = Math.max(0, state.lastResolvedAttackDamage ?? 0);
     if (amount <= 0) return [];
 
     return [{

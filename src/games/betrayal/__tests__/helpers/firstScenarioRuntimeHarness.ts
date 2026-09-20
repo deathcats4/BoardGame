@@ -1107,6 +1107,11 @@ export function createDustHauntCore(playerIds: string[] = ['0', '1', '2']): Betr
     if (core.pendingEventRollResolution) {
         core = acknowledgePendingEventRollResolution(core);
     }
+    setDiscoveredTestRoom(core, 'upper-west', {
+        name: '图书馆',
+        visualId: 'library',
+        discoveryReward: 'omen',
+    });
     return acknowledgePendingCardResolutions(core);
 }
 

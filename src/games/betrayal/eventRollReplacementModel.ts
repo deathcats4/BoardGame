@@ -11,6 +11,7 @@ import {
     createDustRuntimeState,
     createUponReflectionRuntimeState,
 } from './hauntRuntimeSetupModel';
+import { resolveHumanAcknowledgementPlayerIds } from './acknowledgementReadModel';
 import {
     cloneHauntTraitorResolution,
     resolveHauntTraitorResolutionForTrigger,
@@ -242,15 +243,13 @@ export function applyBetrayalEventRollReplacementState(
         uponReflectionSetup: replacement.uponReflectionSetup,
     };
     const requiresAcknowledgement = eventRollResolutionNeedsAcknowledgement(acknowledgementContext);
-    const configuredRequiredPlayerIds = pending.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
+    const wasSinglePlayerResolution = pending.requiresAcknowledgement === false;
     core.pendingEventRollResolution = {
         ...pending,
         requiredPlayerIds: requiresAcknowledgement
-            ? configuredRequiredPlayerIds.length > 0
-                ? [...configuredRequiredPlayerIds]
-                : core.playerIds.length > 0
-                    ? [...core.playerIds]
-                    : [pending.playerId]
+            ? wasSinglePlayerResolution
+                ? [pending.playerId]
+                : resolveHumanAcknowledgementPlayerIds(core, pending.playerId)
             : [pending.playerId],
         acknowledgedPlayerIds: [],
         hauntRoll: replacement.hauntRoll ? { ...replacement.hauntRoll } : undefined,

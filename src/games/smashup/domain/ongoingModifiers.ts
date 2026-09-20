@@ -16,6 +16,7 @@ import { getMunchkinSpecialCardDescriptor } from '../data/factions/munchkin';
 import { getBaseDef, getCardDef } from '../data/cards';
 import { getSuppressionFilteredStateForSource, isBaseAbilitySuppressed, isBaseScoringSuppressed, isCardSuppressed } from './ongoingEffects';
 import { shouldGenerateSmashUpPodAlias } from './variantBindingRuntime';
+import { getEffectiveBaseAbilitySourceIds } from './effectiveBaseAbilities';
 import {
     countSemanticControlledMinionCandidates,
     countSemanticControlledRuntimeActions,
@@ -369,10 +370,15 @@ function getFilteredBreakpointModifierContext(
     originalBreakpoint: number,
 ): BreakpointModifierContext {
     const filteredState = getSuppressionFilteredStateForSource(state, sourceDefId);
+    const filteredBase = filteredState.bases[baseIndex] ?? state.bases[baseIndex];
+    const contextualBase = getBaseDef(sourceDefId)
+        && getEffectiveBaseAbilitySourceIds(filteredState, baseIndex).includes(sourceDefId)
+        ? { ...filteredBase, defId: sourceDefId }
+        : filteredBase;
     return {
         state: filteredState,
         baseIndex,
-        base: filteredState.bases[baseIndex] ?? state.bases[baseIndex],
+        base: contextualBase,
         originalBreakpoint,
     };
 }
@@ -487,15 +493,22 @@ export function getBasePowerModifiers(
     const base = state.bases[baseIndex];
     let total = 0;
 
-    const baseEntry = basePowerModifiers.get(base.defId);
-    if (baseEntry && !isBaseAbilitySuppressed(state, baseIndex)) {
-        const filteredState = getSuppressionFilteredStateForSource(state, base.defId);
-        total += baseEntry.modifier({
-            state: filteredState,
-            baseIndex,
-            base: filteredState.bases[baseIndex] ?? base,
-            playerId,
-        });
+    if (!isBaseAbilitySuppressed(state, baseIndex)) {
+        for (const sourceDefId of getEffectiveBaseAbilitySourceIds(state, baseIndex)) {
+            const baseEntry = basePowerModifiers.get(sourceDefId);
+            if (!baseEntry) continue;
+            const filteredState = getSuppressionFilteredStateForSource(state, sourceDefId);
+            const filteredBase = filteredState.bases[baseIndex] ?? base;
+            const contextualBase = getBaseDef(sourceDefId)
+                ? { ...filteredBase, defId: sourceDefId }
+                : filteredBase;
+            total += baseEntry.modifier({
+                state: filteredState,
+                baseIndex,
+                base: contextualBase,
+                playerId,
+            });
+        }
     }
 
     // 遍历基地上的所有 ongoing 行动卡

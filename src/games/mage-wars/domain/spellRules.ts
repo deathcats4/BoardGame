@@ -13,6 +13,7 @@ import type {
     MageWarsConfigSpellContinuousModifierStat,
     MageWarsConfigSpellGrantedTraitId,
     MageWarsConfigSpellSemantics,
+    MageWarsConfigSpellMovementEffect,
     MageWarsConfigSpellUpkeepEffect,
 } from '../data/configPackage';
 import {
@@ -28,6 +29,8 @@ import {
     getTemporaryChargeDiceModifier,
     getTemporaryMeleeDiceModifier,
     getTemporaryNextMeleePierceModifier,
+    hasTemporaryElusive,
+    hasTemporaryNextMeleeUnavoidable,
     hasTemporaryMovedThisAction,
     hasTemporaryQuickActionAfterMove,
     hasTemporarySwift,
@@ -153,6 +156,13 @@ export interface MageWarsObjectUpkeepDirectDamage {
     sourceSpellCardId: number;
     ownerId: PlayerId;
     effect: Extract<MageWarsConfigSpellUpkeepEffect, { kind: 'direct-damage' }>;
+}
+
+export interface MageWarsObjectMovementDirectDamage {
+    sourceObjectId: string;
+    sourceSpellCardId: number;
+    ownerId: PlayerId;
+    effect: Extract<MageWarsConfigSpellMovementEffect, { kind: 'direct-damage' }>;
 }
 
 export interface MageWarsObjectUpkeepHealTransfer {
@@ -381,7 +391,7 @@ export function isMageWarsElementalStaffBindableSpell(spell: MageWarsConfigSpell
 }
 
 export function isMageWarsPassiveArmorEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
-    return [3702, 3703, 3707, 3708, 3709, 3711, 3721].includes(spell.spellCardId);
+    return [3702, 3703, 3707, 3708, 3709, 3711, 3712, 3721].includes(spell.spellCardId);
 }
 
 export function isMageWarsImplementedPassiveArmorEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -389,7 +399,15 @@ export function isMageWarsImplementedPassiveArmorEquipmentSpell(spell: MageWarsC
 }
 
 export function isMageWarsWeaponAttackEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
-    return [3701, 3704, 3706].includes(spell.spellCardId);
+    return [3701, 3704, 3706, 3722].includes(spell.spellCardId);
+}
+
+export function isMageWarsDamageTypeAttackBonusEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
+    return [3714, 3719].includes(spell.spellCardId);
+}
+
+export function isMageWarsImplementedDamageTypeAttackBonusEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsDamageTypeAttackBonusEquipmentSpell(spell) && spell.requiresCodeSupport === false;
 }
 
 export function isMageWarsDefenseEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -428,6 +446,7 @@ export function isMageWarsImplementedElementalStaffSpell(spell: MageWarsConfigSp
 export function isMageWarsImplementedEquipmentSpell(spell: MageWarsConfigSpellCard): boolean {
     return isMageWarsImplementedPassiveArmorEquipmentSpell(spell)
         || isMageWarsImplementedWeaponAttackEquipmentSpell(spell)
+        || isMageWarsImplementedDamageTypeAttackBonusEquipmentSpell(spell)
         || (isMageWarsDefenseEquipmentSpell(spell) && spell.requiresCodeSupport === false)
         || isMageWarsImplementedMeleeAttackManaTaxEquipmentSpell(spell)
         || (isMageWarsBeastStaffSpell(spell) && spell.requiresCodeSupport === false)
@@ -443,6 +462,22 @@ export function isMageWarsHealingSpell(spell: MageWarsConfigSpellCard): boolean 
 
 export function isMageWarsImplementedHealingSpell(spell: MageWarsConfigSpellCard): boolean {
     return isMageWarsHealingSpell(spell) && spell.requiresCodeSupport === false;
+}
+
+export function isMageWarsStatusHealingSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3423;
+}
+
+export function isMageWarsImplementedStatusHealingSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsStatusHealingSpell(spell) && spell.requiresCodeSupport === false;
+}
+
+export function isMageWarsToxinPurificationSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3418;
+}
+
+export function isMageWarsImplementedToxinPurificationSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsToxinPurificationSpell(spell) && spell.requiresCodeSupport === false;
 }
 
 export function isMageWarsLifeDrainSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -461,8 +496,32 @@ export function isMageWarsImplementedForcePushSpell(spell: MageWarsConfigSpellCa
     return isMageWarsForcePushSpell(spell) && spell.requiresCodeSupport === false;
 }
 
+export function isMageWarsTemporaryTraitSpell(spell: MageWarsConfigSpellCard): boolean {
+    return [3421, 3422, 3426].includes(spell.spellCardId);
+}
+
+export function isMageWarsImplementedTemporaryTraitSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsTemporaryTraitSpell(spell) && spell.requiresCodeSupport === false;
+}
+
+export function isMageWarsManaDrainSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3500;
+}
+
+export function isMageWarsImplementedManaDrainSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsManaDrainSpell(spell) && spell.requiresCodeSupport === false;
+}
+
 export function isMageWarsSleepSpell(spell: MageWarsConfigSpellCard): boolean {
     return spell.spellCardId === 3411;
+}
+
+export function isMageWarsBattleFurySpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3416;
+}
+
+export function isMageWarsImplementedBattleFurySpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsBattleFurySpell(spell) && spell.requiresCodeSupport === false;
 }
 
 export function isMageWarsImplementedSleepSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -473,8 +532,24 @@ export function isMageWarsTeleportSpell(spell: MageWarsConfigSpellCard): boolean
     return spell.spellCardId === 3410;
 }
 
+export function isMageWarsBanishSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3413;
+}
+
+export function isMageWarsImplementedBanishSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsBanishSpell(spell) && spell.requiresCodeSupport === false;
+}
+
 export function isMageWarsImplementedTeleportSpell(spell: MageWarsConfigSpellCard): boolean {
     return isMageWarsTeleportSpell(spell) && spell.requiresCodeSupport === false;
+}
+
+export function isMageWarsKnockdownSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3424;
+}
+
+export function isMageWarsImplementedKnockdownSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsKnockdownSpell(spell) && spell.requiresCodeSupport === false;
 }
 
 export function isMageWarsChargeOnSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -518,7 +593,7 @@ export function isMageWarsImplementedExplodeSpell(spell: MageWarsConfigSpellCard
 }
 
 export function isMageWarsDispelSpell(spell: MageWarsConfigSpellCard): boolean {
-    return [3419, 3606].includes(spell.spellCardId);
+    return [3414, 3419, 3420, 3606].includes(spell.spellCardId);
 }
 
 export function isMageWarsImplementedDispelSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -531,6 +606,14 @@ export function isMageWarsStealEnchantmentSpell(spell: MageWarsConfigSpellCard):
 
 export function isMageWarsImplementedStealEnchantmentSpell(spell: MageWarsConfigSpellCard): boolean {
     return isMageWarsStealEnchantmentSpell(spell) && spell.requiresCodeSupport === false;
+}
+
+export function isMageWarsEnchantmentRelocationSpell(spell: MageWarsConfigSpellCard): boolean {
+    return spell.spellCardId === 3412;
+}
+
+export function isMageWarsImplementedEnchantmentRelocationSpell(spell: MageWarsConfigSpellCard): boolean {
+    return isMageWarsEnchantmentRelocationSpell(spell) && spell.requiresCodeSupport === false;
 }
 
 export function isMageWarsImplementedVisibleEnchantmentSpell(spell: MageWarsConfigSpellCard): boolean {
@@ -563,6 +646,10 @@ export function getMageWarsHiddenResponseKind(
     return isMageWarsHiddenResponseEnchantmentSpell(spell)
         ? spell.semantics?.responseKind
         : undefined;
+}
+
+export function isMageWarsTeleportTrapSpell(spell: Pick<MageWarsConfigSpellCard, 'spellCardId'>): boolean {
+    return spell.spellCardId === 1907;
 }
 
 export const MAGE_WARS_HIDDEN_RESPONSE_CARD_IDS = {
@@ -723,6 +810,8 @@ export function resolveMageWarsChainLightningEffectDieResult(
 }
 
 export type MageWarsSpellCastChoiceFamily =
+    | 'battle-fury'
+    | 'banish'
     | 'bloodstrike'
     | 'call-of-the-wild'
     | 'charge-on'
@@ -733,11 +822,17 @@ export type MageWarsSpellCastChoiceFamily =
     | 'elemental-staff-binding'
     | 'explode'
     | 'force-push'
+    | 'temporary-trait'
+    | 'mana-drain'
     | 'hidden-response-enchantment'
     | 'jet-stream'
+    | 'knockdown'
     | 'life-drain'
+    | 'move-enchantment'
     | 'self-equipment'
     | 'single-healing'
+    | 'status-healing'
+    | 'toxin-purification'
     | 'sleep'
     | 'steal-enchantment'
     | 'summon-creature'
@@ -783,10 +878,13 @@ export function isMageWarsZoneHealingChoiceSpell(spell: MageWarsConfigSpellCard)
 export function resolveMageWarsSpellCastChoiceFamily(
     spell: MageWarsConfigSpellCard,
 ): MageWarsSpellCastChoiceFamily | undefined {
+    if (isMageWarsImplementedBattleFurySpell(spell)) return 'battle-fury';
+    if (isMageWarsImplementedBanishSpell(spell)) return 'banish';
     if (isMageWarsImplementedWallSpell(spell)) return 'wall';
     if (isMageWarsImplementedElementalStaffSpell(spell)) return 'elemental-staff-binding';
     if (isMageWarsImplementedEquipmentSpell(spell) && !isMageWarsElementalStaffSpell(spell)) return 'self-equipment';
     if (isMageWarsImplementedStealEnchantmentSpell(spell)) return 'steal-enchantment';
+    if (isMageWarsImplementedEnchantmentRelocationSpell(spell)) return 'move-enchantment';
     if (isMageWarsChainLightningSpell(spell) && spell.requiresCodeSupport === false) return 'chain-lightning';
     if (isMageWarsImplementedVisibleAreaEnchantmentSpell(spell)) return 'visible-area-enchantment';
     if (isMageWarsSummonCreatureChoiceSpell(spell)) return 'summon-creature';
@@ -795,10 +893,15 @@ export function resolveMageWarsSpellCastChoiceFamily(
     if (isMageWarsDirectAttackChoiceSpell(spell)) return 'direct-attack';
     if (isMageWarsJetStreamChoiceSpell(spell)) return 'jet-stream';
     if (isMageWarsHiddenResponseEnchantmentChoiceSpell(spell)) return 'hidden-response-enchantment';
+    if (isMageWarsImplementedStatusHealingSpell(spell)) return 'status-healing';
+    if (isMageWarsImplementedToxinPurificationSpell(spell)) return 'toxin-purification';
     if (isMageWarsImplementedHealingSpell(spell) && !isMageWarsAreaTargetSpell(spell)) return 'single-healing';
     if (isMageWarsImplementedLifeDrainSpell(spell)) return 'life-drain';
     if (isMageWarsImplementedForcePushSpell(spell)) return 'force-push';
+    if (isMageWarsImplementedTemporaryTraitSpell(spell)) return 'temporary-trait';
+    if (isMageWarsImplementedManaDrainSpell(spell)) return 'mana-drain';
     if (isMageWarsImplementedTeleportSpell(spell)) return 'teleport';
+    if (isMageWarsImplementedKnockdownSpell(spell)) return 'knockdown';
     if (isMageWarsImplementedChargeOnSpell(spell)) return 'charge-on';
     if (isMageWarsImplementedCallOfTheWildSpell(spell)) return 'call-of-the-wild';
     if (isMageWarsImplementedRouseTheBeastSpell(spell)) return 'rouse-the-beast';
@@ -834,7 +937,10 @@ function uniqMageWarsDamageTypes(damageTypes: Iterable<MageWarsDamageType>): Mag
 
 export function parseMageWarsDamageTypesFromText(text: string | undefined): MageWarsDamageType[] {
     if (!text) return [];
-    return MAGE_WARS_DAMAGE_TYPES.filter((damageType) => text.includes(damageType));
+    const damageTypes = MAGE_WARS_DAMAGE_TYPES.filter((damageType) => text.includes(damageType));
+    return text.includes('以太') || text.includes('aether')
+        ? uniqMageWarsDamageTypes([...damageTypes, 'aether'])
+        : damageTypes;
 }
 
 export function resolveMageWarsSpellAttackDamageTypes(spell: MageWarsConfigSpellCard): MageWarsDamageType[] {
@@ -908,6 +1014,10 @@ export function isMageWarsLivingArenaObject(object: MageWarsArenaObjectState): b
     return !isMageWarsNonlivingArenaObject(object);
 }
 
+export function isMageWarsBanishedArenaObject(object: MageWarsArenaObjectState): boolean {
+    return object.banished !== undefined;
+}
+
 export function isMageWarsNonlivingArenaObject(object: MageWarsArenaObjectState): boolean {
     if (object.kind !== 'creature') return false;
     const rulesText = [object.typeLine, object.attackOrTraitLine, object.rulesText].filter(Boolean).join('；');
@@ -926,6 +1036,24 @@ function resolveMageWarsVisibleEnchantmentsAttachedToObject(
 ): MageWarsArenaObjectState[] {
     return Object.values(core.objects).filter((candidate) => (
         isMageWarsVisibleEnchantmentArenaObject(candidate)
+        && candidate.anchoredToObjectId === objectId
+    ));
+}
+
+export function resolveMageWarsToxinEnchantmentsAttachedToObject(
+    core: MageWarsCore,
+    objectId: string,
+): MageWarsArenaObjectState[] {
+    return resolveMageWarsVisibleEnchantmentsAttachedToObject(core, objectId)
+        .filter(isMageWarsToxinEnchantmentArenaObject);
+}
+
+export function resolveMageWarsEnchantmentsAttachedToObject(
+    core: MageWarsCore,
+    objectId: string,
+): MageWarsArenaObjectState[] {
+    return Object.values(core.objects).filter((candidate) => (
+        candidate.kind === 'enchantment'
         && candidate.anchoredToObjectId === objectId
     ));
 }
@@ -1012,6 +1140,32 @@ export function resolveMageWarsAttachedVisibleEnchantmentUpkeepManaCosts(
                     sourceObjectId: enchantment.id,
                     sourceSpellCardId: enchantment.sourceSpellCardId,
                     amount: effect.amount,
+                }))
+            ?? []
+        ));
+}
+
+export function parseMageWarsManaDrainDiceCount(spell: MageWarsConfigSpellCard): number | undefined {
+    const text = [spell.rulesText, spell.attackOrTraitLine]
+        .filter(Boolean)
+        .join('；');
+    const match = /投掷\s*(\d+)\s*颗?攻击骰/.exec(text);
+    return match ? Number(match[1]) : undefined;
+}
+
+export function resolveMageWarsAttachedVisibleEnchantmentMovementDirectDamage(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): MageWarsObjectMovementDirectDamage[] {
+    return resolveMageWarsVisibleEnchantmentsAttachedToObject(core, object.id)
+        .flatMap((enchantment) => (
+            resolveMageWarsVisibleObjectEnchantmentSemantics(enchantment)?.movementEffects
+                ?.filter((effect) => effect.kind === 'direct-damage')
+                .map((effect) => ({
+                    sourceObjectId: enchantment.id,
+                    sourceSpellCardId: enchantment.sourceSpellCardId,
+                    ownerId: enchantment.ownerId,
+                    effect,
                 }))
             ?? []
         ));
@@ -1120,18 +1274,59 @@ export function resolveMageWarsObjectAttackDiceModifier(
     };
 }
 
+export function resolveMageWarsObjectRangedDiceModifier(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): MageWarsAttackDiceModifier {
+    if (object.kind !== 'creature') return { value: 0, sourceObjectIds: [] };
+    const sources = resolveMageWarsAttachedVisibleEnchantmentModifierSources(core, object, 'rangedDice');
+    return {
+        value: sources.reduce((total, source) => total + source.value, 0),
+        sourceObjectIds: sources.map((source) => source.objectId),
+    };
+}
+
 function resolveMageWarsAttachedVisibleEnchantmentTraitSources(
     core: MageWarsCore,
     object: MageWarsArenaObjectState,
     trait: MageWarsConfigSpellGrantedTraitId,
-): Array<{ objectId: string; value?: number }> {
+): Array<{
+    objectId: string;
+    value?: number;
+    createdAtSequence?: number;
+    createdAtTimestamp?: number;
+}> {
     return resolveMageWarsVisibleEnchantmentsAttachedToObject(core, object.id)
         .flatMap((enchantment) => (
             resolveMageWarsVisibleObjectEnchantmentSemantics(enchantment)?.grants
                 ?.filter((grant) => grant.trait === trait)
-                .map((grant) => ({ objectId: enchantment.id, value: grant.value }))
+                .map((grant) => ({
+                    objectId: enchantment.id,
+                    value: grant.value,
+                    createdAtSequence: enchantment.createdAtSequence,
+                    createdAtTimestamp: enchantment.createdAtTimestamp,
+                }))
             ?? []
         ));
+}
+
+export function resolveMageWarsObjectLimitedLifeSources(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): Array<{ objectId: string; createdAtSequence?: number; createdAtTimestamp?: number }> {
+    return resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'limited-life')
+        .map((source) => ({
+            objectId: source.objectId,
+            createdAtSequence: source.createdAtSequence,
+            createdAtTimestamp: source.createdAtTimestamp,
+        }));
+}
+
+export function isMageWarsLimitedLifeArenaObject(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): boolean {
+    return resolveMageWarsObjectLimitedLifeSources(core, object).length > 0;
 }
 
 export function resolveMageWarsObjectMentalCalmSources(
@@ -1191,7 +1386,28 @@ export function resolveMageWarsDamageBarrierSource(
     core: MageWarsCore,
     targetPlayerId: PlayerId,
     attackerId: string,
+    targetObjectId?: string,
 ): MageWarsDamageBarrierSource | undefined {
+    if (targetObjectId) {
+        return resolveMageWarsVisibleEnchantmentsAttachedToObject(core, targetObjectId)
+            .map((enchantment) => {
+                const damageBarrier = getMageWarsCombatTraitsFromConfig(enchantment.sourceSpellCardId)?.damageBarrier;
+                if (!damageBarrier) return undefined;
+
+                const alreadyTriggered = damageBarrier.oncePerAttackerPerRound
+                    && enchantment.damageBarrierRoundNumber === core.turnNumber
+                    && (enchantment.damageBarrierAttackerIdsThisRound ?? []).includes(attackerId);
+                if (alreadyTriggered) return undefined;
+
+                return {
+                    ...damageBarrier,
+                    objectId: enchantment.id,
+                    sourceSpellCardId: enchantment.sourceSpellCardId,
+                };
+            })
+            .find((source): source is MageWarsDamageBarrierSource => Boolean(source));
+    }
+
     return Object.values(core.objects)
         .filter((equipment) => (
             equipment.kind === 'equipment'
@@ -1234,7 +1450,65 @@ export function resolveMageWarsObjectEffectiveLife(
     core: MageWarsCore,
     object: MageWarsArenaObjectState,
 ): number {
-    return object.life + resolveMageWarsAttachedVisibleEnchantmentModifierValue(core, object, 'life');
+    const effects = resolveMageWarsVisibleEnchantmentsAttachedToObject(core, object.id)
+        .flatMap((enchantment, index) => {
+            const semantics = resolveMageWarsVisibleObjectEnchantmentSemantics(enchantment);
+            if (!semantics) return [];
+            const limitedLife = semantics.grants?.some((grant) => grant.trait === 'limited-life') === true;
+            const lifeModifiers = semantics.continuousModifiers
+                ?.filter((modifier) => modifier.stat === 'life' && modifier.operation === 'add')
+                .map((modifier) => ({
+                    kind: 'life-modifier' as const,
+                    value: modifier.value,
+                    createdAtSequence: enchantment.createdAtSequence ?? 0,
+                    createdAtTimestamp: enchantment.createdAtTimestamp ?? 0,
+                    index,
+                }))
+                ?? [];
+            return [
+                ...(limitedLife
+                    ? [{
+                        kind: 'limited-life' as const,
+                        value: 0,
+                        createdAtSequence: enchantment.createdAtSequence ?? 0,
+                        createdAtTimestamp: enchantment.createdAtTimestamp ?? 0,
+                        index,
+                    }]
+                    : []),
+                ...lifeModifiers,
+            ];
+        })
+        .sort((left, right) => (
+            left.createdAtSequence - right.createdAtSequence
+            || left.createdAtTimestamp - right.createdAtTimestamp
+            || left.index - right.index
+        ));
+
+    let effectiveLife = object.life;
+    let limitedLifeActive = false;
+    for (const effect of effects) {
+        if (effect.kind === 'limited-life') {
+            limitedLifeActive = true;
+            continue;
+        }
+        if (!limitedLifeActive) effectiveLife += effect.value;
+    }
+    return effectiveLife;
+}
+
+export function resolveMageWarsObjectChanneling(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): number {
+    const baseChanneling = object.spellcastingSource?.channeling ?? 0;
+    if (baseChanneling <= 0) return 0;
+
+    const grantedChanneling = resolveMageWarsAttachedVisibleEnchantmentTraitSources(
+        core,
+        object,
+        'channeling',
+    ).reduce((total, source) => total + (source.value ?? 1), 0);
+    return baseChanneling + grantedChanneling;
 }
 
 export function resolveMageWarsObjectEffectiveArmor(
@@ -1251,16 +1525,25 @@ export function isMageWarsSlowArenaObject(core: MageWarsCore, object: MageWarsAr
         || resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'slow').length > 0;
 }
 
-export function isMageWarsSwiftArenaObject(object: MageWarsArenaObjectState): boolean {
+export function isMageWarsSwiftArenaObject(
+    object: MageWarsArenaObjectState,
+    core?: MageWarsCore,
+): boolean {
     if (object.kind !== 'creature') return false;
     const rulesText = [object.typeLine, object.attackOrTraitLine, object.rulesText].filter(Boolean).join('；');
-    return rulesText.includes('迅捷');
+    return rulesText.includes('迅捷')
+        || (core ? resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'swift').length > 0 : false);
 }
 
-export function isMageWarsElusiveArenaObject(object: MageWarsArenaObjectState): boolean {
+export function isMageWarsElusiveArenaObject(
+    object: MageWarsArenaObjectState,
+    core?: MageWarsCore,
+): boolean {
     if (object.kind !== 'creature') return false;
     const rulesText = [object.typeLine, object.attackOrTraitLine, object.rulesText].filter(Boolean).join('；');
-    return rulesText.includes('遁逸');
+    return rulesText.includes('遁逸')
+        || hasTemporaryElusive(object)
+        || (core ? resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'elusive').length > 0 : false);
 }
 
 export function isMageWarsLegendarySpell(spell: Pick<MageWarsConfigSpellCard, 'attackOrTraitLine' | 'rulesText'>): boolean {
@@ -1407,6 +1690,10 @@ export function isMageWarsVisibleEnchantmentArenaObject(object: MageWarsArenaObj
     return object.kind === 'enchantment' && object.revealed === true;
 }
 
+export function isMageWarsHiddenEnchantmentArenaObject(object: MageWarsArenaObjectState): boolean {
+    return object.kind === 'enchantment' && object.revealed !== true;
+}
+
 export function isMageWarsVisibleAttachedEnchantmentArenaObject(object: MageWarsArenaObjectState): boolean {
     return isMageWarsVisibleEnchantmentArenaObject(object)
         && (
@@ -1416,15 +1703,29 @@ export function isMageWarsVisibleAttachedEnchantmentArenaObject(object: MageWars
         );
 }
 
+export function isMageWarsToxinEnchantmentArenaObject(object: MageWarsArenaObjectState): boolean {
+    if (!isMageWarsVisibleAttachedEnchantmentArenaObject(object)) return false;
+    const spell = getMageWarsSpellCardFromConfig(object.sourceSpellCardId);
+    return spell?.typeLine?.includes('毒素') === true;
+}
+
+export function resolveMageWarsEnchantmentZoneId(
+    core: MageWarsCore,
+    object: MageWarsArenaObjectState,
+): ArenaZoneId | undefined {
+    if (object.kind !== 'enchantment') return undefined;
+    if (object.anchoredToZoneId) return getArenaZone(core, object.anchoredToZoneId)?.id;
+    if (object.anchoredToPlayerId) return core.players[object.anchoredToPlayerId]?.mageZoneId;
+    if (object.anchoredToObjectId) return core.objects[object.anchoredToObjectId]?.zoneId;
+    return undefined;
+}
+
 export function resolveMageWarsVisibleEnchantmentZoneId(
     core: MageWarsCore,
     object: MageWarsArenaObjectState,
 ): ArenaZoneId | undefined {
     if (!isMageWarsVisibleEnchantmentArenaObject(object)) return undefined;
-    if (object.anchoredToZoneId) return getArenaZone(core, object.anchoredToZoneId)?.id;
-    if (object.anchoredToPlayerId) return core.players[object.anchoredToPlayerId]?.mageZoneId;
-    if (object.anchoredToObjectId) return core.objects[object.anchoredToObjectId]?.zoneId;
-    return undefined;
+    return resolveMageWarsEnchantmentZoneId(core, object);
 }
 
 export function resolveMageWarsEnchantmentTotalManaCost(object: MageWarsArenaObjectState): number | undefined {
@@ -1538,7 +1839,16 @@ export function isMageWarsLegalVisibleEnchantmentTarget(
     if (targetRule.includes('非法师生物')) return targetObject.kind === 'creature';
     if (targetRule.includes('实体生物')) return isMageWarsCorporealCreatureArenaObject(targetObject);
     if (targetRule.includes('生物')) return targetObject.kind === 'creature';
+    if (targetRule.includes('对象')) return (targetObject.spellcastingSource?.channeling ?? 0) > 0;
     return false;
+}
+
+export function resolveMageWarsEnchantmentRelocationManaCost(object: MageWarsArenaObjectState): number | undefined {
+    if (object.kind !== 'enchantment') return undefined;
+    if (object.revealed !== true) return 1;
+    const sourceSpell = getMageWarsSpellCardFromConfig(object.sourceSpellCardId);
+    const level = sourceSpell?.level;
+    return Number.isInteger(level) && level !== undefined && level > 0 ? level : undefined;
 }
 
 export function isMageWarsLegalHiddenResponseEnchantmentTarget(
@@ -1559,21 +1869,27 @@ export function isMageWarsLegalHiddenResponseEnchantmentTarget(
 
 export function isMageWarsLegalVisibleAreaEnchantmentTarget(
     core: MageWarsCore,
-    spell: Pick<MageWarsConfigSpellCard, 'targetRule'>,
+    spell: Pick<MageWarsConfigSpellCard, 'spellCardId' | 'targetRule'>,
     payload: MageWarsSpellTargetPayload,
 ): boolean {
     if (payload.targetPlayerId || payload.targetObjectId || !payload.targetZoneId) return false;
-    return spell.targetRule?.includes('区域') === true
-        && getArenaZone(core, payload.targetZoneId) !== undefined;
+    const zone = getArenaZone(core, payload.targetZoneId);
+    if (!zone || spell.targetRule?.includes('区域') !== true) return false;
+    if (!isMageWarsTeleportTrapSpell(spell)) return true;
+
+    return !zone.objectIds.some((objectId) => {
+        const object = core.objects[objectId];
+        return object?.kind === 'creature' && object.ownerId !== core.currentPlayerId;
+    });
 }
 
 export function isMageWarsTeleportSpellTarget(object: MageWarsArenaObjectState): boolean {
     return object.kind === 'creature';
 }
 
-export function isMageWarsTanglevineTarget(object: MageWarsArenaObjectState): boolean {
+export function isMageWarsTanglevineTarget(object: MageWarsArenaObjectState, core?: MageWarsCore): boolean {
     return isMageWarsCorporealCreatureArenaObject(object)
-        && !isMageWarsFlyingArenaObject(object)
+        && !isMageWarsFlyingArenaObject(object, core)
         && !isMageWarsUncontainableArenaObject(object);
 }
 
@@ -1587,6 +1903,11 @@ export function isMageWarsUnmovableArenaObject(object: MageWarsArenaObjectState)
         || Boolean(object.restrainedByObjectId)
         || rulesText.includes('无法移动')
         || rulesText.includes('稳固');
+}
+
+export function isMageWarsStableArenaObject(object: MageWarsArenaObjectState): boolean {
+    const rulesText = [object.typeLine, object.attackOrTraitLine, object.rulesText].filter(Boolean).join('；');
+    return rulesText.includes('稳固');
 }
 
 export function resolveMageWarsTeleportSpellManaCostForTargetZone(
@@ -1720,14 +2041,19 @@ export function isMageWarsGuardingArenaObjectCanProtect(object: MageWarsArenaObj
         && !isMageWarsSmallArenaObject(object);
 }
 
-export function isMageWarsFlyingArenaObject(object: MageWarsArenaObjectState): boolean {
+export function isMageWarsFlyingArenaObject(object: MageWarsArenaObjectState, core?: MageWarsCore): boolean {
     if (object.kind !== 'creature') return false;
     if (isMageWarsArenaObjectRestrained(object)) return false;
     const rulesText = [object.typeLine, object.attackOrTraitLine, object.rulesText].filter(Boolean).join('；');
+    if (core) {
+        if (resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'remove-flying').length > 0) return false;
+        if (resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'flying').length > 0) return true;
+    }
     return rulesText.includes('飞行');
 }
 
 function canMageWarsArenaObjectHinderMovement(
+    core: MageWarsCore,
     mover: MageWarsArenaObjectState,
     enemy: MageWarsArenaObjectState,
 ): boolean {
@@ -1738,8 +2064,8 @@ function canMageWarsArenaObjectHinderMovement(
     if (isMageWarsArenaObjectRestrained(enemy)) return false;
     if (isMageWarsSmallArenaObject(enemy)) return false;
 
-    const moverFlying = isMageWarsFlyingArenaObject(mover);
-    const enemyFlying = isMageWarsFlyingArenaObject(enemy);
+    const moverFlying = isMageWarsFlyingArenaObject(mover, core);
+    const enemyFlying = isMageWarsFlyingArenaObject(enemy, core);
     return moverFlying === enemyFlying;
 }
 
@@ -1748,9 +2074,9 @@ export function isMageWarsArenaObjectHinderedInZone(
     object: MageWarsArenaObjectState,
     zoneId: ArenaZoneId,
 ): boolean {
-    if (isMageWarsElusiveArenaObject(object)) return false;
+    if (isMageWarsElusiveArenaObject(object, core)) return false;
     return Object.values(core.objects).some((enemy) => (
-        enemy.zoneId === zoneId && canMageWarsArenaObjectHinderMovement(object, enemy)
+        enemy.zoneId === zoneId && canMageWarsArenaObjectHinderMovement(core, object, enemy)
     ));
 }
 
@@ -1758,7 +2084,7 @@ export function canMageWarsArenaObjectUseSwiftFreeMove(
     core: MageWarsCore,
     object: MageWarsArenaObjectState,
 ): boolean {
-    const hasSwiftMove = hasTemporarySwift(object) || isMageWarsSwiftArenaObject(object);
+    const hasSwiftMove = hasTemporarySwift(object) || isMageWarsSwiftArenaObject(object, core);
     if (!hasSwiftMove) return false;
     if (isMageWarsSlowArenaObject(core, object)) return false;
     if (hasTemporarySwiftFreeMoveUsed(object)) return false;
@@ -1840,7 +2166,7 @@ export function parseMageWarsSpellAttackProfile(spell: MageWarsConfigSpellCard):
     const attackLine = spell.attackOrTraitLine;
     if (!attackLine) return undefined;
 
-    const match = /(\d+)\s*颗?攻击骰/.exec(attackLine);
+    const match = /(\d+)\s*颗?(?:[^\s；，。]+)?攻击骰/.exec(attackLine);
     if (!match) return undefined;
 
     return {
@@ -2051,6 +2377,17 @@ export function hasMageWarsObjectVampiricEnchantment(
 ): boolean {
     return attackProfile.rangeKind === 'melee'
         && resolveMageWarsAttachedVisibleEnchantmentTraitSources(core, object, 'vampiric').length > 0;
+}
+
+export function hasMageWarsObjectVampiricTrait(
+    object: MageWarsArenaObjectState,
+    attackProfile: MageWarsObjectAttackProfile,
+): boolean {
+    if (object.kind !== 'creature' || attackProfile.rangeKind !== 'melee') return false;
+    return [object.attackOrTraitLine, object.rulesText]
+        .filter(Boolean)
+        .join('；')
+        .includes('吸血');
 }
 
 export function canMageWarsObjectUsePostMoveQuickAction(
@@ -2308,10 +2645,12 @@ export function isMageWarsObjectAttackTargetAllowed(
     attacker: MageWarsArenaObjectState,
     attackProfile: MageWarsObjectAttackProfile,
     target: MageWarsArenaObjectState,
+    core?: MageWarsCore,
 ): boolean {
+    if (isMageWarsBanishedArenaObject(attacker) || isMageWarsBanishedArenaObject(target)) return false;
     if (attackProfile.rangeKind !== 'melee') return true;
-    if (!isMageWarsFlyingArenaObject(target)) return true;
-    return isMageWarsFlyingArenaObject(attacker) || attackProfile.reach === true;
+    if (!isMageWarsFlyingArenaObject(target, core)) return true;
+    return isMageWarsFlyingArenaObject(attacker, core) || attackProfile.reach === true;
 }
 
 function materializeMageWarsObjectDefenseProfile(

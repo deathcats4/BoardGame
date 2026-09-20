@@ -166,7 +166,12 @@ export function RecentRollPanel({
   const eventThresholdsLabel = roll.branchThresholds?.length
     ? [...roll.branchThresholds]
       .sort((left, right) => right.min - left.min)
-      .map((branch) => `${branch.min}+ ${branch.label}`)
+      .map((branch) =>
+        t("board.roll.threshold", {
+          value: branch.min,
+          label: branch.label,
+        }),
+      )
       .join(" · ")
     : "";
   const diceStageRoll: BetrayalRecentRollState = showEventDamageDiceStage
@@ -533,7 +538,7 @@ export function RecentRollPanel({
         }
         className={`pointer-events-none min-h-[214px] text-[#f3e0a6] ${className}`}
       >
-        <div className="grid h-full min-h-[214px] grid-cols-[minmax(260px,1fr)_minmax(190px,0.58fr)] items-center gap-3">
+        <div className="grid h-full min-h-[214px] grid-cols-[minmax(220px,0.62fr)_minmax(190px,0.88fr)] items-center gap-3">
           <div className="relative h-full min-h-[214px] min-w-0">
             {diceStageWithPrompt}
           </div>

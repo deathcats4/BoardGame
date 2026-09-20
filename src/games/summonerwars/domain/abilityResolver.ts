@@ -976,6 +976,19 @@ export function calculateEffectiveStrength(
     }
   }
 
+  // 仲裁“忠诚律令”：与友方召唤师相邻的士兵获得 +1 战力。
+  if (unit.card.unitClass === 'common') {
+    const hasLoyaltyDecree = state.players[unit.owner]?.activeEvents.some(ev =>
+      getBaseCardId(ev.id) === CARD_IDS.ZHONGCAI_LOYALTY_DECREE,
+    );
+    const summoner = state.players[unit.owner] ? getPlayerUnits(state, unit.owner)
+      .find(candidate => candidate.card.unitClass === 'summoner' && manhattanDistance(candidate.position, unit.position) === 1) : undefined;
+    if (hasLoyaltyDecree && summoner) {
+      strength += 1;
+      modifiers.push({ source: CARD_IDS.ZHONGCAI_LOYALTY_DECREE, sourceName: '忠诚律令', value: 1 });
+    }
+  }
+
   // 冰霜飞弹：相邻每有一个友方建筑+1战力
   if (abilityIds.has('frost_bolt')) {
     let frostBonus = 0;

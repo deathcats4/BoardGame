@@ -60,6 +60,8 @@ export {
 
 import { EventStreamRollbackContext } from '../hooks/EventStreamRollbackContext';
 
+const EMPTY_SEAT_CONTROLLERS: Record<string, AiSeatController> = {};
+
 // re-export 供外部使用（测试等场景）
 export { filterPlayedEvents } from './latency/optimisticEngine';
 export { buildAiProgressMarker } from './useGameProviderRuntime';
@@ -180,7 +182,7 @@ export function LocalGameProvider({
     setupData,
     children,
     onCommandRejected,
-    seatControllers = {},
+    seatControllers = EMPTY_SEAT_CONTROLLERS,
     playerNames,
     playerId: localPlayerId,
     followCurrentTurnPlayer = false,

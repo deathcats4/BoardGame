@@ -82,8 +82,11 @@ test.describe('大杀四方文化冲击阿南西传说真实入口验证', () =>
       },
     });
 
+    const factionSearch = page.getByTestId('faction-search-input');
+    await expect(factionSearch).toBeVisible({ timeout: 15000 });
+    await factionSearch.fill('阿南西');
+
     const option = page.getByTestId('faction-option-anansi_tales');
-    await option.scrollIntoViewIfNeeded({ timeout: 15000 });
     await expect(option).toBeVisible({ timeout: 15000 });
     await expect.poll(async () => option.locator('.atlas-shimmer').count(), {
       message: '阿南西传说派系卡不应残留 atlas shimmer',
@@ -216,5 +219,108 @@ test.describe('大杀四方文化冲击阿南西传说真实入口验证', () =>
     });
     await assertCardVisualReady(page, 'web-ally');
     await game.screenshot('07-故事讲述者小屋-主动基地能力结算后', testInfo);
+  });
+
+  test('羽毛礼物从真实入口完成己方随从移动、给牌与交互收口', async ({ page, game }, testInfo) => {
+    test.setTimeout(120000);
+    await setChineseLocale(page.context());
+    await game.openTestGame('smashup', {
+      p0: 'anansi_tales,aliens',
+      p1: 'pirates,ninjas',
+      skipFactionSelect: true,
+      skipInitialization: false,
+      seed: 20260919,
+    }, 45000);
+
+    await game.setupScene({
+      gameId: 'smashup',
+      currentPlayer: '0',
+      phase: 'playCards',
+      player0: {
+        hand: [
+          { uid: 'feather-card', defId: 'anansi_tales_feather_gifts', type: 'action', owner: '0' },
+        ],
+        deck: [],
+        discard: [],
+        factions: ['anansi_tales', 'aliens'],
+        minionsPlayed: 0,
+        minionLimit: 1,
+        actionsPlayed: 0,
+        actionLimit: 1,
+        vp: 0,
+      },
+      player1: {
+        hand: [],
+        deck: [],
+        discard: [],
+        factions: ['pirates', 'ninjas'],
+        minionsPlayed: 0,
+        minionLimit: 1,
+        actionsPlayed: 0,
+        actionLimit: 1,
+        vp: 0,
+      },
+      bases: [
+        {
+          defId: 'base_anansis_web',
+          minions: [
+            { uid: 'own-minion', defId: 'anansi_tales_akye_the_turtle', owner: '0', controller: '0', power: 3 },
+            { uid: 'enemy-minion', defId: 'pirate_first_mate', owner: '1', controller: '1', power: 2 },
+          ],
+        },
+        { defId: 'base_storytellers_hut', minions: [] },
+      ],
+    });
+
+    await game.waitForPhase('playCards');
+    await assertCardVisualReady(page, 'feather-card');
+    await assertCardVisualReady(page, 'own-minion');
+    await game.playCard('anansi_tales_feather_gifts');
+    await game.waitForInteraction('anansi_tales_feather_gifts', 10000);
+
+    const sourceOptions = await game.getInteractionOptions();
+    expect(sourceOptions.some(option => option.value?.minionUid === 'own-minion')).toBe(true);
+    expect(sourceOptions.some(option => option.value?.minionUid === 'enemy-minion')).toBe(false);
+    await game.screenshot('08-羽毛礼物-选择己方随从', testInfo);
+
+    await game.selectInteractionOptionBy(
+      option => option.value?.minionUid === 'own-minion' && option.value?.baseIndex === 0,
+      '羽毛礼物选择己方随从',
+    );
+    await game.waitForInteraction('anansi_tales_feather_gifts_destination', 10000);
+    const destinationOptions = await game.getInteractionOptions();
+    expect(destinationOptions.some(option => option.value?.baseIndex === 0)).toBe(false);
+    expect(destinationOptions.some(option => option.value?.baseIndex === 1)).toBe(true);
+    await game.screenshot('09-羽毛礼物-选择另一基地', testInfo);
+
+    await game.selectInteractionOptionBy(
+      option => option.value?.baseIndex === 1,
+      '羽毛礼物选择另一基地',
+    );
+    await game.waitForInteraction('anansi_tales_feather_gifts', 10000);
+    await game.selectInteractionOptionBy(
+      option => option.value?.targetPlayerId === '1',
+      '羽毛礼物把行动牌给玩家 1',
+    );
+    await game.waitForNoInteraction(10000);
+
+    await expect.poll(async () => {
+      const state = await game.getState();
+      return {
+        base0Minions: state.core.bases[0]?.minions?.map((minion: { uid?: string }) => minion.uid) ?? [],
+        base1Minions: state.core.bases[1]?.minions?.map((minion: { uid?: string }) => minion.uid) ?? [],
+        p0Discard: state.core.players['0']?.discard?.map((card: { uid?: string }) => card.uid) ?? [],
+        p1Hand: state.core.players['1']?.hand?.map((card: { uid?: string }) => card.uid) ?? [],
+        interactionOpen: Boolean(state.sys?.interaction?.current),
+      };
+    }, { timeout: 15000 }).toEqual({
+      base0Minions: ['enemy-minion'],
+      base1Minions: ['own-minion'],
+      p0Discard: [],
+      p1Hand: ['feather-card'],
+      interactionOpen: false,
+    });
+    await assertCardVisualReady(page, 'own-minion');
+    await game.screenshot('10-羽毛礼物-移动给牌并收口', testInfo);
   });
 });

@@ -8,7 +8,7 @@ import type { AiSeatController, AiSetupOptionStatus } from '../../../engine/ai/t
 import type { CardPreviewRef } from '../../../core';
 import type { AbilityDef, AbilityEffect } from './combat';
 import type { ResourcePool } from './resourceSystem';
-import type { TokenDef, TokenState } from './tokenTypes';
+import type { DamageOrigin, TokenDef, TokenState } from './tokenTypes';
 import type { PassiveAbilityDef } from './passiveAbility';
 import type { RollDieConditionalEffect, RollDieDefaultEffect } from './tokenTypes';
 
@@ -32,6 +32,8 @@ export type TurnPhase =
 
 export type DieFace =
     | 'fist'
+    | 'web'
+    | 'spider'
     | 'palm'
     | 'taiji'
     | 'lotus'
@@ -103,6 +105,7 @@ export const IMPLEMENTED_DICETHRONE_CHARACTER_IDS = [
     'tianshi',
     'lieren',
     'vampire_lord',
+    'zhizhuxia',
 ] as const;
 
 export type SelectableCharacterId = (typeof IMPLEMENTED_DICETHRONE_CHARACTER_IDS)[number];
@@ -165,6 +168,12 @@ export const DICETHRONE_CHARACTER_CATALOG: CharacterDefinition[] = [
         nameKey: 'characters.vampire_lord',
         setupOptionStatus: 'in_progress',
         setupOptionStatusReason: '当前范围已完成审计，等待真人确认进入完成态',
+    },
+    {
+        id: 'zhizhuxia',
+        nameKey: 'characters.zhizhuxia',
+        setupOptionStatus: 'in_progress',
+        setupOptionStatusReason: '专属卡牌已录入；规则、资源链和真实入口仍在审计中',
     },
 ].map(withDerivedCharacterBadges);
 
@@ -350,6 +359,14 @@ export interface PendingAttack {
     resolvedDamage?: number;
     /** 本次攻击期间实际新增到防御方身上的状态层数（供二级防御移除本次投掷已施加的状态） */
     statusEffectsAppliedThisAttack?: Record<string, number>;
+    /** 蜘蛛侠“落网”已在本次普通攻击进入防御前触发并被消费。 */
+    zhizhuxiaWebbedTriggeredThisAttack?: boolean;
+    /** 记录本次攻击开始时目标是否已有落网，供“终极能力不重新获得落网”裁定使用。 */
+    zhizhuxiaWebbedWasPresentAtStart?: boolean;
+    /** 蜘蛛感应对本次普通攻击主伤害的百分比修正。 */
+    zhizhuxiaDamagePercent?: number;
+    /** “飞荡脱身”允许蜘蛛感应把蛛网视为成功面。 */
+    zhizhuxiaSpiderSenseAcceptsWeb?: boolean;
     /** 攻击方骰面计数快照（用于 postDamage 阶段的连击判定，因为防御阶段会重置骰子） */
     attackDiceFaceCounts?: Record<string, number>;
     /** 攻击方骰子点数快照（用于 2/3/4/5-of-a-kind 的“相同数字”判定） */
@@ -564,6 +581,8 @@ export interface PendingDamage {
     sourceAbilityId?: string;
     /** 伤害范围（attack=攻击伤害，direct=直接伤害） */
     damageScope?: 'attack' | 'direct';
+    /** 伤害现实来源（ability=技能区，card=手牌，token/status=标记或状态，system=系统） */
+    damageOrigin?: DamageOrigin;
     /** 是否为不可防御伤害（只跳过防御技能；终极伤害另行封锁降低/回避） */
     unblockable?: boolean;
     /** 响应窗口类型 */
@@ -607,6 +626,7 @@ export interface PendingDamage {
         sourceAbilityId?: string;
         sourcePlayerId?: PlayerId;
         damageScope?: 'attack' | 'direct';
+        damageOrigin?: DamageOrigin;
         unblockable?: boolean;
         /** 神罚反弹在响应窗口收口时按最终伤害计算。 */
         reflectFromPendingDamage?: boolean;
@@ -895,8 +915,8 @@ export interface HeroState {
         id: 'nyra';
         hp: number;
         maxHp: number;
-        /** 妮拉是否处于激活面。倒下后普通治疗只恢复血量，不立即恢复承伤/加伤资格。 */
-        active?: boolean;
+        /** 妮拉是否处于激活面。该字段是正式运行时的唯一激活状态来源。 */
+        active: boolean;
     };
 }
 
@@ -992,9 +1012,9 @@ export interface DiceThroneCore {
      */
     afterCardResponseWindowSequence?: number;
     /**
-     * 最近一次攻击结算的实际伤害值
-     * 由 ATTACK_RESOLVED 写入，TURN_CHANGED / ATTACK_INITIATED 时清除
-     * 用于 card-dizzy 等需要"造成至少 N 伤害"条件的卡牌
+     * 共享的“本回合最近一次正式攻击净掉血”记录
+     * 由 ATTACK_RESOLVED 写入，TURN_CHANGED 时统一清除
+     * 只记录攻击伤害，不被独立卡牌/直接伤害覆盖，供卡牌和被动能力复用
      */
     lastResolvedAttackDamage?: number;
     /**

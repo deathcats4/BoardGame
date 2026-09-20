@@ -624,6 +624,97 @@ const expectTutorialCardDoesNotCoverTargets = async (
   }
 };
 
+const expectTutorialCardDoesNotOverlapProtectedRegions = async (
+  page: Page,
+  label: string,
+) => {
+  const metrics = await page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>(
+      '[data-testid="tutorial-overlay-card"]',
+    );
+    if (!card) return { hasCard: false, regions: [] };
+    const cardRect = card.getBoundingClientRect();
+    const overlap = (regionRect: DOMRect) => {
+      const width = Math.max(
+        0,
+        Math.min(cardRect.right, regionRect.right) -
+          Math.max(cardRect.left, regionRect.left),
+      );
+      const height = Math.max(
+        0,
+        Math.min(cardRect.bottom, regionRect.bottom) -
+          Math.max(cardRect.top, regionRect.top),
+      );
+      return Math.round(width * height);
+    };
+    return {
+      hasCard: true,
+      cardRect: {
+        left: Math.round(cardRect.left),
+        top: Math.round(cardRect.top),
+        right: Math.round(cardRect.right),
+        bottom: Math.round(cardRect.bottom),
+      },
+      regions: Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-tutorial-protected-region]',
+        ),
+      ).map((region) => {
+        const regionRect = region.getBoundingClientRect();
+        return {
+          name: region.dataset.tutorialProtectedRegion ?? "unknown",
+          overlapArea: overlap(regionRect),
+          regionRect: {
+            left: Math.round(regionRect.left),
+            top: Math.round(regionRect.top),
+            right: Math.round(regionRect.right),
+            bottom: Math.round(regionRect.bottom),
+          },
+        };
+      }),
+    };
+  });
+
+  expect(metrics.hasCard, `${label} 必须有教程卡`).toBe(true);
+  for (const region of metrics.regions) {
+    expect(
+      region.overlapArea,
+      `${label} 教程卡不能覆盖保护阅读区：${JSON.stringify(metrics)}`,
+    ).toBe(0);
+  }
+};
+
+const expectScenarioReaderHasNoVisibleDuplicateViewerLabel = async (
+  page: Page,
+  label: string,
+) => {
+  const visibleDuplicateCount = await page
+    .getByTestId("betrayal-scenario-reader-dialog")
+    .evaluate((dialog) =>
+      Array.from(dialog.querySelectorAll<HTMLElement>("*")).filter((element) => {
+        if (element.textContent?.trim() !== "你是英雄：英雄剧本书") {
+          return false;
+        }
+        if (element.closest(".sr-only")) {
+          return false;
+        }
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          rect.width > 2 &&
+          rect.height > 2
+        );
+      }).length,
+    );
+
+  expect(
+    visibleDuplicateCount,
+    `${label} 不应在剧本书本体内重复显示“你是英雄：英雄剧本书”`,
+  ).toBe(0);
+};
+
 const expectBetrayalMoveTargetsMatchDiscoveredRooms = async (
   page: Page,
   label: string,
@@ -2001,6 +2092,53 @@ const expectInventoryPreviewCardReadable = async (previewOverlay: Locator) => {
   ).toBe("none");
 };
 
+const expectInventoryMagnifyVisibility = async (
+  magnifyButton: Locator,
+  expectedVisible: boolean,
+  message: string,
+) => {
+  if (expectedVisible) {
+    await expect
+      .poll(
+        () =>
+          magnifyButton.evaluate((node) =>
+            Number(window.getComputedStyle(node as HTMLElement).opacity),
+          ),
+        { message: `${message}：透明度`, timeout: 3000 },
+      )
+      .toBeGreaterThanOrEqual(0.99);
+    await expect
+      .poll(
+        () =>
+          magnifyButton.evaluate((node) =>
+            window.getComputedStyle(node as HTMLElement).pointerEvents,
+          ),
+        { message: `${message}：点击状态`, timeout: 3000 },
+      )
+      .toBe("auto");
+    return;
+  }
+
+  await expect
+    .poll(
+      () =>
+        magnifyButton.evaluate((node) =>
+          Number(window.getComputedStyle(node as HTMLElement).opacity),
+        ),
+      { message: `${message}：透明度`, timeout: 3000 },
+    )
+    .toBeLessThanOrEqual(0.01);
+  await expect
+    .poll(
+      () =>
+        magnifyButton.evaluate((node) =>
+          window.getComputedStyle(node as HTMLElement).pointerEvents,
+        ),
+      { message: `${message}：点击状态`, timeout: 3000 },
+    )
+    .toBe("none");
+};
+
 const clickNext = async (page: Parameters<typeof test>[0]["page"]) => {
   const nextButton = page.getByTestId("tutorial-next-button");
   await expect(nextButton).toBeVisible({ timeout: 2000 });
@@ -2177,13 +2315,14 @@ const saveMainFlowVisibleStep = async (
 };
 
 const expectMainFlowVisibleStepsCovered = async (
-  page: Parameters<typeof test>[0]["page"],
   observedStepIds: Set<string>,
+  expectedVisibleStepIds: string[],
 ) => {
-  const visibleStepIds = await readVisibleTutorialStepIds(page);
+  const visibleStepIds = Array.from(new Set(expectedVisibleStepIds)).sort();
+  const observedIds = Array.from(new Set(observedStepIds)).sort();
   expect(
-    Array.from(observedStepIds),
-    "主线教程每一张玩家可见提示卡都必须在同一条端到端链路中截图；隐藏自动桥接步骤不要求截图",
+    observedIds,
+    `主线教程每一张玩家可见提示卡都必须在同一条端到端链路中截图；隐藏自动桥接步骤不要求截图。实际截图步骤：${observedIds.join(", ")}；教程可见步骤：${visibleStepIds.join(", ")}`,
   ).toEqual(visibleStepIds);
 };
 
@@ -3280,6 +3419,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       ["betrayal-scenario-book-section-special"],
       "英雄剧本书目标页与图书馆原因",
     );
+    await expectTutorialCardDoesNotOverlapProtectedRegions(
+      page,
+      "英雄剧本书目标页与图书馆原因",
+    );
+    await expectScenarioReaderHasNoVisibleDuplicateViewerLabel(
+      page,
+      "英雄剧本书目标页",
+    );
     await saveScreenshot(page, STEP_HAUNT_NATURAL_05);
 
     await clickNext(page);
@@ -3287,6 +3434,10 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toContainText("点关闭回到牌桌");
     await expect(page.getByTestId("betrayal-scenario-reader-close")).toBeVisible();
     await expectTutorialCardInForeground(page, "点关闭回到牌桌");
+    await expectTutorialCardDoesNotOverlapProtectedRegions(
+      page,
+      "点关闭回到牌桌",
+    );
     await saveScreenshot(page, STEP_HAUNT_NATURAL_06);
 
     await page.getByTestId("betrayal-scenario-reader-close").click();
@@ -3516,10 +3667,13 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(scenarioObjectivePage).toContainText("英雄剧本书");
     await expect(
       page.getByTestId("betrayal-scenario-reader-header-progress"),
-    ).toContainText("2/2");
+    ).toContainText("1/1");
     await expect(
       page.getByTestId("betrayal-scenario-reader-prev-zone"),
-    ).toBeEnabled();
+    ).toBeDisabled();
+    await expect(
+      page.getByTestId("betrayal-scenario-reader-next-zone"),
+    ).toBeDisabled();
     await expect(scenarioObjectivePage).toContainText("敌方情报 / 胜利条件");
     await expect(scenarioObjectivePage).toContainText("真名");
     await expect(scenarioObjectivePage).toContainText("驱逐法术");
@@ -3963,7 +4117,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     ]);
   });
 
-  test("主线教程会从基础回合自然推进到第一次英雄目标行动", async ({
+  test("主线教程会从基础回合自然推进到作祟公开与英雄读本", async ({
     page,
     context,
   }) => {
@@ -3993,6 +4147,8 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toBeVisible({
       timeout: 15000,
     });
+    const expectedMainFlowVisibleStepIds = await readVisibleTutorialStepIds(page);
+    expect(expectedMainFlowVisibleStepIds).toContain("objective-and-turn");
     await expect(page.getByTestId("tutorial-next-button")).toBeVisible({
       timeout: 15000,
     });
@@ -4328,7 +4484,11 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await page.getByTestId("betrayal-event-roll-start").click();
     await waitForStep(page, "view-book", 30000);
     await expect(tutorialOverlayCard).toContainText("放大按钮");
-    await expect(tutorialOverlayCard).toContainText("读它的牌面");
+    await expect(tutorialOverlayCard).toContainText("查看牌面");
+    await expect(tutorialOverlayCard).toContainText("悬浮到书本本体");
+    await expect(tutorialOverlayCard).toContainText("触屏设备");
+    await expect(tutorialOverlayCard).toContainText("长按书本本体");
+    await expect(tutorialOverlayCard).toContainText("不会触发使用书本");
     await expect(tutorialOverlayCard).not.toContainText("使用书本本体");
     await expect(tutorialOverlayCard).not.toContainText("兔脚");
     await expect(tutorialOverlayCard).not.toContainText("其他玩家确认");
@@ -4347,12 +4507,37 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(
       page.getByTestId("betrayal-inventory-omen-book"),
     ).toHaveAttribute("data-event-roll-book-available", "true");
-    await expect(
-      page.getByTestId("betrayal-inventory-omen-book-magnify"),
-    ).toBeVisible();
+    const omenBook = page.getByTestId("betrayal-inventory-omen-book");
+    const omenBookMagnify = page.getByTestId(
+      "betrayal-inventory-omen-book-magnify",
+    );
+    const rabbitFootMagnify = page.getByTestId(
+      "betrayal-inventory-rope-magnify",
+    );
+    await expectInventoryMagnifyVisibility(
+      omenBookMagnify,
+      false,
+      "桌面端未悬浮书本时，放大镜不应提前显示",
+    );
+    await expectInventoryMagnifyVisibility(
+      rabbitFootMagnify,
+      false,
+      "桌面端未悬浮其它持有物时，同类放大镜也不应提前显示",
+    );
+    await omenBook.hover();
+    await expectInventoryMagnifyVisibility(
+      omenBookMagnify,
+      true,
+      "悬浮书本后，放大镜必须出现",
+    );
+    await expectInventoryMagnifyVisibility(
+      rabbitFootMagnify,
+      false,
+      "悬浮书本时，只显示书本自己的放大镜",
+    );
     await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
       "data-tutorial-highlight-target",
-      "betrayal-inventory-omen-book-magnify",
+      "betrayal-inventory-omen-book",
     );
     await saveMainFlowVisibleStep(
       page,
@@ -4361,7 +4546,7 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       mainFlowFullShot(20, "事件骰出现与书本可查看"),
     );
 
-    await page.getByTestId("betrayal-inventory-omen-book-magnify").click();
+    await omenBookMagnify.click();
     const bookPreviewBeforeUse = page.getByTestId(
       "betrayal-inventory-preview-overlay",
     );
@@ -5013,6 +5198,61 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         return stepId ?? "";
       }, { timeout: 10000 })
       .toBe("rabbit-foot-result");
+    const postRabbitFootConfirmationDiagnostics = await page.evaluate(() => {
+      const state = (
+        window as unknown as {
+          __BG_TEST_HARNESS__?: {
+            state?: {
+              get?: () => {
+                core?: {
+                  playerIds?: string[];
+                  seatControllers?: Record<string, { type?: string }>;
+                  recentRoll?: { id?: string };
+                  pendingEventRollResolution?: {
+                    rollId?: string;
+                    playerId?: string;
+                    requiredPlayerIds?: string[];
+                    acknowledgedPlayerIds?: string[];
+                    requiresAcknowledgement?: boolean;
+                  };
+                };
+              };
+            };
+          };
+        }
+      ).__BG_TEST_HARNESS__?.state?.get?.();
+      const button = document.querySelector<HTMLElement>(
+        '[data-testid="betrayal-discovery-continue"]',
+      );
+      return {
+        playerIds: state?.core?.playerIds ?? [],
+        seatControllers: state?.core?.seatControllers ?? null,
+        recentRollId: state?.core?.recentRoll?.id ?? null,
+        pendingEventRollResolution:
+          state?.core?.pendingEventRollResolution ?? null,
+        buttonText: button?.textContent ?? null,
+        buttonRequiredCount:
+          button?.getAttribute("data-event-roll-required-count") ?? null,
+      };
+    });
+    expect(postRabbitFootConfirmationDiagnostics.seatControllers).toMatchObject({
+      "0": { type: "human" },
+      "1": { type: "local-ai" },
+      "2": { type: "local-ai" },
+    });
+    expect(
+      postRabbitFootConfirmationDiagnostics.pendingEventRollResolution,
+    ).toMatchObject({
+      requiredPlayerIds: ["0"],
+      acknowledgedPlayerIds: [],
+      requiresAcknowledgement: true,
+    });
+    expect(postRabbitFootConfirmationDiagnostics.buttonText).toContain(
+      "确认 0/1",
+    );
+    expect(postRabbitFootConfirmationDiagnostics.buttonRequiredCount).toBe(
+      "1",
+    );
     const rabbitFootResultPlacement = await tutorialOverlayCard.getAttribute(
       "data-tutorial-placement",
     );
@@ -5415,7 +5655,9 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toContainText("结束回合");
     const libraryRoom = page.getByTestId("betrayal-room-upper-west");
     await expect(libraryRoom).toBeVisible({ timeout: 10000 });
-    await expect(libraryRoom).toContainText("图书馆");
+    await expect(libraryRoom).toContainText("未探索二层");
+    await expect(libraryRoom).not.toContainText("图书馆");
+    await expect(libraryRoom).toHaveAttribute("data-room-state", "unexplored");
     await expect(libraryRoom).toBeDisabled();
     await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
       "data-tutorial-highlight-target",
@@ -5576,6 +5818,14 @@ test.describe("山屋惊魂教程最小真实链路", () => {
       ["betrayal-scenario-book-section-special"],
       "默认主线英雄剧本书目标页与图书馆原因",
     );
+    await expectTutorialCardDoesNotOverlapProtectedRegions(
+      page,
+      "默认主线英雄剧本书目标页与图书馆原因",
+    );
+    await expectScenarioReaderHasNoVisibleDuplicateViewerLabel(
+      page,
+      "默认主线英雄剧本书目标页",
+    );
     await saveMainFlowVisibleStep(
       page,
       observedMainFlowStepIds,
@@ -5588,6 +5838,10 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(tutorialOverlayCard).toContainText("点关闭回到牌桌");
     await expect(page.getByTestId("betrayal-scenario-reader-close")).toBeVisible();
     await expectTutorialCardInForeground(page, "点关闭回到牌桌");
+    await expectTutorialCardDoesNotOverlapProtectedRegions(
+      page,
+      "默认主线点关闭回到牌桌",
+    );
     await saveMainFlowVisibleStep(
       page,
       observedMainFlowStepIds,
@@ -5600,15 +5854,15 @@ test.describe("山屋惊魂教程最小真实链路", () => {
     await expect(page.getByTestId("betrayal-runtime-header-grid")).toContainText(
       /作祟中|恶兆后|Haunt/i,
     );
-    await waitForStep(page, "open-library-move-after-goal", 30000);
     const visibleAfterMainReaderCloseStepIds = await readVisibleTutorialStepIds(page);
-    expect(visibleAfterMainReaderCloseStepIds).not.toContain("wait-for-hero-turn-after-haunt");
-    await expect(tutorialOverlayCard).toContainText("已经读到英雄目标");
-    await expect(tutorialOverlayCard).toContainText("先点“移动”");
-    await expect(tutorialOverlayCard).toContainText("从上层平台可前往的房间");
+    expect(visibleAfterMainReaderCloseStepIds).not.toContain("open-library-move-after-goal");
+    expect(visibleAfterMainReaderCloseStepIds).not.toContain("move-to-library-after-goal");
+    expect(visibleAfterMainReaderCloseStepIds).not.toContain("hero-study-name-roll");
+    expect(visibleAfterMainReaderCloseStepIds).not.toContain("hero-study-name-result");
+    expect(visibleAfterMainReaderCloseStepIds).not.toContain("hero-study-name-closeout");
     await expect
       .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "作祟读本关闭后正式轮序必须交回当前英雄",
+        message: "作祟读本关闭后隐藏回合交接必须回到当前英雄",
         timeout: 30000,
       })
       .toMatchObject({
@@ -5620,156 +5874,12 @@ test.describe("山屋惊魂教程最小真实链路", () => {
         mummyTrueNameFound: false,
       });
     await expect(page.getByTestId("betrayal-scenario-reader-dialog")).toBeHidden();
+    await expect(tutorialOverlayCard).toBeHidden({ timeout: 10000 });
 
-    await expect(page.getByTestId("betrayal-action-move")).toBeVisible();
-    await expect(page.getByTestId("betrayal-action-move")).toBeEnabled();
-    await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
-      "data-tutorial-highlight-target",
-      "betrayal-action-move",
-    );
-    await expectTutorialCardInForeground(page, "先点“移动”");
-    await saveMainFlowVisibleStep(
-      page,
+    await expectMainFlowVisibleStepsCovered(
       observedMainFlowStepIds,
-      "open-library-move-after-goal",
-      mainFlowFullShot(34, "读完目标后准备打开移动"),
+      expectedMainFlowVisibleStepIds,
     );
-
-    await page.getByTestId("betrayal-action-move").click();
-    await expectBetrayalMoveTargetsMatchDiscoveredRooms(
-      page,
-      "主线目标阅读后的移动",
-    );
-    await waitForStep(page, "move-to-library-after-goal", 10000);
-    await expect(tutorialOverlayCard).toContainText("图书馆现在是相邻移动目标");
-    await expect(tutorialOverlayCard).toContainText("点击图书馆移动进去");
-    await expect(tutorialOverlayCard).toContainText("进去后才能执行");
-    const postGoalLibraryRoom = page.getByTestId("betrayal-room-upper-west");
-    await expect(postGoalLibraryRoom).toBeVisible({ timeout: 10000 });
-    await expect(postGoalLibraryRoom).toBeEnabled();
-    await expect(postGoalLibraryRoom).toHaveAttribute("data-room-state", "discovered");
-    await expect(postGoalLibraryRoom).toHaveAttribute("data-room-visual-id", "library");
-    await expect(postGoalLibraryRoom).toContainText("图书馆");
-    await expect(page.getByTestId("betrayal-room-explore-target-upper-west")).toHaveCount(0);
-    await expect(page.getByTestId("tutorial-highlight-ring")).toHaveAttribute(
-      "data-tutorial-highlight-target",
-      "betrayal-room-upper-west",
-    );
-    await expectTutorialCardInForeground(page, "图书馆现在是相邻移动目标");
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "move-to-library-after-goal",
-      mainFlowFullShot(35, "图书馆成为可点击移动目标"),
-    );
-
-    await postGoalLibraryRoom.click();
-    await expect(
-      page.getByTestId("betrayal-room-occupant-upper-west-0"),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(
-      page.getByTestId("betrayal-visual-transition-blocker"),
-    ).toHaveCount(0, { timeout: 10000 });
-    await waitForStep(page, "hero-study-name-roll", 10000);
-    await expect(tutorialOverlayCard).toContainText("石棺房、研究室或图书馆");
-    await expect(tutorialOverlayCard).toContainText("你当前在图书馆");
-    await expect(tutorialOverlayCard).toContainText("寻找木乃伊真名");
-    await expect(tutorialOverlayCard).toContainText("6+ 知识检定");
-    await expect(page.getByTestId("betrayal-action-use")).toBeVisible();
-    await expect(page.getByTestId("betrayal-action-use")).toBeEnabled();
-    await expect(page.getByTestId("betrayal-action-use")).toContainText(
-        "寻找木乃伊真名",
-      );
-    await expectTutorialCardInForeground(page, "寻找木乃伊真名");
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "hero-study-name-roll",
-      mainFlowFullShot(36, "英雄寻找木乃伊真名入口"),
-    );
-
-    await page.getByTestId("betrayal-action-use").click();
-    await waitForStep(page, "hero-study-name-result", 10000);
-    const studyNameRollPanel = page.getByTestId("betrayal-recent-roll-panel");
-    await expect(studyNameRollPanel).toBeVisible({ timeout: 10000 });
-    await expect(studyNameRollPanel).toContainText("寻找木乃伊真名");
-    await expect(studyNameRollPanel).toContainText("知识检定");
-    await expect(studyNameRollPanel.getByTestId("betrayal-recent-roll-outcome"))
-      .toContainText("取得第 1 枚知识标记");
-    await expect(studyNameRollPanel.getByTestId("betrayal-recent-roll-total"))
-      .toContainText("总点数");
-    await expectVisiblePhysicalDiceBox(studyNameRollPanel);
-    await waitForPhysicalDiceSettled(studyNameRollPanel);
-    await expect
-      .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "寻找真名成功后必须写入第 1 枚知识标记，而不是只显示教程提示",
-        timeout: 10000,
-      })
-      .toMatchObject({
-        currentPlayer: "0",
-        phase: "haunt",
-        recentRollKind: "hauntActionTraitCheck",
-        recentRollDiceCount: 4,
-        recentRollSourceTitle: "寻找木乃伊真名",
-        recentRollLabel: "知识检定",
-        recentRollLatestLabel: "取得第 1 枚知识标记",
-        mummyKnowledgeTokenCount: 1,
-        mummyTrueNameFound: true,
-        mummyBanishmentSpellLearned: false,
-        recommendedAction: "endTurn",
-      });
-    await expect(tutorialOverlayCard).toContainText("检定成功");
-    await expect(tutorialOverlayCard).toContainText("点“确认”回到牌桌");
-    const studyNameContinueButton = page.getByTestId("betrayal-roll-continue");
-    await expect(studyNameContinueButton).toBeVisible();
-    await expect(studyNameContinueButton).toHaveAttribute(
-      "data-recent-roll-confirmed-count",
-      "0",
-    );
-    await expect(studyNameContinueButton).toHaveAttribute(
-      "data-recent-roll-required-count",
-      "1",
-    );
-    await expectTutorialCardInForeground(page, "检定成功");
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "hero-study-name-result",
-      mainFlowFullShot(37, "寻找真名知识检定成功"),
-    );
-
-    await studyNameContinueButton.click();
-    await waitForStep(page, "hero-study-name-closeout", 10000);
-    await expect(page.getByTestId("betrayal-recent-roll-panel")).toBeHidden();
-    await expect(tutorialOverlayCard).toContainText("结果已经落到英雄目标进度上");
-    await expect(tutorialOverlayCard).toContainText("每名英雄每回合只能尝试一个");
-    await expect(tutorialOverlayCard).toContainText("结束回合");
-    await expect(page.getByTestId("betrayal-action-endTurn")).toBeVisible();
-    await expect(page.getByTestId("betrayal-action-endTurn")).toBeEnabled();
-    await expect
-      .poll(() => readBetrayalHauntTutorialState(page), {
-        message: "确认找真名结果后必须关闭投骰层并回到结束回合入口",
-        timeout: 10000,
-      })
-      .toMatchObject({
-        currentPlayer: "0",
-        currentExplorerRoomId: "upper-west",
-        phase: "haunt",
-        recentRollKind: null,
-        mummyKnowledgeTokenCount: 1,
-        mummyTrueNameFound: true,
-        mummyBanishmentSpellLearned: false,
-        recommendedAction: "endTurn",
-    });
-    await expectTutorialCardInForeground(page, "结果已经落到英雄目标进度上");
-    await saveMainFlowVisibleStep(
-      page,
-      observedMainFlowStepIds,
-      "hero-study-name-closeout",
-      mainFlowFullShot(38, "确认后回到牌桌可结束回合"),
-    );
-
-    await expectMainFlowVisibleStepsCovered(page, observedMainFlowStepIds);
 
     assertNoFatalFrontendErrors([
       { label: "betrayal-tutorial-main-player-path", diagnostics },

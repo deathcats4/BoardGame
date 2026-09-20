@@ -111,6 +111,27 @@ describe('国际事件四派系资源与静态合同', () => {
         expect(allSlots).not.toEqual(expect.arrayContaining([51, 52, 53, 54, 55]));
     });
 
+    it('火枪手静态名称与中文本地化名称保持一致', () => {
+        const zhLocale = JSON.parse(readFileSync('public/locales/zh-CN/game-smashup.json', 'utf8')) as {
+            cards?: Record<string, { name?: string }>;
+        };
+        const expectedNames: Record<string, string> = {
+            musketeers_biding_time: '等待时机',
+            musketeers_to_battle: '投入战斗！',
+            musketeers_token_of_affection: '情谊信物',
+            musketeers_porthos: '波尔托斯',
+            musketeers_athos: '阿多斯',
+            musketeers_dartagnan: '达达尼昂',
+            musketeers_aramis: '阿拉密斯',
+        };
+        const definitions = new Map(getFactionCards(SMASHUP_FACTION_IDS.MUSKETEERS).map(card => [card.id, card]));
+
+        for (const [defId, expectedName] of Object.entries(expectedNames)) {
+            expect(definitions.get(defId)?.name, `${defId} static name`).toBe(expectedName);
+            expect(zhLocale.cards?.[defId]?.name, `${defId} locale name`).toBe(expectedName);
+        }
+    });
+
     it('8 张国际事件基地按派系返回，且槽位使用合同一致', () => {
         expect(INTERNATIONAL_INCIDENT_BASES).toHaveLength(8);
 

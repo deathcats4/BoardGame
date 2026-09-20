@@ -21,6 +21,7 @@ import {
 } from '../domain/abilityCatalog';
 import { MageWarsDomain } from '../domain';
 import { MAGE_WARS_COMMANDS } from '../domain/commands';
+import { MAGE_WARS_EVENTS } from '../domain/events';
 import {
     buildMageWarsObjectAbilityActivationOpportunity,
     MAGE_WARS_OBJECT_ABILITY_EXECUTION_TAG,
@@ -251,10 +252,8 @@ describe('mage-wars ability catalog', () => {
         const needsCodeIds = mageWarsAbilityRegistry.getByTag('implementation:needs-code')
             .map((def) => def.id)
             .sort();
-        expect(needsCodeIds).toHaveLength(62);
-        expect(needsCodeIds).toEqual(expect.arrayContaining([
-            getMageWarsSpellAbilityId(1804),
-        ]));
+        expect(needsCodeIds).toHaveLength(26);
+        expect(needsCodeIds).not.toContain(getMageWarsSpellAbilityId(1804));
         expect(needsCodeIds).not.toContain(getMageWarsSpellAbilityId(3407));
         expect(needsCodeIds).not.toContain(getMageWarsSpellAbilityId(2500));
         expect(needsCodeIds).not.toContain(getMageWarsSpellAbilityId(25700));
@@ -271,6 +270,7 @@ describe('mage-wars ability catalog', () => {
             familyBySpellCardId(1701),
             familyBySpellCardId(3405),
             familyBySpellCardId(1913),
+            familyBySpellCardId(1804),
         ];
 
         expect(families).toEqual([
@@ -278,20 +278,21 @@ describe('mage-wars ability catalog', () => {
             'zone-attack',
             'zone-healing',
             'visible-area-enchantment',
+            'visible-object-enchantment',
         ]);
         expect(families).not.toContain('zone-target');
     });
 
-    test('throws a contract error when execution is reached without a spell-cast family', () => {
+    test('executes a fully contracted visible object enchantment family', () => {
         const spellCardId = 1804;
         const spell = getMageWarsSpellCardFromConfig(spellCardId);
         expect(spell).toBeDefined();
 
-        expect(() => executeMageWarsSpellAbility({
+        const events = executeMageWarsSpellAbility({
             ownerId: '0',
             timestamp: 104,
             state: makeMageWarsAbilityState({
-                mageId: MAGE_IDS.BEASTMASTER_APPRENTICE,
+                mageId: MAGE_IDS.WARLOCK_APPRENTICE,
                 mana: 20,
                 phase: 'creatureAction',
             }),
@@ -300,28 +301,41 @@ describe('mage-wars ability catalog', () => {
                 playerId: '0',
                 payload: {
                     spellCardId,
-                    manaCost: 8,
-                    targetPlayerId: '1',
+                    manaCost: 5,
+                    targetObjectId: 'blue-gremlin-1',
                 },
             },
             random: fixedRandom,
             spell: spell!,
-            manaCost: 8,
-        })).toThrow(/without a spell-cast family/);
+            manaCost: 5,
+        });
+
+        expect(events).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.ARENA_OBJECT_SUMMONED,
+                payload: {
+                    object: expect.objectContaining({
+                        sourceSpellCardId: spellCardId,
+                        revealed: true,
+                        anchoredToObjectId: 'blue-gremlin-1',
+                    }),
+                },
+            }),
+        ]));
     });
 
     test('tracks standard starting spell effects separately from code gaps', () => {
         expect(summarizeMageWarsAbilityGaps()).toEqual({
             total: 153,
-            implemented: 91,
-            needsCode: 62,
+            implemented: 127,
+            needsCode: 26,
             bySpellType: {
-                '攻击': { total: 12, implemented: 10, needsCode: 2 },
-                '结界': { total: 38, implemented: 22, needsCode: 16 },
+                '攻击': { total: 12, implemented: 12, needsCode: 0 },
+                '结界': { total: 38, implemented: 35, needsCode: 3 },
                 '魔物': { total: 15, implemented: 4, needsCode: 11 },
-                '生物': { total: 33, implemented: 25, needsCode: 8 },
-                '咒语': { total: 28, implemented: 15, needsCode: 13 },
-                '装备': { total: 27, implemented: 15, needsCode: 12 },
+                '生物': { total: 33, implemented: 32, needsCode: 1 },
+                '咒语': { total: 28, implemented: 25, needsCode: 3 },
+                '装备': { total: 27, implemented: 19, needsCode: 8 },
             },
         });
 

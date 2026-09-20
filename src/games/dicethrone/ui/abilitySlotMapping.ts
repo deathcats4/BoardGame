@@ -181,6 +181,17 @@ const CHARACTER_SLOT_ABILITY_OVERRIDES: Record<string, Record<string, string[]>>
         meditate: ['undying'],
         ultimate: ['bloody-slaughter'],
     },
+    zhizhuxia: {
+        fist: ['heavy-punch'],
+        chi: ['combo-strike'],
+        sky: ['trap'],
+        lotus: ['venom-punch'],
+        combo: ['wall-crawl'],
+        lightning: ['spider-reflex'],
+        calm: ['counter'],
+        meditate: ['spider-sense'],
+        ultimate: ['ultimate-spider'],
+    },
 };
 
 const CURSED_PIRATE_NORMAL_SLOT_ABILITY_OVERRIDES: Record<string, string[]> = {

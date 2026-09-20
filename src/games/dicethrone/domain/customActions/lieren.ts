@@ -27,7 +27,13 @@ function handleNyraEffect(context: CustomActionContext): DiceThroneEvent[] {
     if ((effect === 'heal' || effect === 'grant-bond-and-heal') && amount > 0) {
         events.push({
             type: 'COMPANION_HEALTH_CHANGED',
-            payload: { playerId: context.attackerId, companionId: 'nyra', delta: amount, sourceAbilityId: context.sourceAbilityId },
+            payload: {
+                playerId: context.attackerId,
+                companionId: 'nyra',
+                delta: amount,
+                active: player.companion.active,
+                sourceAbilityId: context.sourceAbilityId,
+            },
             sourceCommandType: 'ABILITY_EFFECT',
             timestamp: context.timestamp + events.length,
         });
@@ -67,7 +73,13 @@ function handleKindredBond(context: CustomActionContext): DiceThroneEvent[] {
     if (healAmount > 0) {
         events.push({
             type: 'COMPANION_HEALTH_CHANGED',
-            payload: { playerId: context.attackerId, companionId: 'nyra', delta: healAmount, sourceAbilityId: context.sourceAbilityId },
+            payload: {
+                playerId: context.attackerId,
+                companionId: 'nyra',
+                delta: healAmount,
+                active: player.companion.active,
+                sourceAbilityId: context.sourceAbilityId,
+            },
             sourceCommandType: 'ABILITY_EFFECT',
             timestamp: context.timestamp + events.length,
         });

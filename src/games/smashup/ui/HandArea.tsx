@@ -272,6 +272,7 @@ const HandCard: React.FC<HandCardProps> = ({
         <motion.div
             data-card-uid={card.uid}
             data-selected={isSelected ? 'true' : 'false'}
+            data-discard-selected={isDiscardSelected ? 'true' : 'false'}
             data-highlighted={isHighlighted ? 'true' : 'false'}
             data-disabled={isDisabled ? 'true' : 'false'}
             className={`

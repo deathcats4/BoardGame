@@ -49,6 +49,7 @@ import { isBaseAbilitySuppressed } from './ongoingEffects';
 import { registerBaseAbilityAsQueuedTrigger } from './baseAbilityQueue';
 import { resolveLiveBaseIndex } from './utils';
 import { shouldGenerateSmashUpPodAlias } from './variantBindingRuntime';
+import { getEffectiveBaseAbilitySourceIds } from './effectiveBaseAbilities';
 import {
     appendPendingPostScoringActions,
     getDeferredReplacementBaseDefId,
@@ -461,6 +462,32 @@ export function triggerActiveBaseAbility(
     return entry.executor(ctx);
 }
 
+export function getActiveBaseAbilitySources(state: SmashUpCore, baseIndex: number): string[] {
+    return getEffectiveBaseAbilitySourceIds(state, baseIndex)
+        .filter(sourceDefId => activeBaseAbilityRegistry.has(sourceDefId));
+}
+
+export function triggerActiveBaseAbilities(ctx: BaseAbilityContext): BaseAbilityResult {
+    if (isBaseAbilitySuppressed(ctx.state, ctx.baseIndex)) return { events: [] };
+    const events: SmashUpEvent[] = [];
+    let matchState = ctx.matchState;
+    for (const sourceDefId of getActiveBaseAbilitySources(ctx.state, ctx.baseIndex)) {
+        const entry = activeBaseAbilityRegistry.get(sourceDefId);
+        if (!entry) continue;
+        const result = entry.executor({
+            ...ctx,
+            baseDefId: sourceDefId,
+            matchState,
+        });
+        events.push(...result.events);
+        if (result.matchState) matchState = result.matchState;
+    }
+    return {
+        events,
+        ...(matchState ? { matchState } : {}),
+    };
+}
+
 /** 触发所有基地在指定时机的能力 */
 export function triggerAllBaseAbilities(
     timing: BaseTriggerTiming,
@@ -491,9 +518,15 @@ export function triggerAllBaseAbilities(
             minionDefId: minionContext?.minionDefId,
             minionPower: minionContext?.minionPower,
             now };
-        const result = triggerBaseAbility(base.defId, timing, ctx);
-        events.push(...result.events);
-        if (result.matchState) ms = result.matchState;
+        for (const sourceDefId of getEffectiveBaseAbilitySourceIds(state, i)) {
+            const result = triggerBaseAbility(sourceDefId, timing, {
+                ...ctx,
+                baseDefId: sourceDefId,
+                matchState: ms,
+            });
+            events.push(...result.events);
+            if (result.matchState) ms = result.matchState;
+        }
     }
     return { events, matchState: ms };
 }

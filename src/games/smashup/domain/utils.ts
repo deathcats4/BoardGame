@@ -538,6 +538,34 @@ export function findSpecificExtraMinionPlay(
         });
 }
 
+export type SpecificExtraActionPlay = NonNullable<PlayerState['specificExtraActionPlays']>[number];
+
+export type SpecificExtraActionPlayMatch = {
+    entry: SpecificExtraActionPlay;
+    index: number;
+};
+
+/** 查找当前出牌是否能消费“只能打指定这张行动”的额外行动机会。 */
+export function findSpecificExtraActionPlay(
+    player: PlayerState | undefined,
+    params: {
+        cardUid: string;
+        defId?: string;
+        targetBaseIndex?: number;
+        targetMinionUid?: string;
+    },
+): SpecificExtraActionPlayMatch | undefined {
+    if (!player?.specificExtraActionPlays?.length) return undefined;
+    return player.specificExtraActionPlays
+        .map((entry, index) => ({ entry, index }))
+        .find(({ entry }) => (
+            entry.cardUid === params.cardUid
+            && (entry.restrictToCardDefId === undefined || entry.restrictToCardDefId === params.defId)
+            && (entry.restrictToBase === undefined || entry.restrictToBase === params.targetBaseIndex)
+            && (entry.restrictToMinionUid === undefined || entry.restrictToMinionUid === params.targetMinionUid)
+        ));
+}
+
 /**
  * 判断这次打出是否“只能”消耗指定基地的基地限定随从额度。
  *

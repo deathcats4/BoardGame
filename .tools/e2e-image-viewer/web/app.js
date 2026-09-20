@@ -21,7 +21,6 @@ const indexList = document.querySelector("#indexList");
 const empty = document.querySelector("#empty");
 
 const MIN_SCALE = 0.12;
-const MAX_SCALE = 4;
 const TILE_WIDTH = 360;
 const TILE_GAP = 26;
 const LABEL_HEIGHT = 34;
@@ -50,6 +49,7 @@ let indexCollapsed = false;
 let lastAppliedFocusToken = "";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const clampScale = (value) => Math.max(MIN_SCALE, value);
 
 const formatBytes = (value) => {
   if (!Number.isFinite(value)) return "";
@@ -273,7 +273,7 @@ const copyPath = async (item) => {
 const centerItem = (item) => {
   const entry = positionedItems.find((candidate) => candidate.item.relativePath === item.relativePath);
   if (!entry) return;
-  const scale = clamp(Math.max(transform.scale, FOCUS_SCALE), MIN_SCALE, MAX_SCALE);
+  const scale = clampScale(Math.max(transform.scale, FOCUS_SCALE));
   transform = {
     x: viewport.clientWidth / 2 - (entry.x + entry.width / 2) * scale,
     y: viewport.clientHeight / 2 - (entry.y + entry.height / 2) * scale,
@@ -387,7 +387,7 @@ const scheduleVisibleRender = () => {
 const zoomAt = (clientX, clientY, nextScale) => {
   const rect = viewport.getBoundingClientRect();
   const oldScale = transform.scale;
-  const scale = clamp(nextScale, MIN_SCALE, MAX_SCALE);
+  const scale = clampScale(nextScale);
   const px = clientX - rect.left;
   const py = clientY - rect.top;
   const boardX = (px - transform.x) / oldScale;
@@ -404,7 +404,7 @@ const fitView = () => {
   if (items.length === 0) return;
   const availableWidth = Math.max(1, viewport.clientWidth - 80);
   const availableHeight = Math.max(1, viewport.clientHeight - 80);
-  const scale = clamp(Math.min(availableWidth / boardSize.width, availableHeight / boardSize.height, 1), MIN_SCALE, MAX_SCALE);
+  const scale = clampScale(Math.min(availableWidth / boardSize.width, availableHeight / boardSize.height, 1));
   transform = {
     x: (viewport.clientWidth - boardSize.width * scale) / 2,
     y: (viewport.clientHeight - boardSize.height * scale) / 2,

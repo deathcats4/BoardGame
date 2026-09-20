@@ -339,7 +339,7 @@ export const InteractionOverlay: React.FC<InteractionOverlayProps> = ({
             <div
                 data-testid="dt-card-pool-overlay"
                 data-card-pool-layout="center-stage"
-                data-card-pool-hand-protection="preserve-visible-hand"
+                data-card-pool-hand-protection="shared-stage-visible-hand"
                 data-card-pool-browse-mode="grid-scroll"
                 className="fixed inset-0 pointer-events-none"
                 style={{ zIndex: UI_Z_INDEX.overlay }}
@@ -412,7 +412,8 @@ export const InteractionOverlay: React.FC<InteractionOverlayProps> = ({
                         <div
                             data-testid="dt-card-pool-selection"
                             data-card-pool-kind={isDeckCardSelection ? 'deck' : 'hand'}
-                            className="scrollbar-thin mx-auto max-h-[min(34vh,22rem)] w-full overflow-y-auto overflow-x-hidden px-1 py-3 [scrollbar-color:rgba(248,113,113,0.42)_transparent]"
+                            data-card-pool-visible-rows="two"
+                            className="scrollbar-thin mx-auto max-h-[min(40vh,28rem)] w-full overflow-y-auto overflow-x-hidden px-1 py-3 [scrollbar-color:rgba(248,113,113,0.42)_transparent]"
                         >
                             <div
                                 data-testid="dt-card-pool-track"

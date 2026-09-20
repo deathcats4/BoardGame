@@ -324,6 +324,9 @@ export function buildLatestDiscoveryDisplayEntry(
   if (isEventSymbolNoCardDiscovery(core.latestDiscovery)) {
     return null;
   }
+  if (isNoEffectRoomDiscovery(core.latestDiscovery)) {
+    return null;
+  }
   const isHauntRollForOwner = Boolean(
     core.latestDiscovery.kind === "omen" &&
       core.recentRoll?.kind === "hauntRoll" &&
@@ -672,6 +675,16 @@ function resolveLatestDiscoveryDisplaySummary(
   return summary
     .replace(/[；;]\s*没有事件、物品或预兆发现牌[。.]?\s*$/, "")
     .trim();
+}
+
+function isNoEffectRoomDiscovery(
+  discovery: BetrayalDiscoverySummary | null,
+): boolean {
+  return Boolean(
+    discovery?.kind === "none" &&
+      (discovery.resolutionSteps?.length ?? 0) === 0 &&
+      discovery.detail.trim() === "没有事件、物品或预兆发现牌",
+  );
 }
 
 function resolveLatestDiscoveryPendingCardResolution(options: {
