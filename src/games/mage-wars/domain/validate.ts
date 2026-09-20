@@ -62,6 +62,7 @@ import {
     isMageWarsLivingArenaObject,
     isMageWarsBanishedArenaObject,
     isMageWarsCorporealCreatureArenaObject,
+    isMageWarsCorporealCreatureArenaObject,
     isMageWarsObjectDefenseProfileReady,
     isMageWarsObjectAttackTargetInRange,
     isMageWarsRangedObjectAttackForbiddenTarget,
@@ -555,6 +556,33 @@ function validateMageWarsBanishSpellCast(ctx: MageWarsSpellCastValidationContext
     const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
     if (!targetObject || targetObject.kind !== 'creature' || isMageWarsBanishedArenaObject(targetObject)) {
         return invalid('invalidTargetObject');
+    }
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetObject.zoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    return { valid: true };
+}
+
+function validateMageWarsBattleFurySpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, command, costResolution, rangePlayer } = ctx;
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.targetWallEdgeId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+        || command.payload.boundSpellCardId !== undefined
+    ) return invalid('invalidTargetMode');
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || !isMageWarsCorporealCreatureArenaObject(targetObject) || isMageWarsBanishedArenaObject(targetObject)) {
+        return invalid('invalidTargetObject');
+    }
+    if (targetObject.temporaryTraits?.battleFuryRoundNumber === state.core.turnNumber) {
+        return invalid('spellAlreadyUsedThisRound');
     }
     if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetObject.zoneId)) {
         return invalid('targetOutOfRange');
@@ -1126,6 +1154,7 @@ function validateMageWarsKnockdownSpellCast(ctx: MageWarsSpellCastValidationCont
 }
 
 const MAGE_WARS_SPELL_CAST_FAMILY_VALIDATORS: Record<MageWarsSpellCastChoiceFamily, MageWarsSpellCastFamilyValidator> = {
+    'battle-fury': validateMageWarsBattleFurySpellCast,
     banish: validateMageWarsBanishSpellCast,
     'bloodstrike': validateMageWarsBloodstrikeSpellCast,
     'call-of-the-wild': validateMageWarsCallOfTheWildSpellCast,

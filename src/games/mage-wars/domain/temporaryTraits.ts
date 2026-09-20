@@ -12,6 +12,7 @@ export type MageWarsTemporaryTraitId =
     | 'vampiric'
     | 'pierce'
     | 'unavoidable'
+    | 'battleFury'
     | 'elusive';
 
 export interface MageWarsTemporaryTraitGain {
@@ -22,6 +23,7 @@ export interface MageWarsTemporaryTraitGain {
     vampiricNextMelee?: boolean;
     nextMeleePierceModifier?: number;
     nextMeleeUnavoidable?: boolean;
+    battleFuryRoundNumber?: number;
 }
 
 export interface MageWarsTemporaryTraitReader {
@@ -93,6 +95,10 @@ export function getTemporaryTraitIdsForTurnCleanup(
     if (hasTemporaryVampiricNextMelee(reader)) traitIds.push('vampiric');
     if (getTemporaryNextMeleePierceModifier(reader) > 0) traitIds.push('pierce');
     if (hasTemporaryNextMeleeUnavoidable(reader)) traitIds.push('unavoidable');
+    if (
+        reader.temporaryTraits?.battleFuryRoundNumber !== undefined
+        && reader.temporaryTraits.battleFuryRoundNumber !== turnNumber
+    ) traitIds.push('battleFury');
     return traitIds;
 }
 
@@ -155,6 +161,10 @@ export function applyTemporaryTraitGain(
     }
     if (gain.nextMeleeUnavoidable === true) {
         temporaryTraits.nextMeleeUnavoidable = true;
+    }
+    if (gain.battleFuryRoundNumber !== undefined) {
+        temporaryTraits.battleFuryRoundNumber = gain.battleFuryRoundNumber;
+        temporaryTraits.battleFuryExtraAttackAvailable = false;
     }
 
     return withTemporaryTraits(object, temporaryTraits);
@@ -235,6 +245,10 @@ export function clearTemporaryTraits(
                 break;
             case 'unavoidable':
                 delete nextTraits.nextMeleeUnavoidable;
+                break;
+            case 'battleFury':
+                delete nextTraits.battleFuryRoundNumber;
+                delete nextTraits.battleFuryExtraAttackAvailable;
                 break;
         }
     }
