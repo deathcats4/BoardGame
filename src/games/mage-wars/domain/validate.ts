@@ -62,7 +62,6 @@ import {
     isMageWarsLivingArenaObject,
     isMageWarsBanishedArenaObject,
     isMageWarsCorporealCreatureArenaObject,
-    isMageWarsCorporealCreatureArenaObject,
     isMageWarsObjectDefenseProfileReady,
     isMageWarsObjectAttackTargetInRange,
     isMageWarsRangedObjectAttackForbiddenTarget,
