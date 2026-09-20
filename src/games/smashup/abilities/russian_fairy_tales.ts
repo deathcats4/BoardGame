@@ -20,7 +20,6 @@ import {
     grantContextualExtraAction,
     inspectDeck,
     revealDeckTop,
-    shuffleHandIntoDeck,
 } from '../domain/abilityHelpers';
 import {
     createEffectProgram,
@@ -40,7 +39,6 @@ import type {
     CardTransferredEvent,
     CardsDrawnEvent,
     DeckReorderedEvent,
-    HandShuffledIntoDeckEvent,
     MinionOnBase,
     MinionPlayedEvent,
     SmashUpCore,
@@ -104,6 +102,7 @@ type RussianPromptContext = {
 
 type FoolishMagicianContext = RussianPromptContext & {
     random: RandomFn;
+    drawnUids: string[];
 };
 
 type SearchPromptRuntimeContext = RussianPromptContext & {
@@ -354,7 +353,7 @@ function buildPlayMinionOffTopEvents(params: {
         ),
     ];
     if (minionIndex < 0) {
-        events.push(deckReordered(params.playFromPlayerId, virtualDeck, params.random, params.reason, params.now, { shuffle: false }));
+        events.push(deckReordered(params.playFromPlayerId, virtualDeck, params.random, params.reason, params.now));
         return { events };
     }
     const played = virtualDeck[minionIndex];
@@ -368,7 +367,7 @@ function buildPlayMinionOffTopEvents(params: {
         params.now,
         'deck',
     ));
-    events.push(deckReordered(params.playFromPlayerId, remaining, params.random, params.reason, params.now, { shuffle: false }));
+    events.push(deckReordered(params.playFromPlayerId, remaining, params.random, params.reason, params.now));
     return { events, playedMinionUid: played.uid };
 }
 
@@ -556,15 +555,17 @@ const russianSearchPromptAfterEventsProgram = createEffectProgram<SearchPromptAf
     },
 );
 
-const foolishMagicianPromptProgram = createPromptProgram<RussianPromptContext, SmashUpCore, SmashUpEvent>({
+const foolishMagicianPromptProgram = createPromptProgram<FoolishMagicianContext, SmashUpCore, SmashUpEvent>({
     sourceId: 'russian_fairy_tales_foolish_magician',
     buildInteraction: (context) => {
-        const hand = context.matchState.core.players[context.playerId]?.hand ?? [];
-        const count = Math.min(3, hand.length);
+        const drawnUidSet = new Set(context.drawnUids);
+        const hand = (context.matchState.core.players[context.playerId]?.hand ?? [])
+            .filter(card => drawnUidSet.has(card.uid));
+        const count = hand.length;
         return createSimpleChoice<CardChoice>(
             `russian_fairy_tales_foolish_magician_${context.now}`,
             context.playerId,
-            '愚蠢的魔术师：选择三张手牌放到牌库顶和/或底',
+            '愚蠢的魔术师：选择本次抽到的牌放到牌库顶和/或底',
             hand.flatMap((card, index) => [
                 {
                     id: `top-${index}`,
@@ -588,10 +589,12 @@ const foolishMagicianPromptProgram = createPromptProgram<RussianPromptContext, S
             },
         );
     },
-    onResolve: ({ state, playerId, value, timestamp }) => {
+    onResolve: ({ context, state, playerId, value, timestamp }) => {
         const choices = (Array.isArray(value) ? value : [value]) as CardChoice[];
-        const hand = state.core.players[playerId]?.hand ?? [];
-        const requiredCount = Math.min(3, hand.length);
+        const drawnUidSet = new Set(context.drawnUids);
+        const hand = (state.core.players[playerId]?.hand ?? [])
+            .filter(card => drawnUidSet.has(card.uid));
+        const requiredCount = hand.length;
         const seen = new Set<string>();
         const top: CardInstance[] = [];
         const bottom: CardInstance[] = [];
@@ -609,13 +612,13 @@ const foolishMagicianPromptProgram = createPromptProgram<RussianPromptContext, S
         if (seen.size !== requiredCount) return { events: [] };
         const events: SmashUpEvent[] = [];
         for (const card of [...top].reverse()) {
-            events.push(cardToDeckTop(card, card.owner, 'russian_fairy_tales_foolish_magician', timestamp, playerId));
+            events.push(cardToDeckTop(card, playerId, 'russian_fairy_tales_foolish_magician', timestamp, playerId));
         }
         for (const card of bottom) {
             events.push(...buildValidatedCardToDeckBottomEvents(state, {
                 cardUid: card.uid,
                 defId: card.defId,
-                ownerId: card.owner,
+                ownerId: playerId,
                 expectedLocation: 'hand',
                 sourcePlayerId: playerId,
                 sourceDefId: 'russian_fairy_tales_foolish_magician',
@@ -638,6 +641,8 @@ const foolishMagicianPromptAfterCommittedDrawProgram = createEffectProgram<Fooli
                 matchState: context.matchState,
                 playerId: context.playerId,
                 now: context.now,
+                random: context.random,
+                drawnUids: context.drawnUids,
             },
             nextProgram: foolishMagicianPromptProgram,
         };
@@ -645,17 +650,23 @@ const foolishMagicianPromptAfterCommittedDrawProgram = createEffectProgram<Fooli
 );
 
 const foolishMagicianProgram = createEffectProgram<FoolishMagicianContext, SmashUpCore, SmashUpEvent>(
-    (context) => ({
-        events: buildStandardDrawEvents(
+    (context) => {
+        const events = buildStandardDrawEvents(
             context.matchState.core,
             context.playerId,
             3,
             context.random,
             context.now,
-        ),
-        context,
-        nextProgram: foolishMagicianPromptAfterCommittedDrawProgram,
-    }),
+        );
+        const drawnUids = events
+            .filter((event): event is CardsDrawnEvent => event.type === SU_EVENTS.CARDS_DRAWN)
+            .flatMap(event => event.payload.cardUids);
+        return {
+            events,
+            context: { ...context, drawnUids },
+            nextProgram: foolishMagicianPromptAfterCommittedDrawProgram,
+        };
+    },
 );
 
 const frogPrincessAttachProgram = createEffectProgram<FrogPrincessAttachContext, SmashUpCore, SmashUpEvent>(
@@ -990,6 +1001,7 @@ function foolishMagician(ctx: AbilityContext): AbilityResult {
         playerId: ctx.playerId,
         random: ctx.random,
         now: ctx.now,
+        drawnUids: [],
     }));
 }
 
@@ -1035,19 +1047,51 @@ function toad(ctx: AbilityContext): AbilityResult {
 
 function massTransformation(ctx: AbilityContext): AbilityResult {
     const events: SmashUpEvent[] = [];
-    for (const playerId of getTurnOrderPlayers(ctx.state)) {
+    const playerIds = getTurnOrderPlayers(ctx.state);
+    const projectedDecks = new Map<PlayerId, CardInstance[]>();
+    for (const playerId of playerIds) {
         const player = ctx.state.players[playerId];
-        if (!player || player.hand.length === 0) continue;
-        const newDeck = ctx.random.shuffle([...player.deck, ...player.hand]);
-        events.push(shuffleHandIntoDeck(
-            playerId,
-            newDeck.map(card => card.uid),
-            'russian_fairy_tales_mass_transformation',
-            ctx.now,
-        ) as HandShuffledIntoDeckEvent);
+        if (player) projectedDecks.set(playerId, [...player.deck]);
+    }
+
+    // The generic action pipeline resolves onPlay before removing the source action
+    // from hand, so exclude that source card from the mass transformation itself.
+    // Then put every remaining hand card on the true owner's deck bottom before any
+    // player draws. This preserves borrowed-card provenance and keeps each draw
+    // count tied to the eligible hand size instead of the pre-transfer deck snapshot.
+    const eligibleHandCounts = new Map<PlayerId, number>();
+    for (const playerId of playerIds) {
+        const player = ctx.state.players[playerId];
+        const handCards = player?.hand.filter(card => card.uid !== ctx.cardUid) ?? [];
+        if (!player || handCards.length === 0) continue;
+        eligibleHandCounts.set(playerId, handCards.length);
+        for (const card of handCards) {
+            const ownerId = ctx.state.players[card.owner] ? card.owner : playerId;
+            events.push(...buildValidatedCardToDeckBottomEvents(ctx.state, {
+                cardUid: card.uid,
+                defId: card.defId,
+                ownerId,
+                sourcePlayerId: playerId,
+                sourceCardUid: ctx.cardUid,
+                sourceDefId: 'russian_fairy_tales_mass_transformation',
+                sourceControllerId: ctx.playerId,
+                sourceBaseIndex: ctx.baseIndex,
+                locationPlayerId: playerId,
+                expectedLocation: 'hand',
+                reason: 'russian_fairy_tales_mass_transformation',
+                now: ctx.now,
+            }));
+            projectedDecks.get(ownerId)?.push(card);
+        }
+    }
+
+    for (const playerId of playerIds) {
+        const handCount = eligibleHandCounts.get(playerId) ?? 0;
+        if (handCount === 0) continue;
+        const projectedDeck = projectedDecks.get(playerId) ?? [];
         events.push(buildCardsDrawn(
             playerId,
-            newDeck.slice(0, player.hand.length).map(card => card.uid),
+            projectedDeck.slice(0, handCount).map(card => card.uid),
             ctx.now,
         ));
     }
@@ -1387,7 +1431,7 @@ export function registerRussianFairyTalesInteractionHandlers(): void {
         return {
             state,
             events: [
-                cardToDeckTop(card, card.owner, 'russian_fairy_tales_the_water_of_life', timestamp, playerId),
+                cardToDeckTop(card, playerId, 'russian_fairy_tales_the_water_of_life', timestamp, playerId),
                 grantContextualExtraAction({ playerId, now: timestamp, matchState: state }, 'russian_fairy_tales_the_water_of_life'),
             ],
         };
@@ -1431,7 +1475,7 @@ export function registerRussianFairyTalesInteractionHandlers(): void {
         if (!card || !isMinionCard(card)) return { state, events: [] };
         return {
             state,
-            events: [cardToDeckTop(card, card.owner, 'russian_fairy_tales_tsar_eagle', timestamp, playerId)],
+            events: [cardToDeckTop(card, targetPlayerId, 'russian_fairy_tales_tsar_eagle', timestamp, playerId)],
         };
     });
 
@@ -1557,7 +1601,7 @@ export function registerRussianFairyTalesInteractionHandlers(): void {
             minionUid: source.uid,
             minionDefId: source.defId,
             fromBaseIndex: context.sourceBaseIndex,
-            toPlayerId: source.owner,
+            toPlayerId: playerId,
             reason: 'russian_fairy_tales_finist_the_falcon',
             now: timestamp,
             sourcePlayerId: playerId,

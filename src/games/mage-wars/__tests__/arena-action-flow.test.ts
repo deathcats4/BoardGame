@@ -1284,6 +1284,7 @@ describe('mage-wars arena action flow', () => {
                         ...summoned.state.core.players['0'],
                         mana: 10,
                         actionReady: true,
+                        quickcastReady: true,
                         preparedSpellCardIds: [conjurationSpellId],
                     },
                 },

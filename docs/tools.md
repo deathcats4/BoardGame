@@ -29,7 +29,8 @@
 | `scripts/<category>/` | 可审计、可复用、可被 npm scripts 调用的项目薄入口；只转发或编排外部工具，不承载完整外部工具源码。 |
 
 - 项目自有外部工具可以放在 `.tools/<tool-name>/` 并随仓库维护；第三方源码安装副本按工具逐项写入 `.gitignore`，例如 `.tools/open-design/`。
-- 端到端图片目录查看器属于外部辅助工具：主体放 `.tools/e2e-image-viewer/`，`scripts/verify/open-e2e-image-viewer.mjs` 只负责启动 / 复用和传参；传入证据根目录、游戏目录或测试目录时默认自动定位最新具体截图目录，不递归混合多个游戏。查看器会复用同目录或同游戏证据里的图组索引 / `label-source-manifest.json` 显示中文标题和承接说明，页面不展示完整本地路径。
+- 端到端图片目录查看器的唯一项目入口是 `scripts/verify/open-verified-image.mjs --dir <证据目录>`；主体仍放 `.tools/e2e-image-viewer/`，但目录解析、网页注册、焦点和媒体筛选统一从这一条入口进入。传入证据根目录、游戏目录或测试目录时默认自动定位最新具体截图目录，不递归混合多个游戏。查看器会复用同目录或同游戏证据里的图组索引 / `label-source-manifest.json` 显示中文标题和承接说明，页面不展示完整本地路径。
+- 查看器网址统一以截图目录 key 作为稳定身份；`VIEWER_URL` 必须原样采用脚本输出，不能手工改写图片文件名、`focus`、`show` 或 `files` 参数。该条是 `.spec/skills/show-image-to-user/SKILL.md` 的适配说明，不建立第二份看图规范。
 - 外部辅助工具可以读取 `test-results/`、`artifacts/` 或 `evidence/` 的本地证据，但不得把候选图、失败图或过程图升级成最终用户展示；最终用户展示仍回到 PASS 清单和看图入口，默认由本地网页查看器打开，不再默认使用 PureRef。
 
 ## 常用入口
@@ -47,7 +48,7 @@
 | PDF 转 Markdown | `npm run pdf:md -- <pdf路径> -o <md路径>` |
 | 模拟房主流程 | `npx tsx scripts/infra/simulate-host.ts` |
 | E2E 单 worker 服务 | `node scripts/infra/start-single-worker-servers.js` |
-| 端到端图片目录查看器 | `node scripts/verify/open-e2e-image-viewer.mjs --dir <证据目录>` |
+| 端到端图片目录查看器 | `node scripts/verify/open-verified-image.mjs --dir <证据目录>` |
 | Android 发布 | `node scripts/mobile/release-android.mjs <ota|native|packages>` |
 | 完整部署 + OTA | `node scripts/release/deploy-and-ota.mjs` |
 | 结构规范校验 | `npm run spec:lint` |
@@ -70,4 +71,4 @@
 - `assets:download` 默认按明确游戏下载；无目标、`--list` 和共享测试不得扩大成全站镜像。
 - 临时裁图、OCR、截图、探针输出和下载样本放 `temp/` 或 `tmp/`，不要放仓库根目录。
 - 项目脚本默认在仓库根目录执行。
-- 带 `--dir`、`--paths`、`--no-open` 等参数的本地查看器优先直接调用 `node scripts/...`；当前 npm 会把部分长参数解析成自己的配置，容易导致查看器选项失效。
+- 带 `--dir`、`--paths`、`--no-open` 等参数的本地查看器统一调用 `node scripts/verify/open-verified-image.mjs`；目录查看、PASS 校验、焦点和媒体筛选不再分成多个项目入口。

@@ -12,6 +12,7 @@ import { createAbilityRuntimeExecutor, createEffectProgram } from './abilityRunt
 import { isBaseAbilitySuppressed } from './ongoingEffects';
 import type { TitanAwareTriggerTiming, TriggerContext } from './ongoingEffects';
 import { registerTriggerProgramExecutor } from './triggerExecutors';
+import { getEffectiveBaseAbilitySourceIds } from './effectiveBaseAbilities';
 
 type BaseTriggerTimingAsTrigger = BaseTriggerTiming;
 type QueuedBaseTriggerContext = TriggerContext & { triggerMinionPower?: number };
@@ -169,85 +170,86 @@ export function collectBaseAbilityTriggers(params: {
   const base = core.bases[baseIndex];
   if (!base) return undefined;
 
-  if (!hasBaseAbility(base.defId, timing)) return undefined;
-  const options = getBaseAbilityOptions(base.defId, timing);
-  const optionContext = {
-    state: core,
-    baseIndex,
-    baseDefId: base.defId,
-    playerId: ownerPlayerId,
-    minionUid: triggerMinionUid,
-    minionDefId: triggerMinionDefId,
-    minionPower: triggerMinionPower,
-    triggerMinionFromDeck,
-    destroyerId,
-    controllerId,
-    reason,
-    rankings: rankings ? structuredClone(rankings) : undefined,
-    actionTargetBaseIndex,
-    actionTargetType,
-    actionTargetMinionUid,
-    triggerCardUid,
-    triggerCardDefId,
-    triggerCardOwnerId,
-    frameId,
-    sourceEventId,
-    now };
-  const resolvedOwnerPlayerId = options?.ownerPlayerId?.(optionContext) ?? ownerPlayerId;
-  if (!core.turnOrder.includes(resolvedOwnerPlayerId)) return undefined;
-  const resolvedOptionContext = {
-    ...optionContext,
-    playerId: resolvedOwnerPlayerId,
-  };
-  if (options?.canTrigger && !options.canTrigger(resolvedOptionContext)) {
-    return undefined;
+  const triggers: TriggerInstance[] = [];
+  for (const sourceDefId of getEffectiveBaseAbilitySourceIds(core, baseIndex)) {
+    if (!hasBaseAbility(sourceDefId, timing)) continue;
+    const options = getBaseAbilityOptions(sourceDefId, timing);
+    const optionContext = {
+      state: core,
+      baseIndex,
+      baseDefId: sourceDefId,
+      playerId: ownerPlayerId,
+      minionUid: triggerMinionUid,
+      minionDefId: triggerMinionDefId,
+      minionPower: triggerMinionPower,
+      triggerMinionFromDeck,
+      destroyerId,
+      controllerId,
+      reason,
+      rankings: rankings ? structuredClone(rankings) : undefined,
+      actionTargetBaseIndex,
+      actionTargetType,
+      actionTargetMinionUid,
+      triggerCardUid,
+      triggerCardDefId,
+      triggerCardOwnerId,
+      frameId,
+      sourceEventId,
+      now };
+    const resolvedOwnerPlayerId = options?.ownerPlayerId?.(optionContext) ?? ownerPlayerId;
+    if (!core.turnOrder.includes(resolvedOwnerPlayerId)) continue;
+    const resolvedOptionContext = {
+      ...optionContext,
+      playerId: resolvedOwnerPlayerId,
+    };
+    if (options?.canTrigger && !options.canTrigger(resolvedOptionContext)) continue;
+    const explicitDerivedFootprint = mergeDerivedFootprint(
+      cloneEffectContractWithBaseSourceContext(options?.effectContract, baseIndex),
+      options?.deriveFootprint?.(resolvedOptionContext),
+    );
+
+    const mandatory = options?.mandatory ?? true;
+    triggers.push({
+      id: `${timing}:${sourceDefId}:${base.defId}:${now}:${triggers.length}`,
+      timing: timingToTriggerTiming(timing),
+      sourceDefId,
+      sourceControllerId: undefined,
+      sourceBaseIndex: baseIndex,
+      mandatory,
+      resolutionClass: mandatory ? 'mandatory' : 'optional',
+      frameId: frameId ?? `${timing}:${sourceEventId ?? now}`,
+      sourceEventId: sourceEventId ?? `${timing}:${now}`,
+      ownerPlayerId: resolvedOwnerPlayerId,
+      witnessRequirement: 'inPlayAtTriggerTime',
+      witnessed: true,
+      baseIndex,
+      triggerMinionUid,
+      triggerMinionDefId,
+      triggerMinionPower,
+      triggerMinionFromDeck,
+      destroyerId,
+      controllerId,
+      reason,
+      rankings: rankings ? structuredClone(rankings) : undefined,
+      actionTargetBaseIndex,
+      actionTargetType,
+      actionTargetMinionUid,
+      triggerCardUid,
+      triggerCardDefId,
+      triggerCardOwnerId,
+      ...(explicitDerivedFootprint
+        ? {
+            derivedFootprint: explicitDerivedFootprint,
+          }
+        : {}),
+      lkiBase: { baseIndex, defId: base.defId },
+    });
   }
-  const explicitDerivedFootprint = mergeDerivedFootprint(
-    cloneEffectContractWithBaseSourceContext(options?.effectContract, baseIndex),
-    options?.deriveFootprint?.(resolvedOptionContext),
-  );
-  // Witness rule (base as source): it must still be in play when the trigger is queued.
-  // Since we are queueing from the live bases array, this is satisfied here.
 
-  const mandatory = options?.mandatory ?? true;
-  const t: TriggerInstance = {
-    id: `${timing}:${base.defId}:${now}:0`,
-    timing: timingToTriggerTiming(timing),
-    sourceDefId: base.defId,
-    sourceControllerId: undefined,
-    sourceBaseIndex: baseIndex,
-    mandatory,
-    resolutionClass: mandatory ? 'mandatory' : 'optional',
-    frameId: frameId ?? `${timing}:${sourceEventId ?? now}`,
-    sourceEventId: sourceEventId ?? `${timing}:${now}`,
-    ownerPlayerId: resolvedOwnerPlayerId,
-    witnessRequirement: 'inPlayAtTriggerTime',
-    witnessed: true,
-    baseIndex,
-    triggerMinionUid,
-    triggerMinionDefId,
-    triggerMinionPower,
-    triggerMinionFromDeck,
-    destroyerId,
-    controllerId,
-    reason,
-    rankings: rankings ? structuredClone(rankings) : undefined,
-    actionTargetBaseIndex,
-    actionTargetType,
-    actionTargetMinionUid,
-    triggerCardUid,
-    triggerCardDefId,
-    triggerCardOwnerId,
-    ...(explicitDerivedFootprint
-      ? {
-          derivedFootprint: explicitDerivedFootprint,
-        }
-      : {}),
-    lkiBase: { baseIndex, defId: base.defId } };
-
+  if (triggers.length === 0) return undefined;
   return {
     type: SU_EVENTS.TRIGGER_QUEUED,
-    payload: { triggers: [t] },
+    payload: { triggers },
     timestamp: now } as unknown as TriggerQueuedEvent;
 }
 
@@ -345,84 +347,86 @@ export function collectExtendedBaseAbilityTriggers(params: {
   } = params;
   const base = core.bases[baseIndex];
   if (!base) return undefined;
-  const opts = getExtendedBaseAbilityOptions(base.defId, timing);
-  if (!opts) return undefined;
-  const optionContext = {
-    state: core,
-    baseIndex,
-    baseDefId: base.defId,
-    playerId: ownerPlayerId,
-    minionUid: triggerMinionUid,
-    minionDefId: triggerMinionDefId,
-    minionPower: triggerMinionPower,
-    triggerMinionFromDeck,
-    destroyerId,
-    controllerId,
-    reason,
-    actionTargetBaseIndex,
-    actionTargetType,
-    actionTargetMinionUid,
-    triggerCardUid,
-    triggerCardDefId,
-    triggerCardOwnerId,
-    frameId,
-    sourceEventId,
-    now,
-  };
-  const resolvedOwnerPlayerId = opts.ownerPlayerId?.(optionContext) ?? ownerPlayerId;
-  if (!core.turnOrder.includes(resolvedOwnerPlayerId)) return undefined;
-  const resolvedOptionContext = {
-    ...optionContext,
-    playerId: resolvedOwnerPlayerId,
-  };
-  if (opts.canTrigger && !opts.canTrigger(resolvedOptionContext)) {
-    return undefined;
+  const triggers: TriggerInstance[] = [];
+  for (const sourceDefId of getEffectiveBaseAbilitySourceIds(core, baseIndex)) {
+    const opts = getExtendedBaseAbilityOptions(sourceDefId, timing);
+    if (!opts) continue;
+    const optionContext = {
+      state: core,
+      baseIndex,
+      baseDefId: sourceDefId,
+      playerId: ownerPlayerId,
+      minionUid: triggerMinionUid,
+      minionDefId: triggerMinionDefId,
+      minionPower: triggerMinionPower,
+      triggerMinionFromDeck,
+      destroyerId,
+      controllerId,
+      reason,
+      actionTargetBaseIndex,
+      actionTargetType,
+      actionTargetMinionUid,
+      triggerCardUid,
+      triggerCardDefId,
+      triggerCardOwnerId,
+      frameId,
+      sourceEventId,
+      now,
+    };
+    const resolvedOwnerPlayerId = opts.ownerPlayerId?.(optionContext) ?? ownerPlayerId;
+    if (!core.turnOrder.includes(resolvedOwnerPlayerId)) continue;
+    const resolvedOptionContext = {
+      ...optionContext,
+      playerId: resolvedOwnerPlayerId,
+    };
+    if (opts.canTrigger && !opts.canTrigger(resolvedOptionContext)) continue;
+    const explicitDerivedFootprint = mergeDerivedFootprint(
+      cloneEffectContractWithBaseSourceContext(opts.effectContract, baseIndex),
+      opts.deriveFootprint?.(resolvedOptionContext),
+    );
+
+    registerExtendedBaseAbilityAsQueuedTrigger(sourceDefId, timing);
+
+    const mandatory = opts.mandatory ?? true;
+    triggers.push({
+      id: `${timing}:${sourceDefId}:${base.defId}:${now}:${triggers.length}`,
+      timing: timingToTriggerTiming(timing),
+      sourceDefId,
+      sourceControllerId: undefined,
+      sourceBaseIndex: baseIndex,
+      mandatory,
+      resolutionClass: mandatory ? 'mandatory' : 'optional',
+      frameId: frameId ?? `${timing}:${sourceEventId ?? now}`,
+      sourceEventId: sourceEventId ?? `${timing}:${now}`,
+      ownerPlayerId: resolvedOwnerPlayerId,
+      witnessRequirement: 'inPlayAtTriggerTime',
+      witnessed: true,
+      baseIndex,
+      triggerMinionUid,
+      triggerMinionDefId,
+      triggerMinionPower,
+      triggerMinionFromDeck,
+      destroyerId,
+      controllerId,
+      reason,
+      actionTargetBaseIndex,
+      actionTargetType,
+      actionTargetMinionUid,
+      triggerCardUid,
+      triggerCardDefId,
+      triggerCardOwnerId,
+      ...(explicitDerivedFootprint
+        ? {
+            derivedFootprint: explicitDerivedFootprint,
+          }
+        : {}),
+      lkiBase: { baseIndex, defId: base.defId },
+    });
   }
-  const explicitDerivedFootprint = mergeDerivedFootprint(
-    cloneEffectContractWithBaseSourceContext(opts.effectContract, baseIndex),
-    opts.deriveFootprint?.(resolvedOptionContext),
-  );
 
-  // Ensure executor exists for queue consumption.
-  registerExtendedBaseAbilityAsQueuedTrigger(base.defId, timing);
-
-  const mandatory = opts.mandatory ?? true;
-  const t: TriggerInstance = {
-    id: `${timing}:${base.defId}:${now}:0`,
-    timing: timingToTriggerTiming(timing),
-    sourceDefId: base.defId,
-    sourceControllerId: undefined,
-    sourceBaseIndex: baseIndex,
-    mandatory,
-    resolutionClass: mandatory ? 'mandatory' : 'optional',
-    frameId: frameId ?? `${timing}:${sourceEventId ?? now}`,
-    sourceEventId: sourceEventId ?? `${timing}:${now}`,
-    ownerPlayerId: resolvedOwnerPlayerId,
-    witnessRequirement: 'inPlayAtTriggerTime',
-    witnessed: true,
-    baseIndex,
-    triggerMinionUid,
-    triggerMinionDefId,
-    triggerMinionPower,
-    triggerMinionFromDeck,
-    destroyerId,
-    controllerId,
-    reason,
-    actionTargetBaseIndex,
-    actionTargetType,
-    actionTargetMinionUid,
-    triggerCardUid,
-    triggerCardDefId,
-    triggerCardOwnerId,
-    ...(explicitDerivedFootprint
-      ? {
-          derivedFootprint: explicitDerivedFootprint,
-        }
-      : {}),
-    lkiBase: { baseIndex, defId: base.defId } };
-
+  if (triggers.length === 0) return undefined;
   return {
     type: SU_EVENTS.TRIGGER_QUEUED,
-    payload: { triggers: [t] },
+    payload: { triggers },
     timestamp: now } as unknown as TriggerQueuedEvent;
 }

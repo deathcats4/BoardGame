@@ -23,6 +23,7 @@ import { HUIJIN_ABILITIES } from './abilities-huijin';
 import { SHOUREN_ABILITIES } from './abilities-shouren';
 import { YONGHENG_ABILITIES } from './abilities-yongheng';
 import { SHADOW_ABILITIES } from './abilities-shadow';
+import { ZHONGCAI_ABILITIES } from './abilities-zhongcai';
 import { abilityText } from './abilityTextHelper';
 import type { InteractionChain } from '../../../engine/primitives/ability';
 
@@ -693,3 +694,6 @@ abilityRegistry.registerAll(YONGHENG_ABILITIES);
 
 // 注册暗影精灵技能
 abilityRegistry.registerAll(SHADOW_ABILITIES);
+
+// 注册仲裁派系技能
+abilityRegistry.registerAll(ZHONGCAI_ABILITIES);

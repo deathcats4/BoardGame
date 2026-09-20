@@ -143,7 +143,7 @@ describe('Betrayal 教程配置', () => {
 
     it('默认教程沿真实基础回合主线推进，只有叛徒视角另列目录章节', () => {
         const manifest = tutorialCatalog.tutorials['basic-setup-and-turn']?.manifest;
-        expect(manifest?.revision).toBe(3);
+        expect(manifest?.revision).toBe(7);
         expect(manifest?.steps.map((step) => step.id)).toEqual([
             'setup-runtime',
             'objective-and-turn',
@@ -180,11 +180,6 @@ describe('Betrayal 教程配置', () => {
             'haunt-hero-reader-goal',
             'haunt-hero-reader-close',
             'wait-for-hero-turn-after-haunt',
-            'open-library-move-after-goal',
-            'move-to-library-after-goal',
-            'hero-study-name-roll',
-            'hero-study-name-result',
-            'hero-study-name-closeout',
         ]);
         expect(new Set(manifest?.steps.map((step) => step.id)).size).toBe(manifest?.steps.length);
 
@@ -217,7 +212,7 @@ describe('Betrayal 教程配置', () => {
         expect(manifest?.steps.find((step) => step.id === 'confirm-room-placement')?.highlightTarget).toBe('betrayal-room-placement-confirm');
         expect(manifest?.steps.find((step) => step.id === 'discovery-card-type')?.highlightTarget).toBe('betrayal-latest-discovery');
         expect(manifest?.steps.find((step) => step.id === 'discovery-card-type')?.infoStep).toBe(true);
-        expect(manifest?.steps.find((step) => step.id === 'view-book')?.highlightTarget).toBe('betrayal-inventory-omen-book-magnify');
+        expect(manifest?.steps.find((step) => step.id === 'view-book')?.highlightTarget).toBe('betrayal-inventory-omen-book');
         expect(manifest?.steps.find((step) => step.id === 'view-book')?.infoStep).toBe(true);
         expect(manifest?.steps.find((step) => step.id === 'use-book')?.highlightTarget).toBe('betrayal-inventory-omen-book');
         expect(manifest?.steps.find((step) => step.id === 'use-book')?.waitForAnimation).toBe(true);
@@ -361,28 +356,11 @@ describe('Betrayal 教程配置', () => {
             infoStep: true,
             viewAs: '0',
         });
-        expect(manifest?.steps.find((step) => step.id === 'open-library-move-after-goal')).toMatchObject({
-            highlightTarget: 'betrayal-action-move',
-            requireAction: true,
-            allowedCommands: [],
-            viewAs: '0',
-        });
-        expect(manifest?.steps.find((step) => step.id === 'move-to-library-after-goal')).toMatchObject({
-            highlightTarget: 'betrayal-room-upper-west',
-            requireAction: true,
-            allowedCommands: [BETRAYAL_COMMANDS.MOVE_TO_ROOM],
-            allowedTargets: ['upper-west'],
-            advanceOnEvents: [{ type: 'EXPLORER_MOVED', match: { playerId: '0', roomId: 'upper-west' } }],
-            viewAs: '0',
-        });
-        expect(manifest?.steps.find((step) => step.id === 'hero-study-name-roll')).toMatchObject({
-            highlightTarget: 'betrayal-action-use',
-            requireAction: true,
-            allowedCommands: [BETRAYAL_COMMANDS.STUDY_MUMMY_NAME],
-            randomPolicy: { mode: 'fixed', values: [3] },
-            advanceOnEvents: [{ type: 'MUMMY_NAME_STUDIED', match: { playerId: '0', success: true } }],
-            viewAs: '0',
-        });
+        expect(manifest?.steps.find((step) => step.id === 'open-library-move-after-goal')).toBeUndefined();
+        expect(manifest?.steps.find((step) => step.id === 'move-to-library-after-goal')).toBeUndefined();
+        expect(manifest?.steps.find((step) => step.id === 'hero-study-name-roll')).toBeUndefined();
+        expect(manifest?.steps.find((step) => step.id === 'hero-study-name-result')).toBeUndefined();
+        expect(manifest?.steps.find((step) => step.id === 'hero-study-name-closeout')).toBeUndefined();
         expect(manifest?.steps.find((step) => step.id === 'confirm-omen-card')).toBeUndefined();
         expect(manifest?.steps.find((step) => step.id === 'banish-mummy')).toBeUndefined();
     });
@@ -1432,10 +1410,17 @@ describe('Betrayal 教程配置', () => {
         expect(zhCNLocale.tutorial.basicSetup.steps.hauntRiskTrack).toContain('所有玩家持有的预兆总数');
         expect(zhCNLocale.tutorial.basicSetup.steps.hauntRiskTrack).toContain('5+');
         expect(basicSteps.viewBook).toContain('放大按钮');
-        expect(basicSteps.viewBook).toContain('读它的牌面');
+        expect(basicSteps.viewBook).toContain('悬浮到书本本体');
+        expect(basicSteps.viewBook).toContain('触屏设备');
+        expect(basicSteps.viewBook).toContain('长按书本本体');
+        expect(basicSteps.viewBook).toContain('不会触发使用书本');
+        expect(basicSteps.viewBook).toContain('查看牌面');
         expect(basicSteps.viewBook).toContain('花费 1 点神志改用知识');
         expect(basicSteps.viewBook).not.toContain('兔脚');
         expect(basicSteps.viewBook).not.toContain('伤害');
+        expect(enLocale.tutorial.basicSetup.steps.viewBook).toContain('hover the Book itself');
+        expect(enLocale.tutorial.basicSetup.steps.viewBook).toContain('press and hold the Book');
+        expect(enLocale.tutorial.basicSetup.steps.viewBook).toContain('does not use it');
         expect(basicSteps.useBook).toContain('扣除 1 点神志');
         expect(basicSteps.useBook).toContain('使用书本本体');
         expect(basicSteps.useBook).toContain('改用知识重新投骰');

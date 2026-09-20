@@ -30,6 +30,8 @@ import { LIEREN_CARDS, getLierenStartingDeck } from './lieren/cards';
 import { LIEREN_ABILITIES } from './lieren/abilities';
 import { VAMPIRE_LORD_CARDS, getVampireLordStartingDeck } from './vampire_lord/cards';
 import { VAMPIRE_LORD_ABILITIES } from './vampire_lord/abilities';
+import { ZHIZHUXIA_CARDS, getZhizhuxiaStartingDeck } from './zhizhuxia/cards';
+import { ZHIZHUXIA_ABILITIES } from './zhizhuxia/abilities';
 import type { AbilityCard } from '../types';
 import type { AbilityDef } from '../domain/combat';
 import type { HeroState } from '../domain/types';
@@ -123,6 +125,11 @@ export const HEROES_DATA: Record<string, HeroData> = {
         cards: VAMPIRE_LORD_CARDS,
         abilities: VAMPIRE_LORD_ABILITIES,
         getStartingDeck: getVampireLordStartingDeck,
+    },
+    zhizhuxia: {
+        cards: ZHIZHUXIA_CARDS,
+        abilities: ZHIZHUXIA_ABILITIES,
+        getStartingDeck: getZhizhuxiaStartingDeck,
     },
 };
 

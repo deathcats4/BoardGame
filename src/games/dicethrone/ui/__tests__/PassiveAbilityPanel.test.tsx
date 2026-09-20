@@ -48,7 +48,7 @@ describe('PassiveAbilityPanel', () => {
         );
     });
 
-    it('攻击后一次性机会不渲染成常驻动作栏小按钮', () => {
+    it('攻击伤害型能力作为常驻按钮显示，并按可用状态高亮', () => {
         render(
             <PassiveAbilityPanel
                 passives={[{
@@ -59,7 +59,7 @@ describe('PassiveAbilityPanel', () => {
                         labelKey: 'passive.vampireLordBloodPower.healShort',
                         cpCost: 0,
                         tokenCost: { tokenId: 'blood_power', amount: 4 },
-                        timing: 'ownRollPhase',
+                        timing: 'ownMainPhase',
                         descriptionKey: 'passive.vampireLordBloodPower.heal',
                         requiresCurrentAttackDamageDealt: true,
                         showWhenUnavailable: true,
@@ -71,6 +71,9 @@ describe('PassiveAbilityPanel', () => {
             />,
         );
 
-        expect(screen.queryByTestId('passive-action-vampire-lord-blood-power-0')).not.toBeInTheDocument();
+        const button = screen.getByTestId('passive-action-vampire-lord-blood-power-0');
+        expect(button).toBeEnabled();
+        expect(button).toHaveAttribute('data-passive-action-usable', 'true');
+        expect(button).toHaveClass('ring-emerald-300/80');
     });
 });

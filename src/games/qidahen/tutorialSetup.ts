@@ -142,21 +142,11 @@ const createBasicTutorialSetup = (): QidahenTutorialPreset => ({
     setupSelections: createDefaultSelections('post-sarhu-1619'),
     coreTransform: (initialCore) => {
         const core = cloneCore(initialCore);
-        const mingCardIds = core.handCards
-            .filter((card) => card.faction === 'ming')
-            .slice(0, 4)
-            .map((card) => card.id);
-        if (mingCardIds.length < 4) {
-            return core;
-        }
-
         core.currentPlayer = '0';
-        core.turnLabel = '第 1 轮 · 大明 · 检查手牌上限';
-        const discardCandidateCardIds = mingCardIds.slice(0, 1);
-        core.turnPhase = 'hand-limit-discard';
+        core.turnLabel = '第 1 轮 · 大明 · 行动窗口';
+        core.turnPhase = 'action-window';
         core.wheelActionUsed = false;
         core.factionActionUsed = false;
-        core.actionWheelPosition = 'wheel-attack';
         core.selectedWheelMoveId = 'move-1-free';
         core.selectedRegionId = 'city-region-24';
         core.selectedActionId = '';
@@ -170,19 +160,7 @@ const createBasicTutorialSetup = (): QidahenTutorialPreset => ({
         core.maShiTradeSelection = null;
         core.khanEdictSelection = null;
         core.diplomacyProgress = null;
-        core.factions.ming = {
-            ...core.factions.ming,
-            handCount: core.factions.ming.handLimit + discardCandidateCardIds.length,
-        };
-        core.handLimitDiscardSelection = {
-            factionId: 'ming',
-            factionName: core.factions.ming.name,
-            handLimit: core.factions.ming.handLimit,
-            handCount: core.factions.ming.handCount,
-            requiredDiscardCount: discardCandidateCardIds.length,
-            candidateCardIds: discardCandidateCardIds,
-            selectedCardIds: [],
-        };
+        core.handLimitDiscardSelection = null;
         core.sunYuanhuaTechSelection = null;
         core.gaoDiDispatchSelection = null;
         return core;

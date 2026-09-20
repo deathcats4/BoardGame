@@ -28,7 +28,10 @@ import {
     hasMageWarsPlayerSpellbookCard,
 } from './spellbook';
 import { validateMageWarsArenaObjectAbility } from './objectAbilityRuntime';
-import { validateMageWarsMageAbilityStatusRemoval } from './mageAbilityRuntime';
+import {
+    resolveMageWarsStatusRemovalCost,
+    validateMageWarsMageAbilityStatusRemoval,
+} from './mageAbilityRuntime';
 import {
     isMageWarsAreaTargetSpell,
     isMageWarsAttackSpell,
@@ -57,6 +60,7 @@ import {
     isMageWarsLegalStealEnchantmentNewTarget,
     isMageWarsObjectAttackTargetAllowed,
     isMageWarsLivingArenaObject,
+    isMageWarsBanishedArenaObject,
     isMageWarsCorporealCreatureArenaObject,
     isMageWarsObjectDefenseProfileReady,
     isMageWarsObjectAttackTargetInRange,
@@ -64,10 +68,13 @@ import {
     isMageWarsQuickSpell,
     isMageWarsSameEnchantmentAnchor,
     isMageWarsSleepSpellTarget,
+    isMageWarsToxinEnchantmentArenaObject,
+    isMageWarsToxinStatusToken,
     isMageWarsStandardSpell,
     isMageWarsTargetInSpellRange,
     isMageWarsTanglevineTarget,
     isMageWarsForceGripTarget,
+    isMageWarsHiddenEnchantmentArenaObject,
     isMageWarsTeleportSpellTarget,
     isMageWarsUnmovableArenaObject,
     isMageWarsVisibleAttachedEnchantmentArenaObject,
@@ -77,6 +84,7 @@ import {
     parseMageWarsSpellAttackProfile,
     resolveMageWarsAttachedEquipmentZoneId,
     resolveMageWarsDamageTypeImmunity,
+    resolveMageWarsEnchantmentZoneId,
     resolveMageWarsEnchantmentTotalManaCost,
     resolveMageWarsEquipmentManaCost,
     resolveMageWarsExplodeManaCostForTarget,
@@ -88,9 +96,12 @@ import {
     resolveMageWarsSpellTargetZoneId,
     resolveMageWarsStealEnchantmentManaCost,
     resolveMageWarsStealEnchantmentNewTargetZoneId,
+    resolveMageWarsEnchantmentRelocationManaCost,
+    resolveMageWarsToxinEnchantmentsAttachedToObject,
     resolveMageWarsTeleportSpellManaCostForTargetZone,
     resolveMageWarsVisibleEnchantmentTargetZoneId,
     resolveMageWarsVisibleEnchantmentZoneId,
+    isMageWarsStableArenaObject,
     type MageWarsSpellCastChoiceFamily,
     type MageWarsSpellCostResolution,
 } from './spellRules';
@@ -112,6 +123,9 @@ const MAGE_WARS_TARGET_DEPENDENT_MANA_FAMILIES = new Set<MageWarsSpellCastChoice
     'explode',
     'dispel',
     'steal-enchantment',
+    'move-enchantment',
+    'status-healing',
+    'toxin-purification',
 ]);
 
 const MAGE_WARS_PUSH_ZONE_TARGET_FAMILIES = new Set<MageWarsSpellCastChoiceFamily>([
@@ -273,7 +287,7 @@ function isMageWarsGuardInterceptionRequired(
     targetObject?: MageWarsArenaObjectState,
 ): boolean {
     if (!attackProfile || attackProfile.rangeKind !== 'melee') return false;
-    if (isMageWarsElusiveArenaObject(attacker)) return false;
+    if (isMageWarsElusiveArenaObject(attacker, core)) return false;
     if (targetObject?.guarding && targetObject.ownerId !== attacker.ownerId && targetObject.zoneId === attacker.zoneId) {
         return false;
     }
@@ -360,6 +374,108 @@ function validateMageWarsHealingSpellCast(
     return { valid: true };
 }
 
+function validateMageWarsStatusHealingSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, command, player, costResolution, rangePlayer } = ctx;
+
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || !isMageWarsLivingArenaObject(targetObject)) {
+        return invalid('invalidHealingTarget');
+    }
+    const targetZoneId = resolveMageWarsSpellTargetZoneId(state.core, command.payload);
+    if (!targetZoneId) return invalid('invalidSpellTarget');
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+
+    const statusTokenIds = command.payload.statusTokenIds ?? [];
+    const statusTokenAmounts = command.payload.statusTokenAmounts ?? {};
+    if (new Set(statusTokenIds).size !== statusTokenIds.length) return invalid('duplicateStatusToken');
+    if (Object.keys(statusTokenAmounts).some((statusTokenId) => !statusTokenIds.includes(statusTokenId as typeof statusTokenIds[number]))) {
+        return invalid('invalidStatusTokenAmount');
+    }
+    const statusCost = resolveMageWarsStatusRemovalCost(targetObject, statusTokenIds, statusTokenAmounts);
+    if ('error' in statusCost) return invalid(statusCost.error);
+    const totalManaCost = (costResolution.spell.manaCost ?? 0) + statusCost.manaCost;
+    if (command.payload.manaCost !== totalManaCost) return invalid('manaCostMismatch');
+    if (player.mana < totalManaCost) return invalid('insufficientMana');
+    return { valid: true };
+}
+
+function validateMageWarsToxinPurificationSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, command, player, costResolution, rangePlayer } = ctx;
+
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.targetWallEdgeId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || !isMageWarsLivingArenaObject(targetObject)) {
+        return invalid('invalidHealingTarget');
+    }
+
+    const targetZoneId = resolveMageWarsSpellTargetZoneId(state.core, command.payload);
+    if (!targetZoneId) return invalid('invalidSpellTarget');
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+
+    const statusTokenIds = command.payload.statusTokenIds ?? [];
+    const statusTokenAmounts = command.payload.statusTokenAmounts ?? {};
+    if (new Set(statusTokenIds).size !== statusTokenIds.length) return invalid('duplicateStatusToken');
+    if (statusTokenIds.some((statusTokenId) => !isMageWarsToxinStatusToken(statusTokenId))) {
+        return invalid('invalidStatusToken');
+    }
+    if (Object.keys(statusTokenAmounts).some((statusTokenId) => !statusTokenIds.includes(statusTokenId as typeof statusTokenIds[number]))) {
+        return invalid('invalidStatusTokenAmount');
+    }
+    const statusCost = resolveMageWarsStatusRemovalCost(targetObject, statusTokenIds, statusTokenAmounts);
+    if ('error' in statusCost) return invalid(statusCost.error);
+
+    const selectedEnchantmentObjectIds = command.payload.selectedEnchantmentObjectIds ?? [];
+    if (new Set(selectedEnchantmentObjectIds).size !== selectedEnchantmentObjectIds.length) {
+        return invalid('duplicateEnchantment');
+    }
+    const toxinEnchantments = resolveMageWarsToxinEnchantmentsAttachedToObject(state.core, targetObject.id);
+    const toxinEnchantmentById = new Map(toxinEnchantments.map((enchantment) => [enchantment.id, enchantment]));
+    let enchantmentManaCost = 0;
+    for (const enchantmentObjectId of selectedEnchantmentObjectIds) {
+        const enchantment = toxinEnchantmentById.get(enchantmentObjectId);
+        if (!enchantment || !isMageWarsToxinEnchantmentArenaObject(enchantment)) {
+            return invalid('invalidToxinEnchantment');
+        }
+        const cost = resolveMageWarsEnchantmentTotalManaCost(enchantment);
+        if (cost === undefined) return invalid('missingEnchantmentManaCost');
+        enchantmentManaCost += cost;
+    }
+
+    const totalManaCost = (costResolution.spell.manaCost ?? 0) + statusCost.manaCost + enchantmentManaCost;
+    if (command.payload.manaCost !== totalManaCost) return invalid('manaCostMismatch');
+    if (player.mana < totalManaCost) return invalid('insufficientMana');
+    return { valid: true };
+}
+
 function validateMageWarsForcePushSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
     const { state, command, costResolution, rangePlayer } = ctx;
 
@@ -416,6 +532,30 @@ function validateMageWarsChargeOnSpellCast(ctx: MageWarsSpellCastValidationConte
     const targetZoneId = resolveMageWarsSpellTargetZoneId(state.core, command.payload);
     if (!targetZoneId) return invalid('invalidSpellTarget');
     if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    return { valid: true };
+}
+
+function validateMageWarsBanishSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, command, costResolution, rangePlayer } = ctx;
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.targetWallEdgeId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+        || command.payload.boundSpellCardId !== undefined
+    ) return invalid('invalidTargetMode');
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || targetObject.kind !== 'creature' || isMageWarsBanishedArenaObject(targetObject)) {
+        return invalid('invalidTargetObject');
+    }
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetObject.zoneId)) {
         return invalid('targetOutOfRange');
     }
     return { valid: true };
@@ -528,6 +668,31 @@ function validateMageWarsDispelSpellCast(ctx: MageWarsSpellCastValidationContext
     if (!command.payload.targetObjectId) return invalid('missingTarget');
     const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
     if (!targetObject) return invalid('invalidTargetObject');
+
+    if (costResolution.spell.spellCardId === 3414) {
+        if (!isMageWarsHiddenEnchantmentArenaObject(targetObject)) return invalid('invalidTargetObject');
+        const targetZoneId = resolveMageWarsEnchantmentZoneId(state.core, targetObject);
+        if (!targetZoneId) return invalid('invalidTargetObject');
+        if (command.payload.manaCost !== 2) return invalid('manaCostMismatch');
+        if (player.mana < 2) return invalid('insufficientMana');
+        if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+            return invalid('targetOutOfRange');
+        }
+        return { valid: true };
+    }
+
+    if (costResolution.spell.spellCardId === 3420) {
+        if (targetObject.kind !== 'creature' && targetObject.kind !== 'conjuration') {
+            return invalid('invalidTargetObject');
+        }
+        if (command.payload.manaCost !== 12) return invalid('manaCostMismatch');
+        if (player.mana < 12) return invalid('insufficientMana');
+        if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetObject.zoneId)) {
+            return invalid('targetOutOfRange');
+        }
+        return { valid: true };
+    }
+
     const targetZoneId = resolveMageWarsVisibleEnchantmentZoneId(state.core, targetObject);
     if (!targetZoneId) return invalid('invalidTargetObject');
     const dispelManaCost = resolveMageWarsEnchantmentTotalManaCost(targetObject);
@@ -573,6 +738,52 @@ function validateMageWarsStealEnchantmentSpellCast(ctx: MageWarsSpellCastValidat
     if (stealEnchantmentManaCost === undefined) return invalid('missingEnchantmentManaCost');
     if (command.payload.manaCost !== stealEnchantmentManaCost) return invalid('manaCostMismatch');
     if (player.mana < stealEnchantmentManaCost) return invalid('insufficientMana');
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, newTargetZoneId)) {
+        return invalid('newTargetOutOfRange');
+    }
+    return { valid: true };
+}
+
+function validateMageWarsMoveEnchantmentSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, player, command, costResolution, rangePlayer } = ctx;
+
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (
+        !targetObject
+        || targetObject.kind !== 'enchantment'
+        || targetObject.ownerId !== player.id
+    ) {
+        return invalid('invalidTargetObject');
+    }
+    const targetZoneId = resolveMageWarsEnchantmentZoneId(state.core, targetObject);
+    if (!targetZoneId) return invalid('invalidTargetObject');
+    const newTargetCount = countMageWarsStealEnchantmentNewTargets(command.payload);
+    if (newTargetCount === 0) return invalid('missingNewTarget');
+    if (newTargetCount > 1) return invalid('invalidTargetMode');
+    if (isMageWarsSameEnchantmentAnchor(targetObject, command.payload)) {
+        return invalid('sameEnchantmentTarget');
+    }
+    if (!isMageWarsLegalStealEnchantmentNewTarget(state.core, targetObject, command.payload)) {
+        return invalid('invalidNewTarget');
+    }
+    const newTargetZoneId = resolveMageWarsStealEnchantmentNewTargetZoneId(state.core, command.payload);
+    if (!newTargetZoneId) return invalid('invalidNewTarget');
+    const manaCost = resolveMageWarsEnchantmentRelocationManaCost(targetObject);
+    if (manaCost === undefined) return invalid('missingEnchantmentLevel');
+    if (command.payload.manaCost !== manaCost) return invalid('manaCostMismatch');
+    if (player.mana < manaCost) return invalid('insufficientMana');
     if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
         return invalid('targetOutOfRange');
     }
@@ -820,13 +1031,65 @@ function validateMageWarsZoneTargetSpellCast(ctx: MageWarsSpellCastValidationCon
     return { valid: true };
 }
 
+function validateMageWarsTemporaryTraitSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, player, command, costResolution, rangePlayer } = ctx;
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || !isMageWarsCorporealCreatureArenaObject(targetObject)) {
+        return invalid('invalidTargetObject');
+    }
+    const targetZoneId = targetObject.zoneId;
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    if (command.payload.manaCost !== costResolution.manaCost) return invalid('manaCostMismatch');
+    if (player.mana < costResolution.manaCost) return invalid('insufficientMana');
+    return { valid: true };
+}
+
+function validateMageWarsManaDrainSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, player, command, costResolution, rangePlayer } = ctx;
+    if (
+        command.payload.targetObjectId
+        || command.payload.targetZoneId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+        || command.payload.newTargetPlayerId
+        || command.payload.newTargetObjectId
+        || command.payload.newTargetZoneId
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetPlayerId) return invalid('missingTarget');
+    if (command.payload.targetPlayerId === player.id) return invalid('cannotTargetSelf');
+    const targetPlayer = state.core.players[command.payload.targetPlayerId];
+    if (!targetPlayer) return invalid('invalidTargetPlayer');
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetPlayer.mageZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    if (command.payload.manaCost !== costResolution.manaCost) return invalid('manaCostMismatch');
+    if (player.mana < costResolution.manaCost) return invalid('insufficientMana');
+    return { valid: true };
+}
+
 function validateMageWarsTanglevineSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
     const { state, command, costResolution, rangePlayer } = ctx;
 
     if (command.payload.targetPlayerId || command.payload.targetZoneId) return invalid('invalidTargetMode');
     if (!command.payload.targetObjectId) return invalid('missingTarget');
     const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
-    if (!targetObject || !isMageWarsTanglevineTarget(targetObject)) return invalid('invalidTargetObject');
+    if (!targetObject || !isMageWarsTanglevineTarget(targetObject, state.core)) return invalid('invalidTargetObject');
     if (hasSameNamedConjurationAttachedToTarget(state.core, costResolution.spell, targetObject.id)) {
         return invalid('conjurationAlreadyAttached');
     }
@@ -838,7 +1101,31 @@ function validateMageWarsTanglevineSpellCast(ctx: MageWarsSpellCastValidationCon
     return { valid: true };
 }
 
+function validateMageWarsKnockdownSpellCast(ctx: MageWarsSpellCastValidationContext): ValidationResult {
+    const { state, command, costResolution, rangePlayer } = ctx;
+
+    if (
+        command.payload.targetPlayerId
+        || command.payload.targetZoneId
+        || command.payload.pushToZoneId
+        || command.payload.chainLightningTargets
+    ) {
+        return invalid('invalidTargetMode');
+    }
+    if (!command.payload.targetObjectId) return invalid('missingTarget');
+    const targetObject = getArenaObject(state.core, command.payload.targetObjectId);
+    if (!targetObject || targetObject.kind !== 'creature') return invalid('invalidTargetObject');
+    if (isMageWarsStableArenaObject(targetObject)) return invalid('targetStable');
+    const targetZoneId = resolveMageWarsSpellTargetZoneId(state.core, command.payload);
+    if (!targetZoneId) return invalid('invalidSpellTarget');
+    if (!isMageWarsTargetInSpellRange(state.core, rangePlayer, costResolution.spell, targetZoneId)) {
+        return invalid('targetOutOfRange');
+    }
+    return { valid: true };
+}
+
 const MAGE_WARS_SPELL_CAST_FAMILY_VALIDATORS: Record<MageWarsSpellCastChoiceFamily, MageWarsSpellCastFamilyValidator> = {
+    banish: validateMageWarsBanishSpellCast,
     'bloodstrike': validateMageWarsBloodstrikeSpellCast,
     'call-of-the-wild': validateMageWarsCallOfTheWildSpellCast,
     'charge-on': validateMageWarsChargeOnSpellCast,
@@ -849,13 +1136,19 @@ const MAGE_WARS_SPELL_CAST_FAMILY_VALIDATORS: Record<MageWarsSpellCastChoiceFami
     'elemental-staff-binding': validateMageWarsSelfEquipmentSpellCast,
     'explode': validateMageWarsExplodeSpellCast,
     'force-push': validateMageWarsForcePushSpellCast,
+    'temporary-trait': validateMageWarsTemporaryTraitSpellCast,
+    'mana-drain': validateMageWarsManaDrainSpellCast,
     'hidden-response-enchantment': validateMageWarsHiddenResponseEnchantmentSpellCast,
     'jet-stream': (ctx) => validateMageWarsAttackSpellCast(ctx, 'jet-stream'),
+    'knockdown': validateMageWarsKnockdownSpellCast,
     'life-drain': (ctx) => validateMageWarsHealingSpellCast(ctx, { cannotTargetSelf: true }),
     'self-equipment': validateMageWarsSelfEquipmentSpellCast,
     'single-healing': (ctx) => validateMageWarsHealingSpellCast(ctx, { cannotTargetSelf: false }),
+    'status-healing': validateMageWarsStatusHealingSpellCast,
+    'toxin-purification': validateMageWarsToxinPurificationSpellCast,
     'sleep': validateMageWarsSleepSpellCast,
     'steal-enchantment': validateMageWarsStealEnchantmentSpellCast,
+    'move-enchantment': validateMageWarsMoveEnchantmentSpellCast,
     'summon-creature': validateMageWarsZoneTargetSpellCast,
     'tanglevine': validateMageWarsTanglevineSpellCast,
     'teleport': validateMageWarsTeleportSpellCast,
@@ -899,6 +1192,7 @@ export function validateCommand(
             if (phase !== 'planning') return invalid('wrongPhase');
             const object = getArenaObject(state.core, command.payload.objectId);
             if (!object) return invalid('invalidSourceObject');
+            if (isMageWarsBanishedArenaObject(object)) return invalid('objectBanished');
             if (object.ownerId !== player.id) return invalid('notYourObject');
             if (!isMageWarsSpellcastingObject(object) || !isMageWarsConfiguredSpellcastingSource(object.spellcastingSource)) {
                 return invalid('objectCannotCastSpells');
@@ -925,6 +1219,7 @@ export function validateCommand(
                 : undefined;
             if (command.payload.casterObjectId && !casterObject) return invalid('invalidSourceObject');
             if (casterObject) {
+                if (isMageWarsBanishedArenaObject(casterObject)) return invalid('objectBanished');
                 if (casterObject.ownerId !== player.id) return invalid('notYourObject');
                 if (!isMageWarsSpellcastingObject(casterObject) || !isMageWarsConfiguredSpellcastingSource(casterObject.spellcastingSource)) {
                     return invalid('objectCannotCastSpells');
@@ -973,14 +1268,19 @@ export function validateCommand(
                 const objectMana = casterObject.mana ?? 0;
                 if (objectMana + player.mana < costResolution.manaCost) return invalid('insufficientMana');
             }
-            if (costResolution.fixedCost && command.payload.manaCost !== costResolution.manaCost) {
+            if (
+                costResolution.fixedCost
+                && spellCastChoiceFamily !== 'status-healing'
+                && command.payload.manaCost !== costResolution.manaCost
+            ) {
                 return invalid('manaCostMismatch');
             }
             const manaValidatedByTargetFamily = MAGE_WARS_TARGET_DEPENDENT_MANA_FAMILIES.has(spellCastChoiceFamily);
             if (!manaValidatedByTargetFamily && !casterObject && player.mana < costResolution.manaCost) {
                 return invalid('insufficientMana');
             }
-            if (!casterObject && hasMageWarsStunStatus(player)) {
+            const stunnedMage = !casterObject && hasMageWarsStunStatus(player);
+            if (stunnedMage) {
                 if (isMageWarsAttackSpell(costResolution.spell)) {
                     return invalid('playerStunnedCannotCastAttackSpell');
                 }
@@ -989,7 +1289,9 @@ export function validateCommand(
                 }
             }
             if (!casterObject) {
-                const mageCastMode = resolveMageWarsMageSpellCastMode(phase, costResolution.spell);
+                const mageCastMode = resolveMageWarsMageSpellCastMode(phase, costResolution.spell, {
+                    stunned: stunnedMage,
+                });
                 if (!mageCastMode) {
                     return invalid(QUICKCAST_PHASES.includes(phase) && !isMageWarsQuickSpell(costResolution.spell)
                         ? 'spellNotQuick'
@@ -1027,6 +1329,13 @@ export function validateCommand(
             if (
                 hasStealEnchantmentNewTarget
                 && spellCastChoiceFamily !== 'steal-enchantment'
+                && spellCastChoiceFamily !== 'move-enchantment'
+            ) {
+                return invalid('invalidTargetMode');
+            }
+            if (
+                command.payload.selectedEnchantmentObjectIds !== undefined
+                && spellCastChoiceFamily !== 'toxin-purification'
             ) {
                 return invalid('invalidTargetMode');
             }
@@ -1035,6 +1344,9 @@ export function validateCommand(
             }
             if (command.payload.targetObjectId && !getArenaObject(state.core, command.payload.targetObjectId)) {
                 return invalid('invalidTargetObject');
+            }
+            if (command.payload.targetObjectId && isMageWarsBanishedArenaObject(getArenaObject(state.core, command.payload.targetObjectId)!)) {
+                return invalid('targetObjectBanished');
             }
             if (command.payload.newTargetPlayerId && !state.core.players[command.payload.newTargetPlayerId]) {
                 return invalid('invalidTargetPlayer');
@@ -1081,6 +1393,7 @@ export function validateCommand(
             if (!object) return invalid('invalidSourceObject');
             if (object.ownerId !== player.id) return invalid('notYourObject');
             if (object.kind !== 'creature') return invalid('objectCannotAct');
+            if (isMageWarsBanishedArenaObject(object)) return invalid('objectBanished');
             if (!object.actionReady) return invalid('objectActionSpent');
             if (hasMageWarsStunStatus(object)) return invalid('objectStunned');
             if (isMageWarsArenaObjectRestrained(object)) return invalid('objectCrippled');
@@ -1096,6 +1409,7 @@ export function validateCommand(
                 if (!object) return invalid('invalidSourceObject');
                 if (object.ownerId !== player.id) return invalid('notYourObject');
                 if (object.kind !== 'creature') return invalid('objectCannotAct');
+                if (isMageWarsBanishedArenaObject(object)) return invalid('objectBanished');
                 if (!object.actionReady) return invalid('objectActionSpent');
                 if (hasMageWarsStunStatus(object)) return invalid('objectStunned');
                 return { valid: true };
@@ -1129,6 +1443,7 @@ export function validateCommand(
             if (!attacker) return invalid('invalidSourceObject');
             if (attacker.ownerId !== player.id) return invalid('notYourObject');
             if (attacker.kind !== 'creature') return invalid('objectCannotAct');
+            if (isMageWarsBanishedArenaObject(attacker)) return invalid('objectBanished');
             if (hasMageWarsStunStatus(attacker)) return invalid('objectStunned');
             const attackProfile = getMageWarsObjectAttackProfile(attacker, attackProfileId);
             if (!attackProfile) {
@@ -1160,9 +1475,10 @@ export function validateCommand(
             }
             const targetObject = targetObjectId ? getArenaObject(state.core, targetObjectId) : undefined;
             if (!targetObject) return invalid('invalidTargetObject');
+            if (isMageWarsBanishedArenaObject(targetObject)) return invalid('targetObjectBanished');
             if (targetObject.ownerId === player.id) return invalid('cannotAttackFriendlyObject');
             if (targetObject.damage >= targetObject.life) return invalid('targetAlreadyDefeated');
-            if (!isMageWarsObjectAttackTargetAllowed(attacker, attackProfile, targetObject)) {
+            if (!isMageWarsObjectAttackTargetAllowed(attacker, attackProfile, targetObject, state.core)) {
                 return invalid('meleeCannotAttackFlying');
             }
             if (isMageWarsRangedObjectAttackForbiddenTarget(attackProfile, targetObject)) {
@@ -1195,6 +1511,7 @@ export function validateCommand(
             if (!equipment) return invalid('invalidSourceObject');
             if (equipment.ownerId !== player.id) return invalid('notYourObject');
             if (!isMageWarsEquipmentArenaObject(equipment)) return invalid('objectCannotAct');
+            if (isMageWarsBanishedArenaObject(equipment)) return invalid('objectBanished');
             if (equipment.anchoredToPlayerId !== player.id || equipment.zoneId !== player.mageZoneId) {
                 return invalid('equipmentNotAttachedToMage');
             }
@@ -1232,9 +1549,10 @@ export function validateCommand(
 
             const targetObject = targetObjectId ? getArenaObject(state.core, targetObjectId) : undefined;
             if (!targetObject) return invalid('invalidTargetObject');
+            if (isMageWarsBanishedArenaObject(targetObject)) return invalid('targetObjectBanished');
             if (targetObject.ownerId === player.id) return invalid('cannotAttackFriendlyObject');
             if (targetObject.damage >= targetObject.life) return invalid('targetAlreadyDefeated');
-            if (!isMageWarsObjectAttackTargetAllowed(equipment, attackProfile, targetObject)) {
+            if (!isMageWarsObjectAttackTargetAllowed(equipment, attackProfile, targetObject, state.core)) {
                 return invalid('meleeCannotAttackFlying');
             }
             if (isMageWarsRangedObjectAttackForbiddenTarget(attackProfile, targetObject)) {

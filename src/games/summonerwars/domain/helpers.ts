@@ -598,6 +598,15 @@ export function getValidSummonPositionsForCard(
     }
   }
 
+  // 仲裁“护持”：仲裁士兵可召唤到友方护持牧师相邻的空格。
+  if (unitCard.faction === 'zhongcai') {
+    for (const unit of getPlayerUnits(state, playerId)) {
+      if (getUnitAbilities(unit, state).includes('zhongcai_support')) {
+        addAdjacentEmpty(unit.position);
+      }
+    }
+  }
+
   // 火焰龙兽 - 护主：火焰龙兽可召唤到召唤师相邻位置。
   if ((unitCard.abilities ?? []).includes('huijin_guard_master')) {
     const summoner = getSummoner(state, playerId);
@@ -740,6 +749,7 @@ export function getUnitBaseAbilities(unit: BoardUnit): string[] {
  */
 export function getUnitAbilities(unit: BoardUnit, state: SummonerWarsCore): string[] {
   if (isUnitFrozen(state, unit)) return [];
+  if (unit.suppressedUntilTurnEnd) return [];
 
   const result = getUnitBaseAbilities(unit);
 
@@ -1412,7 +1422,7 @@ export function getPushPullOptions(
  */
 export function hasEntangleAbility(unit: BoardUnit, state: SummonerWarsCore): boolean {
   const abilities = getUnitAbilities(unit, state);
-  return abilities.includes('rebound') || abilities.includes('entangle');
+  return abilities.includes('rebound') || abilities.includes('entangle') || abilities.includes('zhongcai_high_gate');
 }
 
 /**

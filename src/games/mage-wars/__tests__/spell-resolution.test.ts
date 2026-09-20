@@ -1213,6 +1213,74 @@ describe('mage-wars spell resolution', () => {
         });
     });
 
+    it('casts Lightning Bolt from the wizard spellbook as a single-target stun attack', () => {
+        const spellCardId = 1708;
+        const statusRandom: RandomFn = {
+            ...fixedRandom,
+            d: (sides: number) => (sides === 12 ? 7 : 3),
+        };
+        const planningState = setupState('planning');
+        const planned = runCommand({
+            core: withPlayerMage(planningState.core, '0', MAGE_IDS.WIZARD_APPRENTICE),
+            sys: planningState.sys,
+        }, planCommand([spellCardId]));
+        const target = makeArenaObject('lightning-bolt-target', '1', ARENA_ZONE_IDS.A2, {
+            life: 30,
+        });
+
+        const result = runCommand({
+            core: withArenaObject(planned.state.core, target),
+            sys: { ...planned.state.sys, phase: 'creatureAction' },
+        }, {
+            type: MAGE_WARS_COMMANDS.CAST_SPELL,
+            playerId: '0',
+            payload: {
+                spellCardId,
+                manaCost: 10,
+                targetObjectId: target.id,
+            },
+        }, statusRandom);
+
+        expect(planned.success).toBe(true);
+        expect(result.success).toBe(true);
+        expect(result.events).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.SPELL_ATTACK_ROLLED,
+                payload: expect.objectContaining({
+                    spellCardId,
+                    sourceAbilityId: 'mw.spell.1708',
+                    targetObjectId: target.id,
+                    diceResults: [3, 3, 3, 3, 3, 3],
+                    effectDieResult: 7,
+                    baseDamage: 18,
+                }),
+            }),
+            expect.objectContaining({
+                type: 'DAMAGE_DEALT',
+                payload: expect.objectContaining({
+                    targetId: target.id,
+                    actualDamage: 18,
+                    sourceAbilityId: 'mw.spell.1708',
+                }),
+            }),
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.STATUS_TOKEN_PLACED,
+                payload: expect.objectContaining({
+                    targetObjectId: target.id,
+                    statusTokenId: STATUS_TOKEN_IDS.STUN,
+                    amount: 1,
+                    sourceAbilityId: 'mw.spell.1708',
+                    spellCardId,
+                }),
+            }),
+        ]));
+        expect(result.state.core.objects[target.id]).toMatchObject({
+            damage: 18,
+            statusTokens: { [STATUS_TOKEN_IDS.STUN]: 1 },
+        });
+        expect(result.state.core.players['0'].discardSpellCardIds).toEqual([spellCardId]);
+    });
+
     it('does not place burn on arena objects with cannot-burn traits', () => {
         const spellCardId = 1702;
         const statusRandom: RandomFn = {

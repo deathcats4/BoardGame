@@ -139,6 +139,7 @@ import {
     getRemainingBaseLimitedMinionQuotaRestrictions,
     canUseBaseLimitedMinionQuota,
     canUseSameNameMinionQuota,
+    findSpecificExtraActionPlay,
     findSpecificExtraMinionPlay,
     getBestMatchingGlobalPowerLimitedQuota,
     getRemainingBaseLimitedPowerLimitedMinionQuotas,
@@ -1210,6 +1211,7 @@ export function reduceTurnStartedEvent(
                 baseLimitedMinionQuotaRestrictions: undefined,
                 baseLimitedSameNameRequired: undefined,
                 specificExtraMinionPlays: undefined,
+                specificExtraActionPlays: undefined,
                 extraMinionPowerCaps: undefined,
                 extraMinionPowerMax: undefined,
                 sameNameMinionRemaining: undefined,
@@ -2082,6 +2084,12 @@ export function reduceActionPlayedEvent(
     const isOngoing = def && def.type === 'action' && (def as ActionCardDef).subtype === 'ongoing';
     const isSpecial = def && def.type === 'action' && (def as ActionCardDef).subtype === 'special';
     const wasExtraActionPlay = isExtraAction === true || player.actionsPlayed >= 1;
+    const specificExtraActionPlay = findSpecificExtraActionPlay(player, {
+        cardUid,
+        defId,
+        targetBaseIndex: event.payload.targetBaseIndex,
+        targetMinionUid: event.payload.targetMinionUid,
+    });
 
     const newHand = (fromBuried || fromDiscard || fromStored) ? player.hand : player.hand.filter(c => c.uid !== cardUid);
     const newStoredCards = fromStored
@@ -2127,6 +2135,9 @@ export function reduceActionPlayedEvent(
             extraCardsPlayedThisTurn: wasExtraActionPlay
                 ? (player.extraCardsPlayedThisTurn ?? 0) + 1
                 : player.extraCardsPlayedThisTurn,
+            specificExtraActionPlays: specificExtraActionPlay
+                ? player.specificExtraActionPlays?.filter((_entry, index) => index !== specificExtraActionPlay.index)
+                : player.specificExtraActionPlays,
         },
     };
     if (resolvedOwnerId !== playerId) {
@@ -3706,16 +3717,49 @@ export function reduceLimitModifiedEvent(
         limitType,
         delta,
         restrictToBase,
+        restrictToMinionUid,
+        restrictToCardUid,
+        restrictToCardDefId,
         powerMax,
         sameNameOnly,
         sameNameDefId,
         specificCardUid,
         excludedMinionDefIds,
         playTiming,
+        destroyAttachedActionAtTurnEnd,
     } = event.payload;
     const player = state.players[playerId];
     if (playTiming === 'immediate') {
         return state;
+    }
+    if (limitType === 'action' && restrictToCardUid !== undefined) {
+        const existing = player.specificExtraActionPlays ?? [];
+        const nextSpecificExtraActionPlays = delta > 0
+            ? [
+                ...existing,
+                ...Array.from({ length: delta }, () => ({
+                    cardUid: restrictToCardUid,
+                    reason: event.payload.reason,
+                    ...(restrictToBase !== undefined ? { restrictToBase } : {}),
+                    ...(restrictToMinionUid !== undefined ? { restrictToMinionUid } : {}),
+                    ...(restrictToCardDefId !== undefined ? { restrictToCardDefId } : {}),
+                    ...(destroyAttachedActionAtTurnEnd ? { destroyAttachedActionAtTurnEnd: true } : {}),
+                })),
+            ]
+            : existing;
+        return {
+            ...state,
+            players: {
+                ...state.players,
+                [playerId]: {
+                    ...player,
+                    actionLimit: player.actionLimit + delta,
+                    specificExtraActionPlays: nextSpecificExtraActionPlays.length > 0
+                        ? nextSpecificExtraActionPlays
+                        : undefined,
+                },
+            },
+        };
     }
     if (limitType === 'minion') {
         if (specificCardUid !== undefined) {

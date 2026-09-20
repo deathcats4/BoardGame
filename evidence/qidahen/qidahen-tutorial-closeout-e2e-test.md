@@ -3,36 +3,51 @@
 ## 验收边界
 
 - 当前实现现场：`D:\gongzuo\webgame\BoardGame` 根目录当前工作区。
-- 教程真实截图批次：`test-results/evidence-screenshots/_shared/qidahen-教程完成/current-closeout-final-20260711`。
+- 教程真实截图批次：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T08-49-35-606Z`。
 - 本记录只证明教程流程、棋盘视觉、轮盘交互和移动端手牌展示链路，不证明《七大恨》全部规则已完成。
 - OpenSpec `2.4 / 4.5` 仍有事件效果全集和完整战术时机缺口，不能因本次截图通过而勾选完成。
+
+## 2026-09-19 本轮重构记录
+
+本轮将基础教程从“识别手牌资源”继续收敛到当前真实决策：
+
+- 删除与当前局面无关的 `opening-hand` 教学卡；正式开局自动处理结束后，欢迎页直接进入公共轮盘的第一个真实决策。
+- 新增 `hand-inspect` 步骤，明确桌面端点击牌右上角“看”、移动端长按牌面、关闭后回到牌桌。
+- 正式 `HandCard` 接入触屏长按检视；长按后的合成 click 被抑制，避免误打出、误支付或误弃牌。
+- 放大层提升到卡片预览层级，修复教程提示卡盖住移动端关闭入口的问题。
+
+静态与领域验证：
+
+- 七大恨教程定向单测：`tutorialFlow.test.ts` 的 `19/19 passed`。
+- `npm run typecheck`：通过。
+- `npm run spec:lint`：通过。
+- `npm run i18n:check -- --game qidahen`：命令可运行，但被既有 `game-summonerwars.factions.zhongcai` 缺失中英文键阻断；该缺口不属于七大恨本轮改动。
+
+本轮真实 E2E：
+
+- `npm run test:e2e:file -- e2e/qidahen/qidahen-closeout.e2e.ts` 最终结果为 `17/17 passed`。
+- 其中单项复跑确认了桌面基础教程的手牌检视入口、进攻/野战战术确认条，以及移动横屏长按手牌检视；长按后未触发支付或正式行动，关闭放大层后回到牌桌。
+- 首次全量复跑的第 17 条只命中旧文案断言；按当前玩家可见文案更新断言后，第二次全量复跑 17 条全部通过。
 
 ## 端到端结果
 
 执行命令：
 
 ```powershell
-$env:QIDAHEN_TUTORIAL_SCREENSHOT_RUN_ID='current-closeout-final-20260711'
-node scripts/infra/run-e2e-single.mjs ci e2e/qidahen/qidahen-closeout.e2e.ts
+npm run test:e2e:file -- e2e/qidahen/qidahen-closeout.e2e.ts
 ```
 
-- 结果：`16/16` 通过。
-- 桌面最终截图：61 张。
+- 结果：`17/17` 通过。
+- 桌面最终截图：66 张。
+- 移动端最终截图：3 张（检视前、长按打开检视、关闭后回到牌桌）。
+- 桌面截图批次：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T08-49-35-606Z`。
+- 移动截图批次：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T08-49-35-606Z-mobile`。
 - 截图范围：`00-教程目录-先选择章节.png` 到 `46-朝鲜第5步-看朝鲜耗损与山海关结果.png`。
 - 覆盖内容：教程目录、基础回合、轮盘、军备、事件、进攻、战斗、撤退、攻城、外交、跨年和朝鲜流程。
 
 ## 图面核验
 
-61 张桌面截图被整理为 8 张轻量核验拼图，逐张核对后通过：
-
-- `temp/qidahen-closeout-final-visual-audit/01-教程当前批次-01-08.webp`
-- `temp/qidahen-closeout-final-visual-audit/02-教程当前批次-09-16.webp`
-- `temp/qidahen-closeout-final-visual-audit/03-教程当前批次-17-24.webp`
-- `temp/qidahen-closeout-final-visual-audit/04-教程当前批次-25-32.webp`
-- `temp/qidahen-closeout-final-visual-audit/05-教程当前批次-33-40.webp`
-- `temp/qidahen-closeout-final-visual-audit/06-教程当前批次-41-48.webp`
-- `temp/qidahen-closeout-final-visual-audit/07-教程当前批次-49-56.webp`
-- `temp/qidahen-closeout-final-visual-audit/08-教程当前批次-57-61.webp`
+66 张桌面截图与 3 张移动截图按原始 PNG 逐张抽审，关键压力态包括：公共轮盘首个决策、手牌区与教程卡同屏、手牌放大层、战术确认条、攻城两层选择、跨年结果和移动端放大卡。
 
 核验结论：
 
@@ -42,12 +57,13 @@ node scripts/infra/run-e2e-single.mjs ci e2e/qidahen/qidahen-closeout.e2e.ts
 
 移动端最终图：
 
-- `test-results/evidence-screenshots/qidahen/mobile-layout.e2e/手机横屏下主地图、手牌和底部操作区应保持可见且不出现顶层横向溢出/01-手机横屏-四张手牌完整可见.png`
-- `test-results/evidence-screenshots/qidahen/mobile-layout.e2e/手机横屏下主地图、手牌和底部操作区应保持可见且不出现顶层横向溢出/02-手机横屏-手牌放大查看.png`
+- `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile/01-移动教程-手牌检视前.png`
+- `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile/02-移动教程-长按手牌打开检视.png`
+- `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile/03-移动教程-关闭检视回到牌桌.png`
 
 移动端结论：
 
-- 横屏四张手牌完整可见，首尾不再被裁成半张。
+- 横屏三张正式起手手牌完整可见，首尾不再被裁成半张。
 - 手牌放大层显示完整，关闭入口可见。
 
 ## 服务器交付
@@ -59,15 +75,15 @@ node scripts/infra/run-e2e-single.mjs ci e2e/qidahen/qidahen-closeout.e2e.ts
   - 标题：`七大恨教程与移动端收口验收`
   - 状态：`passed`
   - 图片数：63
-- `GET /api/tasks/boardgame/qidahen-tutorial-closeout` 返回的清单包含 61 张教程桌面图和 2 张移动端最终图，共 63 张。
+- 历史服务器记录中的图片清单为 61 张教程桌面图和 2 张移动端最终图；该历史数量不代表本轮本地最终批次。
 - 根地址返回任务产物预览应用，不是单独图片页面。
 
-本次恢复现场没有可用浏览器实例，因此没有重新完成手机视口下 63 张逐张滑动的交互回查；没有用本地截图、接口清单或临时页面冒充这项浏览器交互验证。服务器任务存在、标题和 63 张清单已通过公开接口直接核对。
+本轮没有重新发布服务器任务，也没有重新做手机视口下服务器轮播逐张滑动回查；本轮结论只基于本地正式 E2E、原始 PNG 和静态检查，不把历史服务器清单冒充为本轮交付。
 
 ## 完成边界
 
 - 教程端到端与视觉证据链：通过。
 - 移动端手牌完整显示与放大：通过。
-- 服务器任务和 63 张交付清单：通过。
-- 服务器手机轮播逐张滑动：本次恢复现场未重新验证。
+- 服务器任务和图片清单：这是历史交付记录，本轮只重新验证了工作区真实 E2E 与本地截图，不把历史服务器清单当作本轮证据。
+- 服务器手机轮播逐张滑动：本轮未重新验证。
 - 《七大恨》整体规则完成：未通过，继续受 OpenSpec `2.4 / 4.5` 缺口约束。

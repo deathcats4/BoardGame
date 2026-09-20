@@ -1261,4 +1261,109 @@ describe('mage-wars mage equipment', () => {
         );
         expect(validateCommand({ core: distantCore, sys: wrongMageState.sys }, command)).toBe('targetOutOfRange');
     });
+
+    it.each([
+        {
+            ringId: 3714,
+            attackId: 1706,
+            mageId: MAGE_IDS.PRIESTESS_APPRENTICE,
+            manaCost: 3,
+            attackManaCost: 5,
+            expectedDice: [3, 3, 3],
+            rawEffectDieResult: 3,
+            effectDieResult: 4,
+            statusTokenId: STATUS_TOKEN_IDS.DAZE,
+        },
+        {
+            ringId: 3719,
+            attackId: 1702,
+            mageId: MAGE_IDS.WARLOCK_APPRENTICE,
+            manaCost: 3,
+            attackManaCost: 5,
+            expectedDice: [3, 3, 3, 3, 3],
+            rawEffectDieResult: 6,
+            effectDieResult: 7,
+            statusTokenId: STATUS_TOKEN_IDS.BURN,
+        },
+    ])('applies damage-type ring $ringId to the mage attack spell $attackId', ({
+        ringId,
+        attackId,
+        mageId,
+        manaCost,
+        attackManaCost,
+        expectedDice,
+        rawEffectDieResult,
+        effectDieResult,
+        statusTokenId,
+    }) => {
+        const planningState = setupState('planning');
+        const planned = runCommand({
+            core: withPlayerMage(planningState.core, '0', mageId),
+            sys: planningState.sys,
+        }, planCommand([ringId, attackId]));
+        const equipped = runCommand({
+            core: planned.state.core,
+            sys: { ...planned.state.sys, phase: 'initiativeQuickcast', phaseActorId: '0' },
+        }, {
+            type: MAGE_WARS_COMMANDS.CAST_SPELL,
+            playerId: '0',
+            payload: {
+                spellCardId: ringId,
+                manaCost,
+                targetPlayerId: '0',
+            },
+        });
+        const target = makeArenaObject(`ring-target-${ringId}`, '1', PLAYER_ZERO_START_ZONE, {
+            life: 30,
+            armor: 0,
+        });
+        const attackState: MatchState<MageWarsCore> = {
+            core: {
+                ...withArenaObject(equipped.state.core, target),
+                phaseActorId: '0',
+                players: {
+                    ...equipped.state.core.players,
+                    '0': {
+                        ...equipped.state.core.players['0'],
+                        quickcastReady: true,
+                    },
+                },
+            },
+            sys: { ...equipped.state.sys, phase: 'initiativeQuickcast' },
+        };
+        const attacked = runCommand(attackState, {
+            type: MAGE_WARS_COMMANDS.CAST_SPELL,
+            playerId: '0',
+            payload: {
+                spellCardId: attackId,
+                manaCost: attackManaCost,
+                targetObjectId: target.id,
+            },
+        }, {
+            ...fixedRandom,
+            d: (sides: number) => sides === 12 ? rawEffectDieResult : 3,
+        });
+
+        expect(equipped.success).toBe(true);
+        expect(attacked.success).toBe(true);
+        expect(attacked.events).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.SPELL_ATTACK_ROLLED,
+                payload: expect.objectContaining({
+                    spellCardId: attackId,
+                    diceResults: expectedDice,
+                    rawEffectDieResult,
+                    effectDieResult,
+                }),
+            }),
+            expect.objectContaining({
+                type: MAGE_WARS_EVENTS.STATUS_TOKEN_PLACED,
+                payload: expect.objectContaining({
+                    targetObjectId: target.id,
+                    statusTokenId,
+                    amount: 1,
+                }),
+            }),
+        ]));
+    });
 });

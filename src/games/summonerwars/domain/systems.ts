@@ -70,6 +70,7 @@ const INTERACTIVE_EVENT_BASE_IDS = new Set<string>([
   CARD_IDS.SHADOW_HIDE_IN_DARKNESS,
   CARD_IDS.SHADOW_MARL_GRIMOIRE,
   CARD_IDS.SHADOW_SHADOW_PULSE,
+  CARD_IDS.ZHONGCAI_OBEDIENCE,
 ]);
 
 function buildBloodRuneOptions(core: SummonerWarsCore, owner: PlayerId): PromptOption<SwInteractionValue>[] {
@@ -106,6 +107,20 @@ type SwInteractionMeta =
       type: 'event_target';
       cardId: string;
       baseId: string;
+    }
+  | {
+      type: 'zhongcai_obedience_select_unit';
+      cardId: string;
+    }
+  | {
+      type: 'zhongcai_obedience_select_position';
+      cardId: string;
+      targetPosition: CellCoord;
+    }
+  | {
+      type: 'zhongcai_decree_discard';
+      cardId: string;
+      charges: number;
     }
   | {
       type: 'shadow_marl_select_card';
@@ -566,6 +581,10 @@ type SwInteractionValue =
   | { action: 'infection'; cardId: string; sourceUnitId: string; targetPosition: CellCoord }
   | { action: 'shouren_encourage'; choice: 'reroll' | 'keep' }
   | { action: 'event_target'; targetPosition: CellCoord }
+  | { action: 'zhongcai_obedience_unit'; targetPosition: CellCoord }
+  | { action: 'zhongcai_obedience_position'; newPosition: CellCoord }
+  | { action: 'zhongcai_decree_discard' }
+  | { action: 'zhongcai_decree_keep' }
   | { action: 'shadow_marl_card'; targetCardId: string }
   | { action: 'shadow_marl_damage'; targetPosition: CellCoord }
   | { action: 'shadow_marl_finish'; skip?: boolean }
@@ -657,7 +676,7 @@ type SwInteractionValue =
   | { action: 'yongheng_continuance_retain'; targetOwner: PlayerId; targetCardId: string }
   | { action: 'huijin_call_guards_target'; targetPosition: CellCoord }
   | { action: 'huijin_call_guards_position'; targetPosition: CellCoord; position: CellCoord }
-  | { action: 'activated_ability_target'; abilityId: string; targetPosition?: CellCoord; targetCardId?: string }
+  | { action: 'activated_ability_target'; abilityId: string; targetPosition?: CellCoord; targetCardId?: string; newPosition?: CellCoord }
   | { action: 'fire_sacrifice_summon'; sacrificeUnitId: string }
   | { action: 'ice_ram_target'; targetPosition: CellCoord }
   | { action: 'ice_ram_push'; targetPosition: CellCoord; pushNewPosition?: CellCoord }
@@ -1880,6 +1899,24 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
               );
               break;
             }
+            case CARD_IDS.ZHONGCAI_OBEDIENCE: {
+              if (!summoner) break;
+              const targets = friendlyUnits
+                .filter((unit) => unit.card.unitClass === 'common'
+                  && manhattanDistance(summoner.position, unit.position) <= 3)
+                .map((unit) => unit.position);
+              queueEventInteraction(
+                'zhongcai-obedience-unit',
+                'interaction.sw.zhongcaiObedienceUnit',
+                buildPositionOptions(targets, (pos) => ({
+                  action: 'zhongcai_obedience_unit',
+                  targetPosition: pos,
+                })),
+                { type: 'zhongcai_obedience_select_unit', cardId: payload.cardId },
+                { sourceId: baseId, targetType: 'minion', autoResolveIfSingle: false },
+              );
+              break;
+            }
             case CARD_IDS.NECRO_BLOOD_SUMMON: {
               const targets = friendlyUnits
                 .filter((unit) => {
@@ -2183,6 +2220,39 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
           newState = queueInteraction(newState, interaction);
         }
 
+        if (event.type === SW_EVENTS.ZHONGCAI_DECREE_PROMPTED) {
+          const payload = event.payload as { playerId: PlayerId; cardId: string; charges: number };
+          const options: PromptOption<SwInteractionValue>[] = [
+            {
+              id: 'discard',
+              labelKey: 'actions.zhongcaiDecreeDiscard',
+              value: { action: 'zhongcai_decree_discard' },
+            },
+            {
+              id: 'keep',
+              labelKey: 'actions.zhongcaiDecreeKeep',
+              value: { action: 'zhongcai_decree_keep' },
+            },
+          ];
+          const interaction = createSimpleChoice(
+            `sw-zhongcai-decree-${event.timestamp ?? 0}-${payload.cardId}`,
+            payload.playerId,
+            'interaction.sw.zhongcaiDecree',
+            options,
+            { sourceId: 'zhongcai_decree', targetType: 'button', autoResolveIfSingle: false },
+          );
+          const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+          interaction.data = {
+            ...interactionData,
+            sw: {
+              type: 'zhongcai_decree_discard',
+              cardId: payload.cardId,
+              charges: payload.charges,
+            } satisfies SwInteractionMeta,
+          };
+          newState = queueInteraction(newState, interaction, { urgent: true });
+        }
+
         if (event.type === SW_EVENTS.SUMMON_FROM_DISCARD_REQUESTED) {
           const payload = event.payload as {
             playerId: PlayerId;
@@ -2415,6 +2485,125 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
           if (!actionId || !sourceUnitId || !sourcePosition) continue;
 
           const shadowSourceUnit = getUnitAt(newState.core, sourcePosition);
+
+          // 仲裁：圣言 / 抹消 / 鼓舞的真实交互入口。
+          if (
+            shadowSourceUnit
+            && (
+              (actionId === 'zhongcai_word' && payload.actionId === 'zhongcai_word')
+              || actionId === 'afterMove:zhongcai_word'
+            )
+          ) {
+            const targets = getPlayerUnits(newState.core, shadowSourceUnit.owner)
+              .filter((unit) => unit.instanceId !== sourceUnitId
+                && unit.card.unitClass === 'common'
+                && manhattanDistance(sourcePosition, unit.position) <= 2);
+            if (targets.length > 0) {
+              const options: PromptOption<SwInteractionValue>[] = [
+                ...buildPositionOptions(targets.map((unit) => unit.position), (pos) => ({
+                  action: 'activated_ability_target',
+                  abilityId: 'zhongcai_word',
+                  targetPosition: pos,
+                })),
+                { id: 'skip', label: '跳过', labelKey: 'actions.skip', value: { skip: true } },
+              ];
+              const interactionId = `sw-zhongcai-word-target-${event.timestamp ?? 0}-${sourceUnitId}`;
+              if (!hasQueuedInteraction(newState, interactionId)) {
+                const interaction = createSimpleChoice(
+                  interactionId,
+                  shadowSourceUnit.owner,
+                  'interaction.sw.zhongcaiWord',
+                  options,
+                  { sourceId: 'zhongcai_word', targetType: 'minion', autoResolveIfSingle: false },
+                );
+                const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+                interaction.data = {
+                  ...interactionData,
+                  sw: {
+                    type: 'activated_ability_target',
+                    abilityId: 'zhongcai_word',
+                    sourceUnitId,
+                    sourcePosition,
+                    step: 'selectUnit',
+                  } satisfies SwInteractionMeta,
+                };
+                newState = queueInteraction(newState, interaction);
+              }
+            }
+          }
+
+          // 只有原始自定义动作触发事件才打开目标选择；
+          // 玩家选定目标后的完成事件也会带 abilityId，但没有 actionId，不能再次弹框。
+          if (shadowSourceUnit && actionId === 'zhongcai_erase' && payload.actionId === 'zhongcai_erase') {
+            const targets = getPlayerUnits(newState.core, shadowSourceUnit.owner)
+              .filter((unit) => unit.card.unitClass === 'common'
+                && manhattanDistance(sourcePosition, unit.position) <= 3);
+            if (targets.length > 0) {
+              const options: PromptOption<SwInteractionValue>[] = [
+                ...buildPositionOptions(targets.map((unit) => unit.position), (pos) => ({
+                  action: 'activated_ability_target',
+                  abilityId: 'zhongcai_erase',
+                  targetPosition: pos,
+                })),
+                { id: 'skip', label: '跳过', labelKey: 'actions.skip', value: { skip: true } },
+              ];
+              const interaction = createSimpleChoice(
+                `sw-zhongcai-erase-${event.timestamp ?? 0}-${sourceUnitId}`,
+                shadowSourceUnit.owner,
+                'interaction.sw.zhongcaiErase',
+                options,
+                { sourceId: 'zhongcai_erase', targetType: 'minion', autoResolveIfSingle: false },
+              );
+              const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+              interaction.data = {
+                ...interactionData,
+                sw: {
+                  type: 'activated_ability_target',
+                  abilityId: 'zhongcai_erase',
+                  sourceUnitId,
+                  sourcePosition,
+                  step: 'selectUnit',
+                } satisfies SwInteractionMeta,
+              };
+              newState = queueInteraction(newState, interaction);
+            }
+          }
+
+          if (shadowSourceUnit && actionId === 'zhongcai_inspire' && payload.actionId === 'zhongcai_inspire') {
+            const targets = getPlayerUnits(newState.core, shadowSourceUnit.owner)
+              .filter((unit) => unit.card.unitClass === 'common'
+                && unit.damage > 0
+                && manhattanDistance(sourcePosition, unit.position) === 1);
+            if (targets.length > 0) {
+              const options: PromptOption<SwInteractionValue>[] = [
+                ...buildPositionOptions(targets.map((unit) => unit.position), (pos) => ({
+                  action: 'activated_ability_target',
+                  abilityId: 'zhongcai_inspire',
+                  targetPosition: pos,
+                })),
+                { id: 'skip', label: '跳过', labelKey: 'actions.skip', value: { skip: true } },
+              ];
+              const interaction = createSimpleChoice(
+                `sw-zhongcai-inspire-${event.timestamp ?? 0}-${sourceUnitId}`,
+                shadowSourceUnit.owner,
+                'interaction.sw.zhongcaiInspire',
+                options,
+                { sourceId: 'zhongcai_inspire', targetType: 'minion', autoResolveIfSingle: false },
+              );
+              const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+              interaction.data = {
+                ...interactionData,
+                sw: {
+                  type: 'activated_ability_target',
+                  abilityId: 'zhongcai_inspire',
+                  sourceUnitId,
+                  sourcePosition,
+                  step: 'selectUnit',
+                } satisfies SwInteractionMeta,
+              };
+              newState = queueInteraction(newState, interaction);
+            }
+          }
 
           if ((actionId === 'shadow_judgment_request' || actionId === 'afterMove:shadow_judgment') && shadowSourceUnit) {
             const targets = getAdjacentCells(sourcePosition)
@@ -3808,6 +3997,84 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
                 },
               }));
             }
+          }
+
+          if (sw.type === 'zhongcai_obedience_select_unit') {
+            const picked = values.find((item) => item.action === 'zhongcai_obedience_unit') as
+              { action: 'zhongcai_obedience_unit'; targetPosition?: CellCoord } | undefined;
+            if (!picked?.targetPosition) continue;
+            const summoner = getSummoner(newState.core, payload.playerId);
+            const targetUnit = getUnitAt(newState.core, picked.targetPosition);
+            if (!summoner || !targetUnit
+              || targetUnit.owner !== payload.playerId
+              || targetUnit.card.unitClass !== 'common'
+              || manhattanDistance(summoner.position, picked.targetPosition) > 3) continue;
+            const destinations = getAdjacentCells(summoner.position)
+              .filter((pos) => isValidCoord(pos) && isCellEmpty(newState.core, pos));
+            if (destinations.length === 0) continue;
+            const options: PromptOption<SwInteractionValue>[] = [
+              ...destinations.map((pos) => ({
+                id: `pos:${pos.row},${pos.col}`,
+                label: formatCellCoord(pos),
+                value: { action: 'zhongcai_obedience_position' as const, newPosition: pos },
+              })),
+              { id: 'skip', label: '跳过', labelKey: 'actions.skip', value: { skip: true } },
+            ];
+            const interaction = createSimpleChoice(
+              `sw-zhongcai-obedience-position-${event.timestamp ?? 0}-${sw.cardId}`,
+              payload.playerId,
+              'interaction.sw.zhongcaiObediencePosition',
+              options,
+              { sourceId: 'zhongcai_obedience', targetType: 'generic', autoResolveIfSingle: false },
+            );
+            const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+            interaction.data = {
+              ...interactionData,
+              sw: {
+                type: 'zhongcai_obedience_select_position',
+                cardId: sw.cardId,
+                targetPosition: picked.targetPosition,
+              } satisfies SwInteractionMeta,
+            };
+            newState = queueInteraction(newState, interaction, { urgent: true });
+          }
+
+          if (sw.type === 'zhongcai_obedience_select_position') {
+            const picked = values.find((item) => item.action === 'zhongcai_obedience_position') as
+              { action: 'zhongcai_obedience_position'; newPosition?: CellCoord } | undefined;
+            if (!picked?.newPosition) continue;
+            nextEvents.push(...executeSwCommand(newState, random, {
+              type: SW_COMMANDS.PLAY_EVENT,
+              payload: {
+                cardId: sw.cardId,
+                targets: [sw.targetPosition],
+                newPosition: picked.newPosition,
+              },
+              playerId: payload.playerId,
+            }));
+          }
+
+          if (sw.type === 'zhongcai_decree_discard') {
+            const picked = values.find((item) => item.action === 'zhongcai_decree_discard') as
+              { action: 'zhongcai_decree_discard' } | undefined;
+            if (!picked) continue;
+            const activeEvent = newState.core.players[payload.playerId]?.activeEvents
+              .find((card) => card.id === sw.cardId);
+            if (!activeEvent || (activeEvent.charges ?? 0) <= 0) continue;
+            nextEvents.push({
+              type: SW_EVENTS.ACTIVE_EVENT_CHARGED,
+              payload: {
+                playerId: payload.playerId,
+                eventCardId: sw.cardId,
+                charges: Math.max(0, (activeEvent.charges ?? 0) - 1),
+              },
+              timestamp: event.timestamp,
+            });
+            nextEvents.push({
+              type: SW_EVENTS.ACTIVE_EVENT_DISCARDED,
+              payload: { playerId: payload.playerId, cardId: sw.cardId },
+              timestamp: event.timestamp,
+            });
           }
 
           if (sw.type === 'shadow_marl_select_card') {
@@ -5935,6 +6202,96 @@ export function createSummonerWarsInteractionSystem(): EngineSystem<SummonerWars
           if (sw.type === 'activated_ability_target') {
             const hasSkip = isSkipValue(value) || values.some((item) => isSkipValue(item));
             if (hasSkip) continue;
+
+            if (sw.abilityId === 'zhongcai_erase' && sw.step === 'selectUnit') {
+              const picked = values.find((item) => item.action === 'activated_ability_target') as
+                { action: 'activated_ability_target'; targetPosition?: CellCoord } | undefined;
+              if (!picked?.targetPosition) continue;
+              nextEvents.push(...executeSwCommand(newState, random, {
+                type: SW_COMMANDS.ACTIVATE_ABILITY,
+                payload: {
+                  abilityId: 'zhongcai_erase',
+                  sourceUnitId: sw.sourceUnitId,
+                  targetPosition: picked.targetPosition,
+                  _noSnapshot: true,
+                },
+                playerId: payload.playerId,
+              }));
+            }
+
+            if (sw.abilityId === 'zhongcai_inspire' && sw.step === 'selectUnit') {
+              const picked = values.find((item) => item.action === 'activated_ability_target') as
+                { action: 'activated_ability_target'; targetPosition?: CellCoord } | undefined;
+              if (!picked?.targetPosition) continue;
+              nextEvents.push(...executeSwCommand(newState, random, {
+                type: SW_COMMANDS.ACTIVATE_ABILITY,
+                payload: {
+                  abilityId: 'zhongcai_inspire',
+                  sourceUnitId: sw.sourceUnitId,
+                  targetPosition: picked.targetPosition,
+                  _noSnapshot: true,
+                },
+                playerId: payload.playerId,
+              }));
+            }
+
+            if (sw.abilityId === 'zhongcai_word' && sw.step === 'selectUnit') {
+              const picked = values.find((item) => item.action === 'activated_ability_target') as
+                { action: 'activated_ability_target'; targetPosition?: CellCoord } | undefined;
+              if (!picked?.targetPosition) continue;
+              const destinations = getForceDestinations(newState.core, picked.targetPosition, 1);
+              if (destinations.length === 0) continue;
+              const options: PromptOption<SwInteractionValue>[] = [
+                ...destinations.map((dest) => ({
+                  id: `pos:${dest.position.row},${dest.position.col}`,
+                  label: formatCellCoord(dest.position),
+                  value: {
+                    action: 'activated_ability_target' as const,
+                    abilityId: 'zhongcai_word',
+                    targetPosition: picked.targetPosition,
+                    newPosition: dest.position,
+                  },
+                })),
+                { id: 'skip', label: '跳过', labelKey: 'actions.skip', value: { skip: true } },
+              ];
+              const interaction = createSimpleChoice(
+                `sw-zhongcai-word-position-${event.timestamp ?? 0}-${sw.sourceUnitId}`,
+                payload.playerId,
+                'interaction.sw.zhongcaiWord',
+                options,
+                { sourceId: 'zhongcai_word', targetType: 'generic', autoResolveIfSingle: false },
+              );
+              const interactionData = (interaction.data ?? {}) as Record<string, unknown>;
+              interaction.data = {
+                ...interactionData,
+                sw: {
+                  type: 'activated_ability_target',
+                  abilityId: 'zhongcai_word',
+                  sourceUnitId: sw.sourceUnitId,
+                  sourcePosition: sw.sourcePosition,
+                  step: 'selectPosition',
+                  targetPosition: picked.targetPosition,
+                } satisfies SwInteractionMeta,
+              };
+              newState = queueInteraction(newState, interaction);
+            }
+
+            if (sw.abilityId === 'zhongcai_word' && sw.step === 'selectPosition') {
+              const picked = values.find((item) => item.action === 'activated_ability_target') as
+                { action: 'activated_ability_target'; targetPosition?: CellCoord; newPosition?: CellCoord } | undefined;
+              if (!picked?.targetPosition || !picked.newPosition) continue;
+              nextEvents.push(...executeSwCommand(newState, random, {
+                type: SW_COMMANDS.ACTIVATE_ABILITY,
+                payload: {
+                  abilityId: 'zhongcai_word',
+                  sourceUnitId: sw.sourceUnitId,
+                  targetPosition: picked.targetPosition,
+                  newPosition: picked.newPosition,
+                  _noSnapshot: true,
+                },
+                playerId: payload.playerId,
+              }));
+            }
 
             if (sw.abilityId === 'shadow_return_to_shadow' && sw.step === 'selectUnit') {
               const picked = values.find((item) => item.action === 'activated_ability_target') as

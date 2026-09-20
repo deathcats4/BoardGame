@@ -155,6 +155,75 @@ describe('格林童话代表性玩法行为', () => {
         expect(selected.finalState.core.players['0'].deck.map(card => card.uid)).toEqual(['minion-1', 'action-1']);
     });
 
+    it('一篮子好东西只将牌库中的行动放到牌库顶', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    deck: [
+                        makeCard('minion-1', 'grimms_fairy_tales_hansel', 'minion', '0'),
+                        makeCard('action-1', 'grimms_fairy_tales_another_story', 'action', '0'),
+                    ],
+                }),
+                '1': makePlayer('1'),
+            },
+        });
+        const result = invokeRegisteredAbilityContract('grimms_fairy_tales_basket_of_goodies', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            cardUid: 'basket',
+            defId: 'grimms_fairy_tales_basket_of_goodies',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 11,
+        });
+
+        expect(result.events.some(event => event.type === SU_EVENTS.DECK_INSPECTED)).toBe(true);
+        const selected = respondToPromptOption(
+            result.matchState!,
+            option => option.value?.cardUid === 'action-1',
+            'choose action from deck',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(selected.finalState.core.players['0'].deck.map(card => card.uid)).toEqual(['action-1', 'minion-1']);
+    });
+
+    it('侏儒怪可以将牌库中的任意牌放到牌库顶', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    deck: [
+                        makeCard('action-1', 'grimms_fairy_tales_another_story', 'action', '0'),
+                        makeCard('minion-1', 'grimms_fairy_tales_hansel', 'minion', '0'),
+                    ],
+                }),
+                '1': makePlayer('1'),
+            },
+        });
+        const result = invokeRegisteredAbilityContract('grimms_fairy_tales_rumpelstiltskin', 'onPlay', {
+            state: core,
+            matchState: makeMatchState(core),
+            playerId: '0',
+            cardUid: 'rumpelstiltskin',
+            defId: 'grimms_fairy_tales_rumpelstiltskin',
+            baseIndex: 0,
+            random: FIXED_RANDOM,
+            now: 12,
+        });
+
+        const selected = respondToPromptOption(
+            result.matchState!,
+            option => option.value?.cardUid === 'minion-1',
+            'choose any card from deck',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(selected.finalState.core.players['0'].deck.map(card => card.uid)).toEqual(['minion-1', 'action-1']);
+    });
+
     it('另一个故事在有合法弃牌时允许跳过，也能把至多三张弃牌洗回牌库', () => {
         const core = makeState({
             players: {

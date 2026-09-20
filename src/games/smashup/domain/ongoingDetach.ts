@@ -57,6 +57,7 @@ export function buildOngoingDetachedEvent(params: {
     defId: string;
     ownerId: PlayerId;
     reason: string;
+    isDestruction?: boolean;
     now?: number;
     clydeReturnToHand?: boolean;
     destination?: 'discard' | 'hand';
@@ -75,6 +76,7 @@ export function buildOngoingDetachedEvent(params: {
             defId: params.defId,
             ownerId: params.ownerId,
             reason: params.reason,
+            ...(params.isDestruction !== undefined ? { isDestruction: params.isDestruction } : {}),
             ...(params.clydeReturnToHand !== undefined ? { clydeReturnToHand: params.clydeReturnToHand } : {}),
             ...(params.destination !== undefined ? { destination: params.destination } : {}),
             ...(params.targetBaseIndex !== undefined ? { targetBaseIndex: params.targetBaseIndex } : {}),

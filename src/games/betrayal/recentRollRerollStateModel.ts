@@ -32,6 +32,7 @@ import {
     cloneMagicCameraRuntimeState,
     cloneUponReflectionRuntimeState,
 } from './hauntRuntimeSetupModel';
+import { resolveHumanAcknowledgementPlayerIds } from './acknowledgementReadModel';
 import { isDustHaunt } from './hauntScenarioReadModel';
 import { cloneHauntTraitorResolution } from './hauntTraitorResolutionModel';
 import { resolveDustTraitorVictoryResult } from './hauntVictoryModel';
@@ -244,16 +245,11 @@ function applyEventRecentRollRerollState(
                 effect: cloneUseEffect(nextEffect),
             }
             : undefined;
-        const configuredRequiredPlayerIds = pendingEventRoll.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
         nextRoll.latestLabel = nextBranch.label;
         core.recentRoll = nextRoll;
         core.pendingEventRollResolution = {
             ...pendingEventRoll,
-            requiredPlayerIds: configuredRequiredPlayerIds.length > 0
-                ? [...configuredRequiredPlayerIds]
-                : core.playerIds.length > 0
-                    ? [...core.playerIds]
-                    : [pendingEventRoll.playerId],
+            requiredPlayerIds: resolveHumanAcknowledgementPlayerIds(core, pendingEventRoll.playerId),
             acknowledgedPlayerIds: [],
             effect: cloneUseEffect(nextEffect),
             nextPendingEventChoice,

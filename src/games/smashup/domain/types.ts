@@ -555,6 +555,15 @@ export interface PlayerState {
         sameNameOnly?: boolean;
         sameNameDefId?: string;
     }>;
+    /** 当前出牌阶段暂存的“只能打出指定这张行动”的额外行动机会。 */
+    specificExtraActionPlays?: Array<{
+        cardUid: string;
+        reason: string;
+        restrictToBase?: number;
+        restrictToMinionUid?: string;
+        restrictToCardDefId?: string;
+        destroyAttachedActionAtTurnEnd?: boolean;
+    }>;
     /** 额外出牌的力量上限（如家园给的额外出牌只能打力量≤2的随从），回合结束清零 */
     extraMinionPowerMax?: number;
     /** 带力量上限的全局额外随从额度集合（每个元素代表 1 次受限额度），回合结束清零 */
@@ -713,6 +722,8 @@ export interface SmashUpReactionResourceFootprint {
     writes: SmashUpReactionResourceRef[];
     opensInteraction?: boolean;
     fallbackReason?: string;
+    /** 独立持续行动同时进入同一弃牌区时，写入顺序不影响结果。 */
+    commutativeOperation?: 'ongoing_detach_discard';
 }
 
 /**
@@ -1809,9 +1820,9 @@ export interface LimitModifiedEvent extends GameEvent<'su:limit_modified'> {
         restrictToMinionUid?: string;
         /** 仅 immediate 额外行动：按计分窗口特殊行动处理，用于保留基地限定和计分窗口限制。 */
         specialActionWindow?: 'meFirst' | 'afterScoring';
-        /** 立即额外行动限定只能打出指定卡牌实例 */
+        /** 额外行动限定只能打出指定卡牌实例；immediate 直接校验，banked 写入指定额外行动机会 */
         restrictToCardUid?: string;
-        /** 立即额外行动限定只能打出指定卡牌定义 */
+        /** 额外行动限定只能打出指定卡牌定义 */
         restrictToCardDefId?: string;
         /** 立即额外行动限定只能打出基地修正（持续行动且目标为基地） */
         restrictToBaseModifier?: boolean;
@@ -1827,6 +1838,8 @@ export interface LimitModifiedEvent extends GameEvent<'su:limit_modified'> {
         specificCardUid?: string;
         /** 仅 immediate：允许本次受限额外出牌从弃牌堆选择指定卡牌。 */
         allowFromDiscard?: boolean;
+        /** 仅 immediate：是否允许玩家放弃这次额外出牌；默认允许。 */
+        allowSkip?: boolean;
         /**
          * 仅 immediate 额外随从：若玩家选择“放弃这次额外随从”，是否需要消费掉 pendingMinionPlayEffects 的队列首项。
          * 用于避免“本应绑定本次额外随从的效果”泄漏到后续普通随从。
@@ -2150,6 +2163,8 @@ export interface OngoingDetachedEvent extends GameEvent<typeof SU_EVENTS.ONGOING
         defId: string;
         ownerId: PlayerId;
         reason: string;
+        /** false means the card is being transferred and must not trigger onCardDestroyed. */
+        isDestruction?: boolean;
         /** Clyde 2.0 replacement choice: true = put into Clyde controller's hand, false/absent = normal discard. */
         clydeReturnToHand?: boolean;
         destination?: 'discard' | 'hand';

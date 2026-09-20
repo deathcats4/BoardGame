@@ -377,12 +377,10 @@ export const handleCompanionHealthChanged: EventHandler<Extract<DiceThroneEvent,
     if (!player || !companion || companion.id !== event.payload.companionId) return state;
 
     const hp = Math.max(0, Math.min(companion.maxHp, companion.hp + event.payload.delta));
-    const previousActive = companion.active ?? companion.hp > 0;
+    // 新事件必须显式携带 active；旧事件回放时保留当时已存在的正式状态。
     const active = hp <= 0
         ? false
-        : typeof event.payload.active === 'boolean'
-            ? event.payload.active
-            : previousActive;
+        : event.payload.active ?? companion.active;
     return {
         ...state,
         players: {
@@ -457,7 +455,6 @@ export const handleAttackInitiated: EventHandler<Extract<DiceThroneEvent, { type
             attackModifierBonusDamage: queuedAttackModifierBonusDamage,
             bonusDamageSources: queuedBonusDamageSources.length > 0 ? queuedBonusDamageSources : undefined,
         },
-        lastResolvedAttackDamage: undefined,
         offensiveRollAttackMadeThisTurn: {
             ...(state.offensiveRollAttackMadeThisTurn ?? {}),
             [attackerId]: true,
@@ -762,6 +759,7 @@ export const handleTokenUsed: EventHandler<Extract<DiceThroneEvent, { type: 'TOK
         amount,
         effectType,
         damageModifier,
+        fullyEvaded,
         evasionRoll,
         deferredDamageEvents,
         appliesToCurrentAttack,
@@ -849,6 +847,9 @@ export const handleTokenUsed: EventHandler<Extract<DiceThroneEvent, { type: 'TOK
             pendingDamage = { 
                 ...state.pendingDamage, 
                 currentDamage: Math.max(0, state.pendingDamage.currentDamage + damageModifier),
+                isFullyEvaded: fullyEvaded === true
+                    ? true
+                    : state.pendingDamage.isFullyEvaded,
                 modifiers,
                 tokenUsageTotals,
                 deferredDamageEvents: deferredDamageEvents ?? state.pendingDamage.deferredDamageEvents,

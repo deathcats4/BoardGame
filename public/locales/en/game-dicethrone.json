@@ -363,10 +363,29 @@
         "At the end of the holder's next Offensive Roll Phase, remove this status and roll 1 die: 1 makes the attack deal no damage; 2-3 halves this attack's damage, rounded up; 4-6 resolves normally."
       ]
     },
+    "combo": {
+      "name": "Combo",
+      "description": [
+        "After this attack deals damage, spend 1 Combo to make one additional attack. Each effect may be activated once per turn."
+      ]
+    },
+    "invisible": {
+      "name": "Invisible",
+      "description": [
+        "When you would take undefendable damage, spend 1 Invisible to fully negate that damage."
+      ]
+    },
     "bleed": {
       "name": "Bleed",
       "description": [
         "Negative status effect, limit 2. During the holder's Upkeep, roll 1 die: 1-4 deals 1 direct damage; 5-6 removes 1 Bleed stack."
+      ]
+    },
+    "webbed": {
+      "name": "Webbed",
+      "description": [
+        "When applied, immediately take 2 undefendable damage.",
+        "The next skill-area ordinary attack damage becomes undefendable, then Webbed is removed. Damage from cards, Tokens, statuses, or system effects does not consume it."
       ]
     }
   },
@@ -471,6 +490,18 @@
       "name": "Dazzle",
       "description": [
         "At the end of the holder's next Offensive Roll Phase, remove this status and roll 1 die: 1 makes the attack deal no damage; 2-3 halves this attack's damage, rounded up; 4-6 resolves normally."
+      ]
+    },
+    "combo": {
+      "name": "Combo",
+      "description": [
+        "After this attack deals damage, spend 1 Combo to make one additional attack. Each effect may be activated once per turn."
+      ]
+    },
+    "invisible": {
+      "name": "Invisible",
+      "description": [
+        "When you would take undefendable damage, spend 1 Invisible to fully negate that damage."
       ]
     },
     "nyras_bond": {
@@ -763,7 +794,8 @@
     "samurai": "Samurai",
     "tianshi": "Seraph",
     "lieren": "Huntress",
-    "vampire_lord": "Vampire Lord"
+    "vampire_lord": "Vampire Lord",
+    "zhizhuxia": "Spider-Man"
   },
   "characters": {
     "monk": "Monk",
@@ -781,7 +813,8 @@
     "artificer": "Artificer",
     "tianshi": "Seraph",
     "lieren": "Huntress",
-    "vampire_lord": "Vampire Lord"
+    "vampire_lord": "Vampire Lord",
+    "zhizhuxia": "Spider-Man"
   },
   "config": {
     "dice": {
@@ -821,6 +854,14 @@
           "claw": "Claw Face",
           "mesmerize": "Mesmerize Face",
           "blood_drop": "Blood Drop Face"
+        }
+      },
+      "zhizhuxia": {
+        "name": "Spider-Man Dice",
+        "face": {
+          "fist": "Fist Face",
+          "web": "Web Face",
+          "spider": "Spider Face"
         }
       }
     },
@@ -968,7 +1009,9 @@
       "nyras_bond": "Nyra's Bond",
       "sabertooth": "Sabertooth",
       "mesmerize": "Mesmerize",
-      "blood_drop": "Blood Drop"
+      "blood_drop": "Blood Drop",
+      "web": "Web",
+      "spider": "Spider"
     }
   },
   "bonusDie": {
@@ -1039,6 +1082,14 @@
       "vampireLordRendClawsClaw": "Claw: +1 attack damage",
       "vampireLordRendClawsMesmerize": "Mesmerize: draw 1 card",
       "vampireLordRendClawsBloodDrop": "Blood Drop: gain 1 Blood Power",
+      "zhizhuxia.spiderReflex.fist": "Fist: counts toward Spider Reflex total damage",
+      "zhizhuxia.spiderReflex.web": "Web: counts toward Spider Reflex total damage",
+      "zhizhuxia.spiderReflex.spider": "Spider: counts toward Spider Reflex total damage",
+      "zhizhuxia.praise.fist": "Fist: gain 1 Invisible",
+      "zhizhuxia.praise.web": "Web: inflict Webbed on the target",
+      "zhizhuxia.praise.spider": "Spider: gain 1 Combo",
+      "zhizhuxia.headTingle.spider": "Spider: gain 1 Combo and 1 Invisible",
+      "zhizhuxia.headTingle.other": "Non-Spider: draw 1 card",
       "lieren.savageForce.spear": "Spear: +1 attack damage",
       "lieren.savageForce.claw": "Claw: +2 attack damage",
       "lieren.savageForce.nyrasBond": "Nyra's Bond: gain Nyra's Bond",
@@ -1460,7 +1511,9 @@
       "nyras_bond": "Nyra's Bond",
       "sabertooth": "Sabertooth",
       "mesmerize": "Mesmerize",
-      "blood_drop": "Blood Drop"
+      "blood_drop": "Blood Drop",
+      "spider": "Spider",
+      "web": "Web"
     },
     "trigger": {
       "generic": "variant condition",
@@ -1813,7 +1866,7 @@
     "targetingRollOpponentDecidesTarget": "The opponent decides who takes this attack",
     "targetingRollPlayerOption": "{{player}}",
       "selectHandCardToDiscard": "Select 1 card from your hand to discard",
-      "selectDeckCardToAddToHand": "Search your draw pile for 1 card, add it to your hand, then shuffle your draw pile",
+      "selectDeckCardToAddToHand": "Choose {{count}} card(s) from your deck to add to your hand",
       "cardPoolSearchPlaceholder": "Search card name or keyword",
       "cardPoolSearchClear": "Clear search",
       "cardPoolFilterResultCount": "Showing {{visible}} / {{total}}",
@@ -4560,7 +4613,31 @@
     "blood-magic-2-flayed": { "name": "Flayed", "description": "2 Claws + 2 Blood Drops: deal 5 undefendable damage.", "effects": { "damage5Unblockable": "Deal 5 undefendable damage" } },
     "undying": { "name": "Undying", "description": "Defensive roll 3 dice: if you roll 2 Claws, inflict Bleed; if you roll 2 Mesmerize, gain 1 Blood Power; for each Blood Drop, steal 1 health.", "effects": { "resolveDefense": "Resolve Bleed, Blood Power, and health steal from the defense dice" } },
     "undying-2": { "name": "Undying II", "description": "Defensive roll 4 dice: if you roll 2 Claws, inflict Bleed; if you roll 2 Mesmerize, gain 1 Blood Power; for each Blood Drop, steal 1 health.", "effects": { "resolveDefense": "Resolve Bleed, Blood Power, and health steal from the defense dice" } },
-    "bloody-slaughter": { "name": "Bloody Slaughter!", "description": "5 Blood Drops: search your draw pile for 1 card, add it to your hand, shuffle your draw pile, gain 2 Blood Power, then deal 10 damage.", "effects": { "searchDeckCard": "Search your draw pile for 1 card, add it to your hand, then shuffle your draw pile", "gainBloodPower": "Gain 2 Blood Power", "damage10": "Deal 10 damage" } }
+    "bloody-slaughter": { "name": "Bloody Slaughter!", "description": "5 Blood Drops: search your draw pile for 1 card, add it to your hand, shuffle your draw pile, gain 2 Blood Power, then deal 10 damage.", "effects": { "searchDeckCard": "Search your draw pile for 1 card, add it to your hand, then shuffle your draw pile", "gainBloodPower": "Gain 2 Blood Power", "damage10": "Deal 10 damage" } },
+    "heavy-punch": { "name": "Heavy Punch", "description": "3/4/5 Fist faces: deal 4/5/6 damage.", "effects": { "damage4": "Deal 4 damage", "damage5": "Deal 5 damage", "damage6": "Deal 6 damage" } },
+    "combo-strike": { "name": "Combo Strike", "description": "2 Fists + 2 Spiders: deal 5 damage and gain 1 Combo.", "effects": { "damage5": "Deal 5 damage", "gainCombo": "Gain 1 Combo" } },
+    "trap": { "name": "Trap", "description": "Small Straight: deal 5 damage, then inflict Webbed. Large Straight: draw 1 card, deal 8 damage, then inflict Webbed.", "effects": { "damage5": "Deal 5 damage", "draw1": "Draw 1 card", "damage8": "Deal 8 damage", "applyWebbed": "Inflict Webbed" } },
+    "venom-punch": { "name": "Venom Punch", "description": "4 Spiders: gain Invisible and deal 7 undefendable damage.", "effects": { "gainInvisible": "Gain 1 Invisible", "damage7Unblockable": "Deal 7 undefendable damage" } },
+    "wall-crawl": { "name": "Wall Crawl", "description": "1 Fist + 3 Webs: gain Invisible and deal 7 damage.", "effects": { "gainInvisible": "Gain 1 Invisible", "damage7": "Deal 7 damage" } },
+    "spider-reflex": { "name": "Spider Reflex", "description": "1 Fist + 2 Webs + 1 Spider: roll 2 bonus dice and deal their total; if the total is 5 or less, gain Combo.", "effects": { "roll2AndDealSum": "Roll 2 bonus dice and deal their total; if the total is 5 or less, gain Combo" } },
+    "counter": { "name": "Counter", "description": "Defensive roll 3 Fists: deal 3 damage.", "effects": { "damage3": "Deal 3 damage" } },
+    "spider-sense": { "name": "Spider Sense", "description": "Defensive roll 2 Webs: if a Spider is rolled, halve incoming damage, rounded up. You may discard Invisible for 1 additional defensive roll.", "effects": { "preventHalfOnSpider": "If a Spider is rolled, halve incoming damage, rounded up; discard Invisible for 1 additional defensive roll" } },
+    "ultimate-spider": { "name": "Venom Shockwave", "description": "5 Spiders: gain Invisible, inflict Webbed, and deal 13 undefendable damage.", "effects": { "gainInvisible": "Gain 1 Invisible", "applyWebbed": "Inflict Webbed", "damage13": "Deal 13 undefendable damage" } },
+    "card-zhizhuxia-milkshake": { "effects": { "heal3": "Heal 3 health" } },
+    "card-zhizhuxia-wallet-arrival": { "effects": { "gain2CP": "Gain 2 CP" } },
+    "card-zhizhuxia-spider-launcher": { "effects": { "applyWebbed": "Inflict Webbed" } },
+    "card-zhizhuxia-praise": { "effects": { "roll1": "Roll 1 die and resolve its face effect" } },
+    "card-zhizhuxia-flying-escape": { "effects": { "acceptWeb": "Allow Spider Sense to treat Web as a success face" } },
+    "card-zhizhuxia-ambush": { "effects": { "discardInvisibleAndAdd3": "Spend 1 Invisible; add 3 damage to this attack" } },
+    "card-zhizhuxia-invisible-punch": { "effects": { "counter3": "If Spider Sense succeeds, deal 3 direct damage" } },
+    "card-zhizhuxia-wishful-thinking": { "effects": { "prevent3": "Spend 1 Invisible and gain a 3-damage shield" } },
+    "card-zhizhuxia-oh-no": { "effects": { "gainInvisible": "Gain 1 Invisible" } },
+    "card-zhizhuxia-radioactive-blood": { "effects": { "gainCombo": "Gain 1 Combo" } },
+    "card-zhizhuxia-head-tingle": { "effects": { "roll1": "Roll 1 die and resolve its face effect" } },
+    "heavy-punch-2": { "name": "Heavy Punch II", "description": "3/4/5 Fists: deal 5/6/7 damage; if at least 4 dice show the same number, gain 1 Combo.", "effects": { "damage5": "Deal 5 damage", "damage6": "Deal 6 damage", "damage7": "Deal 7 damage", "gainComboIfFourOfAKind": "If at least 4 dice show the same number, gain 1 Combo" } },
+    "combo-strike-2": { "name": "Combo Strike II", "description": "2 Webs + 2 Spiders: deal 6 damage and gain 1 Combo.", "effects": { "damage6": "Deal 6 damage", "gainCombo": "Gain 1 Combo" } },
+    "trap-2": { "name": "Trap II", "description": "Small Straight: deal 6 damage, then inflict Webbed. Large Straight: draw 1 card, deal 9 damage, then inflict Webbed.", "effects": { "damage6": "Deal 6 damage", "draw1": "Draw 1 card", "damage9": "Deal 9 damage", "applyWebbed": "Inflict Webbed" } },
+    "venom-punch-2": { "name": "Venom Punch II", "description": "4 Spiders: gain Invisible and deal 8 undefendable damage.", "effects": { "gainInvisible": "Gain 1 Invisible", "damage8Unblockable": "Deal 8 undefendable damage" } }
   },
   "companion": {
     "nyra": {
@@ -4615,6 +4692,21 @@
         "modifyDieTo6": "Set 1 die to 6"
       }
     },
+    "upgrade-zhizhuxia-heavy-punch-2": { "name": "Heavy Punch II", "description": "Upgrade your Heavy Punch. 3/4/5 Fists deal 5/6/7 damage; if at least 4 dice show the same number, gain 1 Combo." },
+    "upgrade-zhizhuxia-combo-strike-2": { "name": "Combo Strike II", "description": "Upgrade your Combo Strike. 2 Webs + 2 Spiders: deal 6 damage and gain 1 Combo." },
+    "upgrade-zhizhuxia-trap-2": { "name": "Trap II", "description": "Upgrade your Trap. Small Straight deals 6 damage and inflicts Webbed; Large Straight draws 1 card, deals 9 damage, then inflicts Webbed." },
+    "upgrade-zhizhuxia-venom-punch-2": { "name": "Venom Punch II", "description": "Upgrade your Venom Punch. 4 Spiders: gain Invisible and deal 8 undefendable damage." },
+    "card-zhizhuxia-milkshake": { "name": "I Love Milkshake!", "description": "Heal 3 health.", "effects": { "heal3": "Heal 3 health" } },
+    "card-zhizhuxia-wallet-arrival": { "name": "Wallet Arrival!", "description": "Gain 2 CP.", "effects": { "gain2CP": "Gain 2 CP" } },
+    "card-zhizhuxia-spider-launcher": { "name": "Spider Launcher!", "description": "Inflict Webbed on 1 opponent.", "effects": { "applyWebbed": "Inflict Webbed" } },
+    "card-zhizhuxia-praise": { "name": "Awesome!", "description": "Roll 1 die: Fist gains Invisible, Web inflicts Webbed on the target, and Spider gains Combo.", "effects": { "roll1": "Roll 1 die and resolve its face effect" } },
+    "card-zhizhuxia-flying-escape": { "name": "Flying Escape!", "description": "During a defensive roll, allow Spider Sense to treat Web as a success face.", "effects": { "acceptWeb": "Allow Spider Sense to treat Web as a success face" } },
+    "card-zhizhuxia-ambush": { "name": "Ambush!", "description": "Spend 1 Invisible to add 3 damage to this attack.", "effects": { "discardInvisibleAndAdd3": "Spend 1 Invisible; add 3 damage to this attack" } },
+    "card-zhizhuxia-invisible-punch": { "name": "Invisible Punch!", "description": "If Spider Sense succeeds, deal 3 direct damage.", "effects": { "counter3": "If Spider Sense succeeds, deal 3 direct damage" } },
+    "card-zhizhuxia-wishful-thinking": { "name": "Wishful Thinking!", "description": "Spend 1 Invisible to gain a 3-damage shield.", "effects": { "prevent3": "Spend 1 Invisible and gain a 3-damage shield" } },
+    "card-zhizhuxia-oh-no": { "name": "Oh No!", "description": "Gain 1 Invisible.", "effects": { "gainInvisible": "Gain 1 Invisible" } },
+    "card-zhizhuxia-radioactive-blood": { "name": "Radioactive Blood!", "description": "Gain 1 Combo.", "effects": { "gainCombo": "Gain 1 Combo" } },
+    "card-zhizhuxia-head-tingle": { "name": "Head Tingle!", "description": "Roll 1 die: if Spider, gain Combo and Invisible; otherwise draw 1 card.", "effects": { "roll1": "Roll 1 die and resolve its face effect" } },
     "upgrade-revolver-2": {
       "name": "Revolver II",
       "description": "Upgrade your Revolver. 3/4/5 bullets deal 4/5/6 damage. If at least 4 dice show the same number, also inflict Knockdown."
@@ -5658,7 +5750,7 @@
     "card-vampire-lord-blood-from-above": { "name": "Blood from Above!", "description": "Roll 1 die and gain half its value, rounded up, as Blood Power." },
     "card-vampire-lord-total-demise": { "name": "Total Demise!", "description": "Attack modifier: roll 5 dice; add +1 attack damage for each Claw. If at least 3 damage was added, inflict 1 Bleed." },
     "card-vampire-lord-boiling-blood": { "name": "Boiling Blood!", "description": "Attack modifier: add +1 attack damage. Also add +1 more attack damage for each Bleed on the attacked opponent." },
-    "card-vampire-lord-gushing-blood": { "name": "Gushing Blood!", "description": "Gain 1 Blood Power and 1 Mesmerize." },
+    "card-vampire-lord-gushing-blood": { "name": "Gushing Blood!", "description": "Gain 1 Blood Power and 1 CP." },
     "upgrade-vampire-lord-undying-2": { "name": "Undying II", "description": "Upgrade Undying to level II." },
     "upgrade-vampire-lord-blood-thirst-2-blood-river": { "name": "Blood Thirst II / Blood River", "description": "Upgrade Blood Thirst to level II and keep the lower Blood River section as a variant of the upgraded ability." },
     "upgrade-vampire-lord-blood-magic-2-flayed": { "name": "Blood Magic II / Flayed", "description": "Upgrade Blood Magic to level II and keep the lower Flayed section as a variant of the upgraded ability." },
@@ -5735,12 +5827,17 @@
     "drawShort": "Draw 2",
     "draw": "With at least 3 Blood Power, spend 3 Blood Power to draw 2 cards; each effect can be activated once per turn",
     "healShort": "Blood Heal",
-    "heal": "With at least 4 Blood Power, spend 4 Blood Power to heal equal to the damage successfully dealt by this attack; activate only during your Roll Phase, once per effect per turn"
+    "heal": "With at least 4 Blood Power, spend 4 Blood Power to heal equal to the damage successfully dealt by your most recent successful attack this turn; activate only during your Main Phase 2, once per effect per turn"
   },
   "vampireLordMesmerize": {
     "name": "Mesmerize",
     "useShort": "Use Mesmerize",
     "use": "Force an opponent to reroll 1 die: a player with this token may spend 1 Mesmerize to roll 1 die. On 5-6, they may force an opponent to reroll any 1 die"
+  },
+  "zhizhuxiaCombo": {
+    "name": "Combo",
+    "useShort": "Use Combo",
+    "use": "After this attack deals damage, spend 1 Combo to make one additional attack; each effect may be activated once per turn"
   },
   "artificerWorkshop": {
     "buildNanobotShort": "Build Nano",

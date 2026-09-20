@@ -18,6 +18,7 @@ import type {
     BonusDieInfo,
     PendingSeatSwapRequest,
     TurnPhase,
+    DamageOrigin,
 } from './core-types';
 import type { AbilityDef } from './combat';
 
@@ -334,6 +335,8 @@ export interface DamageDealtEvent extends GameEvent<'DAMAGE_DEALT'> {
         unblockable?: boolean;
         /** 伤害范围（attack=攻击伤害，direct=直接伤害） */
         damageScope?: 'attack' | 'direct';
+        /** 伤害现实来源（ability=技能区，card=手牌，token/status=标记或状态，system=系统） */
+        damageOrigin?: DamageOrigin;
         /** 跳过护盾消耗（用于 HP 重置类效果，如神圣祝福将 HP 设为 1） */
         bypassShields?: boolean;
         /** 等本次伤害响应窗口消耗指定 token 后再授予的 token。 */
@@ -371,8 +374,8 @@ export interface CompanionHealthChangedEvent extends GameEvent<'COMPANION_HEALTH
         playerId: PlayerId;
         companionId: 'nyra';
         delta: number;
-        /** 显式设置妮拉激活态；省略时保留原激活态，血量降到 0 会自动倒下。 */
-        active?: boolean;
+        /** 本次生命变化后的正式激活态；血量降到 0 时 reducer 强制倒下。 */
+        active: boolean;
         sourceAbilityId?: string;
     };
 }
@@ -904,6 +907,8 @@ export interface TokenUsedEvent extends GameEvent<'TOKEN_USED'> {
         effectType: 'damageBoost' | 'damageReduction' | 'evasionAttempt' | 'removeDebuff' | 'botActivation' | 'custom';
         /** 伤害修改量（加伤/减伤） */
         damageModifier?: number;
+        /** 使用后是否把本次伤害标记为完全规避 */
+        fullyEvaded?: boolean;
         /** 闪避投骰结果（仅 evasionAttempt） */
         evasionRoll?: {
             value: number;

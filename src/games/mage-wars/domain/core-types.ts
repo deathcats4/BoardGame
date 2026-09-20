@@ -66,6 +66,10 @@ export interface MageWarsArenaObjectState {
     ownerId: PlayerId;
     sourceSpellCardId: number;
     sourceObjectId: string;
+    /** 领域内按对象效果开始生效顺序分配的稳定序号。 */
+    createdAtSequence?: number;
+    /** 记录创建或重新附属时的命令时间戳，供审计和回放使用。 */
+    createdAtTimestamp?: number;
     spellcastingSource?: MageWarsSpellcastingSource;
     mana?: number;
     preparedSpellCardId?: number;
@@ -85,6 +89,7 @@ export interface MageWarsArenaObjectState {
     temporaryTraits?: {
         swift?: boolean;
         teleportMovement?: boolean;
+        elusive?: boolean;
         freeMoveUsedThisAction?: boolean;
         movedThisAction?: boolean;
         quickActionAfterMoveAvailable?: boolean;
@@ -93,6 +98,14 @@ export interface MageWarsArenaObjectState {
         meleeDiceModifierUntilRoundNumber?: number;
         vampiricNextMelee?: boolean;
         nextMeleePierceModifier?: number;
+        nextMeleeUnavoidable?: boolean;
+        battleFuryRoundNumber?: number;
+        battleFuryExtraAttackAvailable?: boolean;
+        banished?: {
+            remainingTokens: number;
+            returnToZoneId: ArenaZoneId;
+            sourceSpellCardId: number;
+        };
     };
     statusTokens: Partial<Record<StatusTokenId, number>>;
     typeLine?: string;
@@ -153,6 +166,8 @@ export interface MageWarsFoundationStatus {
 export interface MageWarsCore {
     playerOrder: PlayerId[];
     currentPlayerId: PlayerId;
+    /** 下一个新建或重新附属对象使用的效果顺序序号。 */
+    nextObjectSequence?: number;
     /** 当前准备/行动阶段真正拥有操作权的玩家；准备阶段可暂不设置。 */
     phaseActorId?: PlayerId;
     /** 当前阶段已经完成阶段动作的玩家。准备阶段双方都完成后才进入下一阶段。 */

@@ -1,13 +1,30 @@
 import type { DamageContext } from '../../../engine/primitives/damageCalculation';
 import type { ModifierDef } from '../../../engine/primitives/modifier';
 import type { PlayerId } from '../../../engine/types';
-import type { MageWarsConfigSpellCard } from '../data/configPackage';
+import type { MageWarsConfigDamageType, MageWarsConfigSpellCard } from '../data/configPackage';
 import type { MageWarsCore } from './types';
 
 export interface MageWarsMageEquipmentRegeneration {
     value: number;
     sourceObjectIds: string[];
 }
+
+export interface MageWarsMageEquipmentAttackDiceModifier {
+    value: number;
+    sourceObjectIds: string[];
+}
+
+const MAGE_WARS_ATTACK_DAMAGE_TYPE_LABELS: readonly MageWarsConfigDamageType[] = [
+    '火焰',
+    '水流',
+    '圣光',
+    '闪电',
+    '毒素',
+    '精神',
+    '风力',
+    '霜冻',
+    'aether',
+];
 
 function parseMageWarsArmorBonus(text: string | undefined): number {
     if (!text) return 0;
@@ -31,6 +48,56 @@ function parseMageWarsRegenerationBonus(text: string | undefined): number {
 
 function resolveMageWarsEquipmentTraitText(object: { attackOrTraitLine?: string; rulesText?: string }): string | undefined {
     return object.attackOrTraitLine ?? object.rulesText;
+}
+
+function parseMageWarsDamageTypeAttackBonus(
+    text: string,
+    damageType: MageWarsConfigDamageType,
+    rangeKind: 'melee' | 'ranged',
+): number {
+    let activeDamageType: MageWarsConfigDamageType | undefined;
+    const rangeLabel = rangeKind === 'melee' ? '近战' : '远程';
+    let value = 0;
+
+    for (const segment of text.split(/[；;]/)) {
+        const nextDamageType = MAGE_WARS_ATTACK_DAMAGE_TYPE_LABELS.find((candidate) => (
+            segment.includes(`${candidate}攻击`)
+        ));
+        if (nextDamageType) activeDamageType = nextDamageType;
+        if (activeDamageType !== damageType) continue;
+
+        for (const match of segment.matchAll(new RegExp(`${rangeLabel}\\s*\\+\\s*(\\d+)`, 'g'))) {
+            const parsed = Number(match[1]);
+            if (Number.isFinite(parsed) && parsed > 0) value += parsed;
+        }
+    }
+
+    return value;
+}
+
+export function resolveMageWarsMageEquipmentAttackDiceModifier(
+    core: MageWarsCore,
+    playerId: PlayerId,
+    damageTypes: readonly MageWarsConfigDamageType[],
+    rangeKind: 'melee' | 'ranged',
+): MageWarsMageEquipmentAttackDiceModifier {
+    if (damageTypes.length === 0) return { value: 0, sourceObjectIds: [] };
+
+    const matchingSources = Object.values(core.objects)
+        .filter((object) => object.kind === 'equipment' && object.anchoredToPlayerId === playerId)
+        .map((object) => {
+            const text = resolveMageWarsEquipmentTraitText(object) ?? '';
+            const value = damageTypes.reduce((total, damageType) => (
+                total + parseMageWarsDamageTypeAttackBonus(text, damageType, rangeKind)
+            ), 0);
+            return { objectId: object.id, value };
+        })
+        .filter((source) => source.value > 0);
+
+    return {
+        value: matchingSources.reduce((total, source) => total + source.value, 0),
+        sourceObjectIds: matchingSources.map((source) => source.objectId),
+    };
 }
 
 export function resolveMageWarsMageEquipmentTraitText(core: MageWarsCore, playerId: PlayerId): string | undefined {
@@ -127,7 +194,7 @@ export function createMageWarsNonlivingBonusDamageModifiers(
 ): ModifierDef<DamageContext>[] {
     if (!target.targetObjectId || !target.nonliving) return [];
 
-    const match = /对抗非活体生物\+?(\d+)/.exec(spell.attackOrTraitLine ?? '');
+    const match = /对抗非活体(?:生物)?\+?(\d+)/.exec(spell.attackOrTraitLine ?? '');
     if (!match) return [];
 
     const value = Number(match[1]);

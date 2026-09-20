@@ -140,6 +140,7 @@ function detachOngoing(
         sourceDefId?: string;
         sourceControllerId?: PlayerId;
         sourceBaseIndex?: number;
+        isDestruction?: boolean;
         destination?: 'discard' | 'hand';
         targetBaseIndex?: number;
         targetKind?: 'ongoing' | 'attached_action';
@@ -913,10 +914,12 @@ function registerActionHeroesInteractionHandlers(): void {
         if (!storedAction) return { state, events: [] };
         return {
             state,
-            events: [grantExtraAction(playerId, 'action_heroes_kickboxbro', timestamp, {
-                restrictToCardUid: storedAction.uid,
-                restrictToCardDefId: storedAction.defId,
-            })],
+            events: [grantImmediateExtraPlayForStoredCard(
+                playerId,
+                storedAction,
+                'action_heroes_kickboxbro',
+                timestamp,
+            )],
         };
     });
 }
@@ -4234,8 +4237,9 @@ function buildDestroyActionLocationEvents(
     const events: SmashUpEvent[] = [
         detachOngoing(location.action.uid, location.action.defId, location.action.ownerId, reason, now, {
             ...sourceInfo,
+            isDestruction: true,
             targetBaseIndex: location.baseIndex,
-            targetKind: location.targetType === 'base' ? 'ongoing' : 'attached_action',
+            targetKind: location.hostUid === undefined ? 'ongoing' : 'attached_action',
         }),
     ];
     if (isWraith(location.action.defId)) {
@@ -4303,7 +4307,10 @@ function buildTransferOngoingActionEventsWithSource(
 ): SmashUpEvent[] {
     if (fromBaseIndex === toBaseIndex) return [];
     return [
-        detachOngoing(action.uid, action.defId, action.ownerId, reason, now, sourceInfo),
+        detachOngoing(action.uid, action.defId, action.ownerId, reason, now, {
+            ...sourceInfo,
+            isDestruction: false,
+        }),
         buildOngoingAttachedEvent({
             uid: action.uid,
             defId: action.defId,

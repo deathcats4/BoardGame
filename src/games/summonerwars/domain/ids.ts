@@ -13,7 +13,7 @@ import type { FactionId, UnitTag } from './types';
 
 /** 所有合法阵营 ID（从 FactionId 类型派生） */
 export const VALID_FACTION_IDS: readonly FactionId[] = [
-  'necromancer', 'trickster', 'paladin', 'goblin', 'frost', 'barbaric', 'mogu', 'huijin', 'shouren', 'yongheng', 'shadow',
+  'necromancer', 'trickster', 'paladin', 'goblin', 'frost', 'barbaric', 'mogu', 'huijin', 'shouren', 'yongheng', 'shadow', 'zhongcai',
 ] as const;
 
 // ============================================================================
@@ -88,6 +88,12 @@ export const CARD_IDS = {
   SHADOW_MARL_GRIMOIRE: 'shadow-marl-grimoire',
   SHADOW_LIGHTNING_STEP: 'shadow-lightning-step',
   SHADOW_SHADOW_PULSE: 'shadow-shadow-pulse',
+
+  // 仲裁事件卡
+  ZHONGCAI_OBEDIENCE: 'zhongcai-obedience',
+  ZHONGCAI_HOLY_DECREE: 'zhongcai-holy-decree',
+  ZHONGCAI_LOYALTY_DECREE: 'zhongcai-loyalty-decree',
+  ZHONGCAI_FREEDOM_DECREE: 'zhongcai-freedom-decree',
 } as const;
 
 // ============================================================================

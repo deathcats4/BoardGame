@@ -15,7 +15,6 @@ import type { ActiveModifier } from '../hooks/useActiveModifiers';
 import { PassiveAbilityPanel, type PassiveAbilityPanelProps } from './PassiveAbilityPanel';
 import { resolveCharacterIdFromDiceDefinitionId } from './assets';
 import {
-    buildBoardShellBlockUnitValue,
     buildBoardShellInlineUnitValue,
 } from '../../../shared/runtimeLayoutUnits';
 
@@ -146,12 +145,15 @@ export const RightSidebar = ({
         right: buildBoardShellInlineUnitValue(1.5),
         bottom: buildBoardShellInlineUnitValue(1.5),
         width: buildBoardShellInlineUnitValue(15),
+        overflow: 'visible',
     };
     const stackStyle: CSSProperties = {
         gap: buildBoardShellInlineUnitValue(0.75),
+        overflow: 'visible',
     };
     const diceTrayFrameStyle: CSSProperties = {
         width: buildBoardShellInlineUnitValue(5.8),
+        overflow: 'visible',
     };
     const actionRailStyle: CSSProperties = {
         width: buildBoardShellInlineUnitValue(10.2),
@@ -171,18 +173,20 @@ export const RightSidebar = ({
         gap: buildBoardShellInlineUnitValue(0.35),
     };
     const hintContainerStyle: CSSProperties = {
+        zIndex: UI_Z_INDEX.hint,
         marginRight: buildBoardShellInlineUnitValue(0.6),
-        maxWidth: 'calc(100vw - 2rem)',
+        maxWidth: 'calc(100vw - 1rem)',
+        overflow: 'visible',
     };
     const hintBubbleStyle: CSSProperties = {
-        maxWidth: `min(calc(100vw - 4rem), ${buildBoardShellInlineUnitValue(8.8)})`,
-        maxHeight: `min(calc(100vh - 2rem), ${buildBoardShellBlockUnitValue(8)})`,
+        width: 'max-content',
+        maxWidth: 'min(calc(100vw - 2rem), 22rem)',
+        boxSizing: 'border-box',
         gap: buildBoardShellInlineUnitValue(0.4),
         borderRadius: buildBoardShellInlineUnitValue(0.5),
         paddingInline: buildBoardShellInlineUnitValue(0.6),
         paddingBlock: buildBoardShellInlineUnitValue(0.4),
-        overflowY: 'auto',
-        overflowWrap: 'anywhere',
+        overflow: 'visible',
     };
     const hintIconStyle: CSSProperties = {
         width: buildBoardShellInlineUnitValue(1),
@@ -190,6 +194,10 @@ export const RightSidebar = ({
     };
     const hintTextStyle: CSSProperties = {
         fontSize: buildBoardShellInlineUnitValue(0.75),
+        maxWidth: '100%',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
     };
     const bonusDiceOwnerLabelStyle: CSSProperties = {
         zIndex: UI_Z_INDEX.hint,
@@ -328,8 +336,9 @@ export const RightSidebar = ({
                             style={hintContainerStyle}
                         >
                             <div
-                                className="flex min-w-0 items-start overflow-hidden border border-amber-500/50 bg-amber-950/95 shadow-lg shadow-amber-900/40 backdrop-blur-sm whitespace-normal"
+                                className="flex min-w-0 items-start border border-amber-500/50 bg-amber-950/95 shadow-lg shadow-amber-900/40 backdrop-blur-sm whitespace-normal"
                                 style={hintBubbleStyle}
+                                data-testid="dice-interaction-hint"
                             >
                                 <MousePointerClick className="text-amber-400 shrink-0" style={hintIconStyle} />
                                 <span
@@ -422,24 +431,26 @@ const CurrentTotalDamageBadge = ({ summary }: { summary: DamageSummary }) => {
         ? Math.max(0, summary.originalDamage)
         : undefined;
     const hasChanged = originalDamage !== undefined && originalDamage !== currentDamage;
+    const damageSummaryLabel = Array.from(t('damageSummary.label').replace(/\s+/g, ''));
     const title = hasChanged
         ? t('damageSummary.changed', { original: originalDamage, current: currentDamage })
         : `${t('damageSummary.label')} ${currentDamage}`;
 
     return (
         <div
-            className="pointer-events-auto flex flex-col items-center justify-center rounded-full border border-rose-400/55 bg-gradient-to-b from-rose-950/95 to-red-900/90 backdrop-blur-sm"
+            className="pointer-events-auto flex flex-col items-center justify-center rounded-none border border-rose-400/55 bg-gradient-to-b from-rose-950/95 to-red-900/90 backdrop-blur-sm"
             data-testid="current-total-damage-badge"
             data-current-damage={currentDamage}
             data-original-damage={originalDamage}
             aria-label={title}
             title={title}
             style={{
-                minWidth: buildBoardShellInlineUnitValue(3.1),
-                minHeight: buildBoardShellInlineUnitValue(2.8),
-                gap: buildBoardShellInlineUnitValue(0.32),
-                paddingInline: buildBoardShellInlineUnitValue(0.58),
-                paddingBlock: buildBoardShellInlineUnitValue(0.38),
+                width: 'max-content',
+                minWidth: 0,
+                minHeight: buildBoardShellInlineUnitValue(3.6),
+                gap: buildBoardShellInlineUnitValue(0.24),
+                paddingInline: buildBoardShellInlineUnitValue(0.38),
+                paddingBlock: buildBoardShellInlineUnitValue(0.28),
                 boxShadow: `0 0 ${buildBoardShellInlineUnitValue(1)} rgba(244,63,94,0.32)`,
             }}
         >
@@ -455,23 +466,51 @@ const CurrentTotalDamageBadge = ({ summary }: { summary: DamageSummary }) => {
                 style={{ gap: buildBoardShellInlineUnitValue(0.22) }}
             >
                 <span
-                    className="font-semibold uppercase tracking-[0.08em] text-rose-100/85"
-                    style={{ fontSize: buildBoardShellInlineUnitValue(0.55) }}
+                    className="flex flex-col items-center font-black uppercase tracking-[0.08em] text-rose-100 leading-none"
+                    data-testid="current-total-damage-label"
+                    aria-hidden="true"
+                    style={{
+                        gap: buildBoardShellInlineUnitValue(0.02),
+                        fontSize: `max(16px, ${buildBoardShellInlineUnitValue(0.82)})`,
+                    }}
                 >
-                    {t('damageSummary.label')}
+                    {damageSummaryLabel.map((character, index) => (
+                        <span key={`${character}-${index}`}>{character}</span>
+                    ))}
                 </span>
-                <span
-                    className="font-black tracking-wide text-rose-100"
-                    style={{ fontSize: buildBoardShellInlineUnitValue(0.8) }}
-                >
-                    {currentDamage}
-                </span>
-                {hasChanged && (
+                {hasChanged ? (
                     <span
-                        className="font-semibold text-rose-200/75"
-                        style={{ fontSize: buildBoardShellInlineUnitValue(0.5) }}
+                        className="flex flex-col items-center font-black text-rose-100 leading-none"
+                        style={{ gap: buildBoardShellInlineUnitValue(0.08) }}
+                        data-testid="current-total-damage-change"
+                        aria-label={`${originalDamage}→${currentDamage}`}
                     >
-                        {originalDamage}→{currentDamage}
+                        <span
+                            className="font-black tracking-wide text-slate-300"
+                            style={{ fontSize: `max(16px, ${buildBoardShellInlineUnitValue(1.15)})` }}
+                        >
+                            {originalDamage}
+                        </span>
+                        <span
+                            className="text-rose-300/85"
+                            aria-hidden="true"
+                            style={{ fontSize: `max(16px, ${buildBoardShellInlineUnitValue(1.15)})` }}
+                        >
+                            ↓
+                        </span>
+                        <span
+                            className="font-black tracking-wide text-amber-200"
+                            style={{ fontSize: `max(16px, ${buildBoardShellInlineUnitValue(1.15)})` }}
+                        >
+                            {currentDamage}
+                        </span>
+                    </span>
+                ) : (
+                    <span
+                        className="font-black tracking-wide text-rose-100"
+                        style={{ fontSize: `max(16px, ${buildBoardShellInlineUnitValue(1.15)})` }}
+                    >
+                        {currentDamage}
                     </span>
                 )}
             </div>

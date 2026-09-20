@@ -10371,6 +10371,263 @@
         }
       }
     },
+    "zh-CN/dicethrone/images/zhizhuxia/官方qa": {
+      "variants": {
+        "png": {
+          "sha256": "f31da27ccf2b230bf899432e61709597f402687b7d6ae3029cb77dae148b3713",
+          "bytes": 4930743,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/连击": {
+      "variants": {
+        "png": {
+          "sha256": "3a1888f1d9aa4a7837067629bfe6278550d3006c2d88a2b8910f0a3dee163506",
+          "bytes": 131562,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/落网": {
+      "variants": {
+        "png": {
+          "sha256": "2f85cd3ba723f11dff2d17b8575bd7bd1459813aa9016e0417113dd1535d9bba",
+          "bytes": 409636,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/手牌": {
+      "variants": {
+        "png": {
+          "sha256": "bb8cd0ca990f224aaa1c825614bf9afb8338c25035032e7b308d20af2582049a",
+          "bytes": 44735909,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/提示卡": {
+      "variants": {
+        "png": {
+          "sha256": "8b1fa00a9bd7173d277e1d9621098926696e48ff63fa1fb0f5d9565991db8f3c",
+          "bytes": 4264382,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/骰子": {
+      "variants": {
+        "png": {
+          "sha256": "39b4d3a25d548ed317001eac47f8b2822a445fa860e97885d528fea7593e546d",
+          "bytes": 49208,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/玩家面板": {
+      "variants": {
+        "png": {
+          "sha256": "b14400ad05d0bcfb6101d7a15686194c023953e9a21c0f846644940bb903f4bd",
+          "bytes": 10077624,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/隐形": {
+      "variants": {
+        "png": {
+          "sha256": "2aa169a707551766a1f04ff3bc83894b6c4a0f58914284d4497cebc0871d8b74",
+          "bytes": 73054,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/ability-cards": {
+      "variants": {
+        "png": {
+          "sha256": "bb8cd0ca990f224aaa1c825614bf9afb8338c25035032e7b308d20af2582049a",
+          "bytes": 44735909,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/官方qa": {
+      "variants": {
+        "webp": {
+          "sha256": "5f684e0788b74e4f28d97ffdfb63e633c2ed87ed2dd40fd5e3ab6e1485d3e0b5",
+          "bytes": 919198,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/连击": {
+      "variants": {
+        "webp": {
+          "sha256": "e1de4f628eb5cca0feb9f8819c32dced5ecc94d008a788ad464994f118dcfe95",
+          "bytes": 29356,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/落网": {
+      "variants": {
+        "webp": {
+          "sha256": "eae55ba70d34d8737b3bdec6b767b38ffc88665f84a19e38c1e42dbbf8f107c1",
+          "bytes": 88078,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/手牌": {
+      "variants": {
+        "webp": {
+          "sha256": "768cd5c1c4ae83cde5e282b7c45341ad1c8391b224a91c7f6411616ada83a48c",
+          "bytes": 5647260,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/提示卡": {
+      "variants": {
+        "webp": {
+          "sha256": "5cba98c0a8db038cdc9d1ccfd5738ce54e67263fecd8497c8eed369397a264dd",
+          "bytes": 802612,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/骰子": {
+      "variants": {
+        "webp": {
+          "sha256": "2f65b03677d272398c0c14f1ee58c0590832c7fd831d8bfa5d253803e3689974",
+          "bytes": 33490,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/玩家面板": {
+      "variants": {
+        "webp": {
+          "sha256": "9b7107e9b105d5e9f2e0a2a52c1b1080ed4126f15a4623c77c68fca1bef49cfe",
+          "bytes": 1868268,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/隐形": {
+      "variants": {
+        "webp": {
+          "sha256": "77f354e6078ab889fb71c362be622a742ddfecaf645231a2f8c81b26c189a5bb",
+          "bytes": 10202,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/ability-cards": {
+      "variants": {
+        "webp": {
+          "sha256": "768cd5c1c4ae83cde5e282b7c45341ad1c8391b224a91c7f6411616ada83a48c",
+          "bytes": 5647260,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/dice": {
+      "variants": {
+        "webp": {
+          "sha256": "2f65b03677d272398c0c14f1ee58c0590832c7fd831d8bfa5d253803e3689974",
+          "bytes": 33490,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/player-board": {
+      "variants": {
+        "webp": {
+          "sha256": "19829e141c2f9aafd57b9e4ee2e8d94b73470de68c8be8ad725529ebab9a4ce9",
+          "bytes": 647682,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/player-board.png": {
+      "variants": {
+        "webp": {
+          "sha256": "99903b069e1a0ed74c0ecbc04eafd84610355bf08253a14334ba774d8275c2dd",
+          "bytes": 465790,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/status-icons-atlas": {
+      "variants": {
+        "webp": {
+          "sha256": "e2a3bdeee7a133354f7cf4b2b4ef8368cd2173985cc60120ff209893fa4d8f9a",
+          "bytes": 21910,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/tip": {
+      "variants": {
+        "webp": {
+          "sha256": "3b112729489f9473e812acd0b3f1b25562871f7a0f6bd8ff3bcb843e2cf188ee",
+          "bytes": 208170,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/compressed/tip.png": {
+      "variants": {
+        "webp": {
+          "sha256": "664ef603d64d1d7e5aa8f9fb17a457821fdc4ba4b8d3533cf51e6e58e7aa6320",
+          "bytes": 144528,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/dice": {
+      "variants": {
+        "png": {
+          "sha256": "39b4d3a25d548ed317001eac47f8b2822a445fa860e97885d528fea7593e546d",
+          "bytes": 49208,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/player-board": {
+      "variants": {
+        "png": {
+          "sha256": "a2a5f45d7d921b7d510d597357f1e909ae06c588841905f6afc46378d435afd5",
+          "bytes": 4220774,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/status-icons-atlas": {
+      "variants": {
+        "json": {
+          "sha256": "631cc4fa8cbee5f41675777393c2aea15fe1ee2c2e13370210da90a4fef76719",
+          "bytes": 457,
+          "mime": "application/json"
+        },
+        "png": {
+          "sha256": "26e280333ff3abece5ef975e547d044df46467f9a35ab246af5bc9a81718850c",
+          "bytes": 101523,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/dicethrone/images/zhizhuxia/tip": {
+      "variants": {
+        "png": {
+          "sha256": "c42e21f4412effe2c21076a5d5d7c55f4ecc523463ea9a4841cbad264a729018",
+          "bytes": 1183485,
+          "mime": "image/png"
+        }
+      }
+    },
     "zh-CN/dicethrone/thumbnails/compressed/fengm": {
       "variants": {
         "webp": {
@@ -12453,8 +12710,8 @@
     "zh-CN/mage-wars/thumbnails/compressed/cover": {
       "variants": {
         "webp": {
-          "sha256": "d823beab60262d4d746c3735398bf55fabd66414a4090201642ae8787c099aa5",
-          "bytes": 324948,
+          "sha256": "c13348027c453a2d764acb469bfa2b802634a92d8e2bb72682db06a0492fcdb3",
+          "bytes": 337418,
           "mime": "image/webp"
         }
       }
@@ -12462,8 +12719,8 @@
     "zh-CN/mage-wars/thumbnails/cover": {
       "variants": {
         "png": {
-          "sha256": "1d3b1fe0fa0363718399054c878fdb263099aef7fb96be004c7d4bd5a2be4bc3",
-          "bytes": 2757985,
+          "sha256": "c6c6077e8682075fde56c6dc9ff24603295f0c148cea3ba06f41e0421d951a77",
+          "bytes": 2936443,
           "mime": "image/png"
         }
       }
@@ -16245,6 +16502,177 @@
           "sha256": "64d48aee3bc19702de8e0f49367961a2d851fa50624ddb901aa1f410c0b55196",
           "bytes": 242959,
           "mime": "image/jpeg"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/cards": {
+      "variants": {
+        "png": {
+          "sha256": "1c7e0823eb8f11933f63efd1fd3e6412ba23e5567930c053a836eee3e95acfa5",
+          "bytes": 19036885,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/compressed/cards": {
+      "variants": {
+        "webp": {
+          "sha256": "31dbbb60ffe3683f8a27e6b154c3a7867e42c324952238d08f4478d7ecaa1bca",
+          "bytes": 1940074,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/compressed/hero": {
+      "variants": {
+        "webp": {
+          "sha256": "8d543dab68f815b6790e236d31a51fec7d3a8c7e50884f033b3a6300d9497a15",
+          "bytes": 211090,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/compressed/tip": {
+      "variants": {
+        "webp": {
+          "sha256": "5b6120a654950543de2a802ff51d736269f445dc5f89e02d692a6e1f191025fc",
+          "bytes": 215528,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/hero": {
+      "variants": {
+        "png": {
+          "sha256": "7a0892f529fe1504e51dc8251c84abf143af119140af6d7a699565d15833c781",
+          "bytes": 1296592,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc20396145019864960224B7B1DEE5FE09B964A709D3043A7A068D44246E6": {
+      "variants": {
+        "png": {
+          "sha256": "4d1219cd30f93e2e891a93b6006f4803eab91462e67b0cfb523641bf467abd35",
+          "bytes": 1297161,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496154D5014FB1571755562F956F358881CC07AC95C28A": {
+      "variants": {
+        "png": {
+          "sha256": "f12ed0a5b5d487282712cafc32ac9636853cc9bc1eb5637bb210162efb0416a8",
+          "bytes": 1408773,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc203961450198649623729BFE5A975FE69CEC48727324687C8219F0D01B0": {
+      "variants": {
+        "png": {
+          "sha256": "553f088740cf8b585f70489d0e3775b2946fa273f881ad2296ce0f71132760d3",
+          "bytes": 1227448,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc20396145019864963316093FE2FA67886B1819FA5C228576EBEF0898B15": {
+      "variants": {
+        "png": {
+          "sha256": "8189ad1761b1dbf7933bfd2dffb06a39dcd4ba338497d9c72ec170df86438f07",
+          "bytes": 1214573,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc20396145019864964222DAFF3E6FB3D2B3B0EE3CF7E1FE9F9717C0CB9EF": {
+      "variants": {
+        "png": {
+          "sha256": "e86e4a4807e81c042613140520796c4514f67c13aee118297ffc6cd5b320f04c",
+          "bytes": 1175470,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496531BB7A2CC39702FE92FDEF18129F7BD73CEAC9F3AE": {
+      "variants": {
+        "png": {
+          "sha256": "668f8b86f054522d548e591e6420e5a674b67d738ee7974cc3e65d2b9d1be7c8",
+          "bytes": 1182313,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496631AFC55696DA10BC4C75E6EC4885E4A1104FD93C18": {
+      "variants": {
+        "png": {
+          "sha256": "769919e4d9ad91fd67715eb0c254760b7112d093b3ec4ed906f6c83b9bb4b200",
+          "bytes": 1246979,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc203961450198649672810FE361DA17F412CA69ED6132A6410AFDC18FDFA": {
+      "variants": {
+        "png": {
+          "sha256": "9b0e75d6efdbb0ace367b132c2a627731cd1a7a2d412fecb34d90b406765caee",
+          "bytes": 1220907,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496816A5E4E4A773E2DF1C6F919CEB8B7A182FCF7BCEA8": {
+      "variants": {
+        "png": {
+          "sha256": "835c9b77365641ac991dc96ab1ff7e7ab60f368cd71645e319b97618ebe1bb48",
+          "bytes": 1245754,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496900CFB26F8815A883A4C370DEAF7A09699064036CC9": {
+      "variants": {
+        "png": {
+          "sha256": "8d2eb341ac86b3d25b206cb5bae13a346b5dc43f6b9b441a5bcd68b26dc44601",
+          "bytes": 1165789,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986496982A02E32FF8C274A2F0310A564A94E219FDC015EF9": {
+      "variants": {
+        "png": {
+          "sha256": "7a0892f529fe1504e51dc8251c84abf143af119140af6d7a699565d15833c781",
+          "bytes": 1296592,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc203961450198649707752E701003DF2C98654882306FEC31180EA26BC04": {
+      "variants": {
+        "png": {
+          "sha256": "374eab76c006f89b72e8e1ec893a0cbdf4c3e7c19884dc0876dc728d581c76be",
+          "bytes": 1260590,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/httpcloud3steamusercontentcomugc2039614501986497170AB7B217F91691DDEC89CDB9057D9401DC9E50BD4": {
+      "variants": {
+        "png": {
+          "sha256": "fe4097fc6b63d25c2c51c736289bf4c3ff796ae88fec953c5eadab19859ab1d3",
+          "bytes": 1243625,
+          "mime": "image/png"
+        }
+      }
+    },
+    "zh-CN/summonerwars/hero/zhongcai/tip": {
+      "variants": {
+        "png": {
+          "sha256": "f12ed0a5b5d487282712cafc32ac9636853cc9bc1eb5637bb210162efb0416a8",
+          "bytes": 1408773,
+          "mime": "image/png"
         }
       }
     },

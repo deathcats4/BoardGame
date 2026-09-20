@@ -3288,6 +3288,263 @@
         }
       }
     },
+    "images/zhizhuxia/官方qa": {
+      "variants": {
+        "png": {
+          "sha256": "f31da27ccf2b230bf899432e61709597f402687b7d6ae3029cb77dae148b3713",
+          "bytes": 4930743,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/连击": {
+      "variants": {
+        "png": {
+          "sha256": "3a1888f1d9aa4a7837067629bfe6278550d3006c2d88a2b8910f0a3dee163506",
+          "bytes": 131562,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/落网": {
+      "variants": {
+        "png": {
+          "sha256": "2f85cd3ba723f11dff2d17b8575bd7bd1459813aa9016e0417113dd1535d9bba",
+          "bytes": 409636,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/手牌": {
+      "variants": {
+        "png": {
+          "sha256": "bb8cd0ca990f224aaa1c825614bf9afb8338c25035032e7b308d20af2582049a",
+          "bytes": 44735909,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/提示卡": {
+      "variants": {
+        "png": {
+          "sha256": "8b1fa00a9bd7173d277e1d9621098926696e48ff63fa1fb0f5d9565991db8f3c",
+          "bytes": 4264382,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/骰子": {
+      "variants": {
+        "png": {
+          "sha256": "39b4d3a25d548ed317001eac47f8b2822a445fa860e97885d528fea7593e546d",
+          "bytes": 49208,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/玩家面板": {
+      "variants": {
+        "png": {
+          "sha256": "b14400ad05d0bcfb6101d7a15686194c023953e9a21c0f846644940bb903f4bd",
+          "bytes": 10077624,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/隐形": {
+      "variants": {
+        "png": {
+          "sha256": "2aa169a707551766a1f04ff3bc83894b6c4a0f58914284d4497cebc0871d8b74",
+          "bytes": 73054,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/ability-cards": {
+      "variants": {
+        "png": {
+          "sha256": "bb8cd0ca990f224aaa1c825614bf9afb8338c25035032e7b308d20af2582049a",
+          "bytes": 44735909,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/官方qa": {
+      "variants": {
+        "webp": {
+          "sha256": "5f684e0788b74e4f28d97ffdfb63e633c2ed87ed2dd40fd5e3ab6e1485d3e0b5",
+          "bytes": 919198,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/连击": {
+      "variants": {
+        "webp": {
+          "sha256": "e1de4f628eb5cca0feb9f8819c32dced5ecc94d008a788ad464994f118dcfe95",
+          "bytes": 29356,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/落网": {
+      "variants": {
+        "webp": {
+          "sha256": "eae55ba70d34d8737b3bdec6b767b38ffc88665f84a19e38c1e42dbbf8f107c1",
+          "bytes": 88078,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/手牌": {
+      "variants": {
+        "webp": {
+          "sha256": "768cd5c1c4ae83cde5e282b7c45341ad1c8391b224a91c7f6411616ada83a48c",
+          "bytes": 5647260,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/提示卡": {
+      "variants": {
+        "webp": {
+          "sha256": "5cba98c0a8db038cdc9d1ccfd5738ce54e67263fecd8497c8eed369397a264dd",
+          "bytes": 802612,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/骰子": {
+      "variants": {
+        "webp": {
+          "sha256": "2f65b03677d272398c0c14f1ee58c0590832c7fd831d8bfa5d253803e3689974",
+          "bytes": 33490,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/玩家面板": {
+      "variants": {
+        "webp": {
+          "sha256": "9b7107e9b105d5e9f2e0a2a52c1b1080ed4126f15a4623c77c68fca1bef49cfe",
+          "bytes": 1868268,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/隐形": {
+      "variants": {
+        "webp": {
+          "sha256": "77f354e6078ab889fb71c362be622a742ddfecaf645231a2f8c81b26c189a5bb",
+          "bytes": 10202,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/ability-cards": {
+      "variants": {
+        "webp": {
+          "sha256": "768cd5c1c4ae83cde5e282b7c45341ad1c8391b224a91c7f6411616ada83a48c",
+          "bytes": 5647260,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/dice": {
+      "variants": {
+        "webp": {
+          "sha256": "2f65b03677d272398c0c14f1ee58c0590832c7fd831d8bfa5d253803e3689974",
+          "bytes": 33490,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/player-board": {
+      "variants": {
+        "webp": {
+          "sha256": "19829e141c2f9aafd57b9e4ee2e8d94b73470de68c8be8ad725529ebab9a4ce9",
+          "bytes": 647682,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/player-board.png": {
+      "variants": {
+        "webp": {
+          "sha256": "99903b069e1a0ed74c0ecbc04eafd84610355bf08253a14334ba774d8275c2dd",
+          "bytes": 465790,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/status-icons-atlas": {
+      "variants": {
+        "webp": {
+          "sha256": "e2a3bdeee7a133354f7cf4b2b4ef8368cd2173985cc60120ff209893fa4d8f9a",
+          "bytes": 21910,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/tip": {
+      "variants": {
+        "webp": {
+          "sha256": "3b112729489f9473e812acd0b3f1b25562871f7a0f6bd8ff3bcb843e2cf188ee",
+          "bytes": 208170,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/compressed/tip.png": {
+      "variants": {
+        "webp": {
+          "sha256": "664ef603d64d1d7e5aa8f9fb17a457821fdc4ba4b8d3533cf51e6e58e7aa6320",
+          "bytes": 144528,
+          "mime": "image/webp"
+        }
+      }
+    },
+    "images/zhizhuxia/dice": {
+      "variants": {
+        "png": {
+          "sha256": "39b4d3a25d548ed317001eac47f8b2822a445fa860e97885d528fea7593e546d",
+          "bytes": 49208,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/player-board": {
+      "variants": {
+        "png": {
+          "sha256": "a2a5f45d7d921b7d510d597357f1e909ae06c588841905f6afc46378d435afd5",
+          "bytes": 4220774,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/status-icons-atlas": {
+      "variants": {
+        "json": {
+          "sha256": "631cc4fa8cbee5f41675777393c2aea15fe1ee2c2e13370210da90a4fef76719",
+          "bytes": 457,
+          "mime": "application/json"
+        },
+        "png": {
+          "sha256": "26e280333ff3abece5ef975e547d044df46467f9a35ab246af5bc9a81718850c",
+          "bytes": 101523,
+          "mime": "image/png"
+        }
+      }
+    },
+    "images/zhizhuxia/tip": {
+      "variants": {
+        "png": {
+          "sha256": "c42e21f4412effe2c21076a5d5d7c55f4ecc523463ea9a4841cbad264a729018",
+          "bytes": 1183485,
+          "mime": "image/png"
+        }
+      }
+    },
     "thumbnails/compressed/fengm": {
       "variants": {
         "webp": {

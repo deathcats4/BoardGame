@@ -13,23 +13,29 @@ import { MAGE_WARS_COMMANDS, type MageWarsCastSpellCommand } from './commands';
 import {
     getMageWarsWallEdgeId,
     MAGE_WARS_GAME_ID,
+    STATUS_TOKEN_IDS,
     type ArenaZoneId,
     type MageWarsWallEdgeId,
+    type StatusTokenId,
 } from './ids';
 import {
     getMageWarsZoneDistance,
     isMageWarsChainLightningTargetObject,
     isMageWarsElementalStaffSpell,
     isMageWarsElementalStaffBindableSpell,
+    isMageWarsHiddenEnchantmentArenaObject,
     isMageWarsLegalHiddenResponseEnchantmentTarget,
     isMageWarsLegalStealEnchantmentNewTarget,
     isMageWarsLivingArenaObject,
+    isMageWarsToxinEnchantmentArenaObject,
+    isMageWarsToxinStatusToken,
     isMageWarsSameEnchantmentAnchor,
     isMageWarsVisibleAttachedEnchantmentArenaObject,
     isMageWarsWallEdgeTargetInRange,
     parseMageWarsSpellAttackProfile,
     resolveMageWarsSpellCastChoiceFamily,
     resolveMageWarsEnchantmentTotalManaCost,
+    resolveMageWarsEnchantmentRelocationManaCost,
     resolveMageWarsEquipmentManaCost,
     resolveMageWarsExplodeManaCostForTarget,
     resolveMageWarsRouseTheBeastManaCostForTarget,
@@ -37,9 +43,12 @@ import {
     resolveMageWarsSpellRawCostTotal,
     resolveMageWarsStealEnchantmentManaCost,
     resolveMageWarsStealEnchantmentNewTargetZoneId,
+    resolveMageWarsToxinEnchantmentsAttachedToObject,
     resolveMageWarsTeleportSpellManaCostForTargetZone,
     type MageWarsSpellCastChoiceFamily,
 } from './spellRules';
+import { resolveMageWarsStatusRemovalCost } from './mageAbilityRuntime';
+import { getStatusTokenAmount } from './statusTokens';
 import type {
     MageWarsArenaObjectState,
     MageWarsCore,
@@ -94,6 +103,9 @@ export interface MageWarsSpellCastChoiceValue {
     chainLightningTargets?: Array<{ targetObjectId: string }>;
     pushToZoneId?: ArenaZoneId;
     boundSpellCardId?: number;
+    statusTokenIds?: StatusTokenId[];
+    statusTokenAmounts?: Partial<Record<StatusTokenId, number>>;
+    selectedEnchantmentObjectIds?: string[];
 }
 
 function resolveMageWarsSpellCastBaseTargetMode(
@@ -102,7 +114,8 @@ function resolveMageWarsSpellCastBaseTargetMode(
     if (family === 'wall') return 'wall-edge';
     if (family === 'elemental-staff-binding') return 'player-bound-spell';
     if (family === 'self-equipment') return 'direct-player';
-    if (family === 'steal-enchantment') return 'object-new-anchor';
+    if (family === 'mana-drain') return 'direct-player';
+    if (family === 'steal-enchantment' || family === 'move-enchantment') return 'object-new-anchor';
     if (family === 'chain-lightning') return 'object-chain';
     if (family === 'jet-stream') return 'target-push-zone';
     if (family === 'force-push') return 'object-push-zone';
@@ -156,8 +169,10 @@ function resolveDirectObjectSpellManaCost(
         case 'explode':
             return resolveMageWarsExplodeManaCostForTarget(targetObject);
         case 'bloodstrike':
+        case 'banish':
         case 'charge-on':
         case 'tanglevine':
+        case 'temporary-trait':
         case 'visible-object-enchantment':
             return resolveMageWarsSpellRawCostTotal(spell);
         default:
@@ -179,6 +194,9 @@ function createMageWarsSpellCastCommand(args: {
     chainLightningTargets?: Array<{ targetObjectId: string }>;
     pushToZoneId?: ArenaZoneId;
     boundSpellCardId?: number;
+    statusTokenIds?: StatusTokenId[];
+    statusTokenAmounts?: Partial<Record<StatusTokenId, number>>;
+    selectedEnchantmentObjectIds?: string[];
     timestamp?: number;
 }): MageWarsCastSpellCommand {
     return {
@@ -199,9 +217,53 @@ function createMageWarsSpellCastCommand(args: {
                 : {}),
             ...(args.pushToZoneId ? { pushToZoneId: args.pushToZoneId } : {}),
             ...(args.boundSpellCardId !== undefined ? { boundSpellCardId: args.boundSpellCardId } : {}),
+            ...(args.statusTokenIds && args.statusTokenIds.length > 0 ? { statusTokenIds: [...args.statusTokenIds] } : {}),
+            ...(args.statusTokenAmounts ? { statusTokenAmounts: { ...args.statusTokenAmounts } } : {}),
+            ...(args.selectedEnchantmentObjectIds && args.selectedEnchantmentObjectIds.length > 0
+                ? { selectedEnchantmentObjectIds: [...args.selectedEnchantmentObjectIds] }
+                : {}),
         },
         ...(typeof args.timestamp === 'number' ? { timestamp: args.timestamp } : {}),
     };
+}
+
+function buildMageWarsSubsets<T>(items: readonly T[]): T[][] {
+    const selections: T[][] = [[]];
+    for (const item of items) {
+        selections.push(...selections.map((selection) => [...selection, item]));
+    }
+    return selections;
+}
+
+function buildMageWarsToxinStatusSelections(targetObject: MageWarsArenaObjectState): Array<{
+    statusTokenIds: StatusTokenId[];
+    statusTokenAmounts: Partial<Record<StatusTokenId, number>>;
+}> {
+    const toxinStatusTokenIds = [STATUS_TOKEN_IDS.ROT, STATUS_TOKEN_IDS.CRIPPLE, STATUS_TOKEN_IDS.WEAK]
+        .filter(isMageWarsToxinStatusToken)
+        .filter((statusTokenId) => getStatusTokenAmount(targetObject, statusTokenId) > 0);
+    const selections: Array<{
+        statusTokenIds: StatusTokenId[];
+        statusTokenAmounts: Partial<Record<StatusTokenId, number>>;
+    }> = [{ statusTokenIds: [], statusTokenAmounts: {} }];
+
+    for (const statusTokenId of toxinStatusTokenIds) {
+        const currentAmount = getStatusTokenAmount(targetObject, statusTokenId);
+        const nextSelections = [...selections];
+        for (const selection of selections) {
+            for (let amount = 1; amount <= currentAmount; amount += 1) {
+                nextSelections.push({
+                    statusTokenIds: [...selection.statusTokenIds, statusTokenId],
+                    statusTokenAmounts: {
+                        ...selection.statusTokenAmounts,
+                        [statusTokenId]: amount,
+                    },
+                });
+            }
+        }
+        selections.splice(0, selections.length, ...nextSelections);
+    }
+    return selections;
 }
 
 function buildMageWarsSpellCastTiming(args: {
@@ -268,6 +330,9 @@ function buildMageWarsSpellCastCandidates(args: {
         targetWallEdgeId?: MageWarsWallEdgeId;
         pushToZoneId?: ArenaZoneId;
         boundSpellCardId?: number;
+        statusTokenIds?: StatusTokenId[];
+        statusTokenAmounts?: Partial<Record<StatusTokenId, number>>;
+        selectedEnchantmentObjectIds?: string[];
         targetMode?: MageWarsSpellCastTargetMode;
         label?: string;
     }) => {
@@ -310,6 +375,9 @@ function buildMageWarsSpellCastCandidates(args: {
             chainLightningTargets: candidateArgs.chainLightningTargets,
             pushToZoneId: candidateArgs.pushToZoneId,
             boundSpellCardId: candidateArgs.boundSpellCardId,
+            statusTokenIds: candidateArgs.statusTokenIds,
+            statusTokenAmounts: candidateArgs.statusTokenAmounts,
+            selectedEnchantmentObjectIds: candidateArgs.selectedEnchantmentObjectIds,
             timestamp: args.timestamp,
         });
         const validation = validateCommand(args.state, command);
@@ -371,6 +439,13 @@ function buildMageWarsSpellCastCandidates(args: {
                     : {}),
                 ...(candidateArgs.pushToZoneId ? { pushToZoneId: candidateArgs.pushToZoneId } : {}),
                 ...(candidateArgs.boundSpellCardId !== undefined ? { boundSpellCardId: candidateArgs.boundSpellCardId } : {}),
+                ...(candidateArgs.statusTokenIds && candidateArgs.statusTokenIds.length > 0
+                    ? { statusTokenIds: [...candidateArgs.statusTokenIds] }
+                    : {}),
+                ...(candidateArgs.statusTokenAmounts ? { statusTokenAmounts: { ...candidateArgs.statusTokenAmounts } } : {}),
+                ...(candidateArgs.selectedEnchantmentObjectIds && candidateArgs.selectedEnchantmentObjectIds.length > 0
+                    ? { selectedEnchantmentObjectIds: [...candidateArgs.selectedEnchantmentObjectIds] }
+                    : {}),
             },
             displayMode: 'card' as const,
             commands: [{
@@ -422,6 +497,12 @@ function buildMageWarsSpellCastCandidates(args: {
                 ...(zoneId ? ['zone', zoneId] : []),
                 ...(targetMode === 'player-bound-spell'
                     ? ['bound-spell', candidateArgs.boundSpellCardId ?? 'none']
+                    : []),
+                ...(candidateArgs.statusTokenIds
+                    ? ['status', ...candidateArgs.statusTokenIds]
+                    : []),
+                ...(candidateArgs.selectedEnchantmentObjectIds
+                    ? ['enchantments', ...candidateArgs.selectedEnchantmentObjectIds]
                     : []),
             ],
             ...(validation.valid
@@ -562,6 +643,45 @@ function buildMageWarsSpellCastCandidates(args: {
                 })),
             ];
         }
+        if (args.family === 'toxin-purification') {
+            const baseManaCost = args.spell.manaCost ?? resolveMageWarsSpellRawCostTotal(args.spell) ?? 0;
+            return targetObjects
+                .filter(isMageWarsLivingArenaObject)
+                .flatMap((targetObject) => {
+                    const statusSelections = buildMageWarsToxinStatusSelections(targetObject);
+                    const toxinEnchantments = resolveMageWarsToxinEnchantmentsAttachedToObject(
+                        args.state.core,
+                        targetObject.id,
+                    ).filter(isMageWarsToxinEnchantmentArenaObject);
+                    const enchantmentSelections = buildMageWarsSubsets(toxinEnchantments.map((enchantment) => enchantment.id));
+
+                    return statusSelections.flatMap((statusSelection) => enchantmentSelections.flatMap((selectedEnchantmentObjectIds) => {
+                        const statusCost = resolveMageWarsStatusRemovalCost(
+                            targetObject,
+                            statusSelection.statusTokenIds,
+                            statusSelection.statusTokenAmounts,
+                        );
+                        if ('error' in statusCost) return [];
+                        const enchantmentManaCost = selectedEnchantmentObjectIds.reduce((total, enchantmentObjectId) => {
+                            const enchantment = toxinEnchantments.find((candidate) => candidate.id === enchantmentObjectId);
+                            return total + (enchantment ? resolveMageWarsEnchantmentTotalManaCost(enchantment) ?? 0 : 0);
+                        }, 0);
+                        return [buildCandidate({
+                            targetObject,
+                            manaCost: baseManaCost + statusCost.manaCost + enchantmentManaCost,
+                            statusTokenIds: statusSelection.statusTokenIds,
+                            statusTokenAmounts: statusSelection.statusTokenAmounts,
+                            selectedEnchantmentObjectIds,
+                            id: [
+                                `target:${targetObject.id}`,
+                                `status:${statusSelection.statusTokenIds.map((statusTokenId) => `${statusTokenId}:${statusSelection.statusTokenAmounts[statusTokenId]}`).join(',') || 'none'}`,
+                                `enchantments:${selectedEnchantmentObjectIds.join(',') || 'none'}`,
+                            ].join(':'),
+                            label: targetObject.name,
+                        })];
+                    }));
+                });
+        }
         if (args.family === 'life-drain') {
             const manaCost = args.spell.manaCost ?? resolveMageWarsSpellRawCostTotal(args.spell) ?? 0;
             return [
@@ -574,8 +694,18 @@ function buildMageWarsSpellCastCandidates(args: {
                         targetPlayer,
                         manaCost,
                         id: `target-player:${targetPlayer.id}`,
-                    })),
+                })),
             ];
+        }
+        if (args.family === 'mana-drain') {
+            const manaCost = args.spell.manaCost ?? resolveMageWarsSpellRawCostTotal(args.spell) ?? 0;
+            return players
+                .filter((targetPlayer) => targetPlayer.id !== args.player.id)
+                .map((targetPlayer) => buildCandidate({
+                    targetPlayer,
+                    manaCost,
+                    id: `target-player:${targetPlayer.id}`,
+                }));
         }
         if (args.family === 'force-push') {
             const manaCost = resolveMageWarsSpellRawCostTotal(args.spell) ?? 0;
@@ -601,11 +731,18 @@ function buildMageWarsSpellCastCandidates(args: {
                     targetZoneId: zone.id,
                 })));
         }
-        if (args.family === 'steal-enchantment') {
+        if (args.family === 'steal-enchantment' || args.family === 'move-enchantment') {
+            const isMoveEnchantment = args.family === 'move-enchantment';
             return targetObjects
-                .filter(isMageWarsVisibleAttachedEnchantmentArenaObject)
+                .filter((targetObject) => isMoveEnchantment
+                    ? targetObject.ownerId === args.player.id
+                        && (isMageWarsHiddenEnchantmentArenaObject(targetObject)
+                            || isMageWarsVisibleAttachedEnchantmentArenaObject(targetObject))
+                    : isMageWarsVisibleAttachedEnchantmentArenaObject(targetObject))
                 .flatMap((targetObject) => {
-                    const manaCost = resolveMageWarsStealEnchantmentManaCost(targetObject) ?? 0;
+                    const manaCost = isMoveEnchantment
+                        ? resolveMageWarsEnchantmentRelocationManaCost(targetObject) ?? 0
+                        : resolveMageWarsStealEnchantmentManaCost(targetObject) ?? 0;
                     const canAttachToNewTarget = (payload: MageWarsCastSpellCommand['payload']): boolean => (
                         !isMageWarsSameEnchantmentAnchor(targetObject, payload)
                         && isMageWarsLegalStealEnchantmentNewTarget(args.state.core, targetObject, payload)

@@ -60,6 +60,7 @@ describe('mage-wars foundation', () => {
         expect(manifest.mobileLayoutPreset).toBe('board-shell');
         expect(manifest.mobileBoardShellLayout).toEqual({
             designWidth: 1920,
+            designHeight: 1080,
         });
         expect(manifest.ai).toMatchObject({
             capture: true,
@@ -146,6 +147,18 @@ describe('mage-wars foundation', () => {
             type: 'atlas',
             atlasId: 'mage-wars:spell-attack-core-atlas',
             index: 0,
+        });
+        expect(getMageWarsSpellCardName(1707)).toBe('烈焰之环');
+        expect(getMageWarsSpellCardPreviewRef(1707)).toEqual({
+            type: 'atlas',
+            atlasId: 'mage-wars:spell-attack-core-atlas',
+            index: 7,
+        });
+        expect(getMageWarsSpellCardName(1708)).toBe('怒雷箭矢');
+        expect(getMageWarsSpellCardPreviewRef(1708)).toEqual({
+            type: 'atlas',
+            atlasId: 'mage-wars:spell-attack-core-atlas',
+            index: 8,
         });
         expect(previewGetter?.('3700')).toEqual({
             type: 'atlas',

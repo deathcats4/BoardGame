@@ -7,6 +7,28 @@
 @source ".";
 
 /*
+ * Possession magnifiers stay out of the card face on real hover devices until
+ * the card is hovered or focused. Touch layouts keep them available.
+ */
+.betrayal-inventory-card-magnify {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .betrayal-inventory-card-magnify {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .group:hover > .betrayal-inventory-card-magnify,
+    .group:focus-within > .betrayal-inventory-card-magnify {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+}
+
+/*
  * Tailwind v4 当前没有稳定检测到 DiceThrone HUD 里一批通过常量复用的 arbitrary-value utilities，
  * 会导致血条高度塌陷、阶段按钮只剩文本壳。
  * 这里用官方 @source inline() 显式保留这些关键类，避免样式回退。
@@ -526,6 +548,49 @@ html[data-keyboard-visible="true"] .auth-modal-container {
     .no-scrollbar {
         -ms-overflow-style: none;
         scrollbar-width: none;
+    }
+
+    /* 小黑屋只收窄自身页面的滚动条，不改变其它游戏或全局默认样式。 */
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(214, 191, 129, 0.36) transparent;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"])::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"])::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"])::-webkit-scrollbar-thumb {
+        background: rgba(214, 191, 129, 0.36);
+        border-radius: 999px;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .custom-scrollbar,
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .scrollbar-thin {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(214, 191, 129, 0.36) transparent;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .custom-scrollbar::-webkit-scrollbar,
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .scrollbar-thin::-webkit-scrollbar {
+        width: 3px;
+        height: 3px;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .custom-scrollbar::-webkit-scrollbar-track,
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .scrollbar-thin::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .custom-scrollbar::-webkit-scrollbar-thumb,
+    :is(html[data-game-id="betrayal"], body[data-game-id="betrayal"]) .scrollbar-thin::-webkit-scrollbar-thumb {
+        background: rgba(214, 191, 129, 0.36);
+        border-radius: 999px;
     }
 
     /* 妯悜缁嗘粴鍔ㄦ潯锛堝崱鐗屽睍绀哄尯锛?*/

@@ -104,7 +104,7 @@ export const VAMPIRE_LORD_PASSIVE_ABILITIES: PassiveAbilityDef[] = [
                 labelKey: 'passive.vampireLordBloodPower.healShort',
                 cpCost: 0,
                 tokenCost: { tokenId: TOKEN_IDS.BLOOD_POWER, amount: 4 },
-                timing: 'ownRollPhase',
+                timing: 'ownMain2Phase',
                 descriptionKey: 'passive.vampireLordBloodPower.heal',
                 customActionId: 'vampire-lord-blood-power-heal-attack-damage',
                 requiresCurrentAttackDamageDealt: true,

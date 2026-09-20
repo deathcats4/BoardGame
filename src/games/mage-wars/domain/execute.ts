@@ -12,6 +12,7 @@ import {
     createMageWarsMageEquipmentArmorDamageModifiers,
     createMageWarsNonlivingBonusDamageModifiers,
     createMageWarsObjectArmorDamageModifiers,
+    resolveMageWarsMageEquipmentAttackDiceModifier,
     resolveMageWarsMageEquipmentTraitText,
 } from './damageRules';
 import { executeMageWarsSpellAbility } from './spellAbilityExecutors';
@@ -24,7 +25,9 @@ import {
     getMageWarsObjectDefenseProfile,
     hasMageWarsObjectBloodstrikeVampiricNextMelee,
     hasMageWarsObjectVampiricEnchantment,
+    hasMageWarsObjectVampiricTrait,
     hasMageWarsDazeStatus,
+    hasMageWarsStunStatus,
     isMageWarsDefenseDisabledByStatus,
     isMageWarsDazeAttackMiss,
     isMageWarsFlyingArenaObject,
@@ -36,6 +39,9 @@ import {
     isMageWarsObjectAttackTargetAllowed,
     isMageWarsObjectAttackTargetInRange,
     isMageWarsQuickSpell,
+    isMageWarsStatusHealingSpell,
+    isMageWarsToxinPurificationSpell,
+    isMageWarsEnchantmentRelocationSpell,
     canMageWarsArenaObjectUseSwiftFreeMove,
     canMageWarsObjectUsePostMoveQuickAction,
     getMageWarsObjectDefenseProfiles,
@@ -54,6 +60,7 @@ import {
     resolveMageWarsObjectEffectiveArmor,
     resolveMageWarsObjectEffectiveLife,
     resolveMageWarsObjectMeleeDiceModifier,
+    resolveMageWarsObjectRangedDiceModifier,
     resolveMageWarsObjectAttackStatusTokenEffects,
     resolveMageWarsObjectAttackManaDrain,
     resolveMageWarsObjectAegisAttackDiceModifier,
@@ -74,7 +81,10 @@ import { MAGE_WARS_OBJECT_ABILITY_IDS, STATUS_TOKEN_IDS, type ArenaZoneId } from
 import { getArenaObject, getMageWarsWallBetweenZones } from './utils';
 import { resolveMageWarsSpellCasterRef, resolveMageWarsSpellCastMode } from './spellCasting';
 import { getStatusTokenAmount } from './statusTokens';
-import { hasTemporaryTeleportMovement } from './temporaryTraits';
+import {
+    hasTemporaryNextMeleeUnavoidable,
+    hasTemporaryTeleportMovement,
+} from './temporaryTraits';
 import {
     createMageWarsArenaObjectSourceConsumeAvailableEvent,
     createMageWarsCounterstrikeSourceConsumeAvailableEvent,
@@ -185,11 +195,12 @@ function createMageWarsDamageBarrierEvents(
     targetPlayerId: PlayerId,
     attackerId?: PlayerId,
     attackerObjectId?: string,
+    targetObjectId?: string,
 ): MageWarsEvent[] {
     const attackerKey = attackerObjectId ?? attackerId;
     if (!attackerKey) return [];
 
-    const source = resolveMageWarsDamageBarrierSource(state.core, targetPlayerId, attackerKey);
+    const source = resolveMageWarsDamageBarrierSource(state.core, targetPlayerId, attackerKey, targetObjectId);
     if (!source) return [];
 
     const attackerObject = attackerObjectId ? getArenaObject(state.core, attackerObjectId) : undefined;
@@ -280,7 +291,7 @@ function createArenaObjectAttackTemporaryTraitsClearAvailableEvent(
         payload: {
             ownerId: attacker.ownerId,
             objectId: attacker.id,
-            traitIds: ['vampiric', 'pierce'],
+            traitIds: ['vampiric', 'pierce', 'unavoidable'],
             sourceAbilityId: BLOODSTRIKE_SPELL_SOURCE_ID,
         },
         sourceCommandType,
@@ -319,7 +330,7 @@ function resolveObjectAttackTarget(
                 life: resolveMageWarsObjectEffectiveLife(core, targetObject),
                 damage: targetObject.damage,
                 armor: resolveMageWarsObjectEffectiveArmor(core, targetObject),
-                flying: isMageWarsFlyingArenaObject(targetObject),
+                flying: isMageWarsFlyingArenaObject(targetObject, core),
                 nonliving: isMageWarsNonlivingArenaObject(targetObject),
                 typeLine: targetObject.typeLine,
                 schoolLine: targetObject.schoolLine,
@@ -452,8 +463,9 @@ function createDefenseAvailableEvent(
     removeGuardAfterMelee: boolean,
     counterstrikeSourceObjectId: string | undefined,
     timestamp: number,
+    attackUnavoidable = isMageWarsObjectAttackUnavoidable(incomingAttackProfile),
 ): MageWarsEvent | undefined {
-    if (isMageWarsObjectAttackUnavoidable(incomingAttackProfile)) return undefined;
+    if (attackUnavoidable) return undefined;
 
     const defenderObject = target.targetObjectId
         ? getArenaObject(core, target.targetObjectId)
@@ -559,6 +571,8 @@ export interface MageWarsObjectAttackResolutionParams {
     attackProfileOverride?: MageWarsObjectAttackProfile;
     /** 攻击逆转允许原攻击来源成为目标，即使它不是原攻击 profile 的合法目标。 */
     ignoreTargetLegality?: boolean;
+    /** 战斗怒火追加攻击本身不能再次触发战斗怒火。 */
+    skipBattleFury?: boolean;
 }
 
 export function resolveMageWarsObjectAttackEvents(
@@ -583,13 +597,17 @@ export function resolveMageWarsObjectAttackEvents(
         skipPreAttackManaCosts = false,
         attackProfileOverride,
         ignoreTargetLegality = false,
+        skipBattleFury = false,
     } = params;
     const attacker = getArenaObject(state.core, attackerObjectId);
     const attackProfile = attackerProfileOrOverride(attacker, attackProfileId, attackProfileOverride);
     const target = resolveObjectAttackTarget(state.core, { targetPlayerId, targetObjectId });
     if (!attacker || !attackProfile || !target) return [];
+    const hasTemporaryUnavoidable = attackProfile.rangeKind === 'melee'
+        && hasTemporaryNextMeleeUnavoidable(attacker);
+    const attackUnavoidable = isMageWarsObjectAttackUnavoidable(attackProfile) || hasTemporaryUnavoidable;
     const targetObject = target.targetObjectId ? getArenaObject(state.core, target.targetObjectId) : undefined;
-    if (targetObject && !ignoreTargetLegality && !isMageWarsObjectAttackTargetAllowed(attacker, attackProfile, targetObject)) return [];
+    if (targetObject && !ignoreTargetLegality && !isMageWarsObjectAttackTargetAllowed(attacker, attackProfile, targetObject, state.core)) return [];
     if (!isMageWarsObjectAttackTargetInRange(state.core, attacker.zoneId, target.zoneId, attackProfile)) {
         return [];
     }
@@ -623,14 +641,18 @@ export function resolveMageWarsObjectAttackEvents(
     const chargeDiceModifier = resolveMageWarsObjectChargeDiceModifier(attacker, attackProfile);
     const meleeDiceModifier = resolveMageWarsObjectMeleeDiceModifier(state.core, attacker, attackProfile);
     const attackDiceModifier = resolveMageWarsObjectAttackDiceModifier(state.core, attacker);
+    const rangedDiceModifier = attackProfile.rangeKind === 'ranged'
+        ? resolveMageWarsObjectRangedDiceModifier(state.core, attacker)
+        : { value: 0, sourceObjectIds: [] };
     const bloodstrikePierceModifier = resolveMageWarsObjectBloodstrikePierceModifier(attacker, attackProfile);
     const hasBloodstrikeVampiric = hasMageWarsObjectBloodstrikeVampiricNextMelee(attacker, attackProfile);
     const hasEnchantmentVampiric = hasMageWarsObjectVampiricEnchantment(state.core, attacker, attackProfile);
-    const hasVampiric = hasBloodstrikeVampiric || hasEnchantmentVampiric;
+    const hasObjectVampiric = hasMageWarsObjectVampiricTrait(attacker, attackProfile);
+    const hasVampiric = hasBloodstrikeVampiric || hasEnchantmentVampiric || hasObjectVampiric;
     const shouldClearBloodstrike = attackProfile.rangeKind === 'melee'
-        && (hasBloodstrikeVampiric || bloodstrikePierceModifier > 0);
+        && (hasBloodstrikeVampiric || bloodstrikePierceModifier > 0 || hasTemporaryUnavoidable);
     const events: MageWarsEvent[] = [];
-    if (targetObject && isMageWarsObjectAttackUnavoidable(attackProfile) && !hiddenAttackReversalCardId) {
+    if (targetObject && attackUnavoidable && !hiddenAttackReversalCardId) {
         events.push(...resolveMageWarsObjectDefenseSourceObjectIds(state.core, targetObject)
             .map((sourceObjectId) => createMageWarsArenaObjectSourceConsumeAvailableEvent(
                 state.core,
@@ -715,7 +737,7 @@ export function resolveMageWarsObjectAttackEvents(
                     attackerObjectId: attacker.id,
                     defenderObjectId: targetObject!.id,
                     attackProfileId: attackProfile.id,
-                    unavoidable: isMageWarsObjectAttackUnavoidable(attackProfile),
+                    unavoidable: attackUnavoidable,
                     ...(actionCost ? { actionCost } : {}),
                     allowCounterstrikeOpportunity,
                     removeGuardAfterMelee,
@@ -751,7 +773,7 @@ export function resolveMageWarsObjectAttackEvents(
                     strikeCount: attackProfile.strikeCount,
                     baseDamage: 0,
                     ...(hasBloodstrikeVampiric ? { vampiricNextMelee: true } : {}),
-                    ...(hasEnchantmentVampiric ? { vampiric: true } : {}),
+                    ...(hasEnchantmentVampiric || hasObjectVampiric ? { vampiric: true } : {}),
                     ...(bloodstrikePierceModifier > 0 ? { pierceModifier: bloodstrikePierceModifier } : {}),
                     ...deathMarkEventPayload,
                     ...actionCostPayload,
@@ -829,7 +851,7 @@ export function resolveMageWarsObjectAttackEvents(
                 strikeCount: attackProfile.strikeCount,
                 baseDamage: 0,
                 ...(hasBloodstrikeVampiric ? { vampiricNextMelee: true } : {}),
-                ...(hasEnchantmentVampiric ? { vampiric: true } : {}),
+                ...(hasEnchantmentVampiric || hasObjectVampiric ? { vampiric: true } : {}),
                 ...(bloodstrikePierceModifier > 0 ? { pierceModifier: bloodstrikePierceModifier } : {}),
                 ...deathMarkEventPayload,
                 ...actionCostPayload,
@@ -900,12 +922,21 @@ export function resolveMageWarsObjectAttackEvents(
             removeGuardAfterMelee,
             counterstrikeSourceObjectId,
             timestamp,
+            attackUnavoidable,
         )
         : undefined;
     if (defenseAvailableEvent) return [defenseAvailableEvent];
 
     for (let strikeIndex = 0; strikeIndex < attackProfile.strikeCount; strikeIndex += 1) {
         const damageTypeAdjustment = resolveMageWarsDamageTypeAdjustment(attackProfile.damageTypes, target);
+        const mageEquipmentAttackDiceModifier = attacker.kind === 'equipment' && attacker.anchoredToPlayerId
+            ? resolveMageWarsMageEquipmentAttackDiceModifier(
+                state.core,
+                attacker.anchoredToPlayerId,
+                attackProfile.damageTypes,
+                attackProfile.rangeKind,
+            )
+            : { value: 0, sourceObjectIds: [] };
         const bloodthirstDiceModifier = resolveMageWarsObjectBloodthirstDiceModifier(
             state.core,
             attacker,
@@ -915,7 +946,8 @@ export function resolveMageWarsObjectAttackEvents(
         );
         const diceCount = resolveMageWarsModifiedAttackDiceCount(
             attackProfile.diceCount + weakAttackDiceModifier + chargeDiceModifier + meleeDiceModifier + bloodthirstDiceModifier
-                + attackDiceModifier.value + deathMarkAttackModifier.value + aegisAttackDiceModifier,
+                + attackDiceModifier.value + rangedDiceModifier.value + deathMarkAttackModifier.value + aegisAttackDiceModifier
+                + mageEquipmentAttackDiceModifier.value,
             damageTypeAdjustment,
         );
         const diceResults = rollD3(random, diceCount);
@@ -923,7 +955,9 @@ export function resolveMageWarsObjectAttackEvents(
             hasRolledMeleeAttackDice = true;
         }
         const rawEffectDieResult = random.d(12);
-        const effectDieResult = rawEffectDieResult + damageTypeAdjustment.effectDieModifier;
+        const effectDieResult = rawEffectDieResult
+            + damageTypeAdjustment.effectDieModifier
+            + mageEquipmentAttackDiceModifier.value;
         const baseDamage = diceResults.reduce((total, result) => total + result, 0);
         const damageEvents = createDamageCalculation({
             state,
@@ -977,11 +1011,15 @@ export function resolveMageWarsObjectAttackEvents(
                     attackDiceModifier: attackDiceModifier.value,
                     attackDiceModifierSourceObjectIds: attackDiceModifier.sourceObjectIds,
                 } : {}),
+                ...(rangedDiceModifier.value !== 0 ? {
+                    rangedDiceModifier: rangedDiceModifier.value,
+                    rangedDiceModifierSourceObjectIds: rangedDiceModifier.sourceObjectIds,
+                } : {}),
                 ...(chargeDiceModifier > 0 ? { chargeDiceModifier } : {}),
                 ...(meleeDiceModifier > 0 ? { meleeDiceModifier } : {}),
                 ...(bloodthirstDiceModifier > 0 ? { bloodthirstDiceModifier } : {}),
                 ...(hasBloodstrikeVampiric ? { vampiricNextMelee: true } : {}),
-                ...(hasEnchantmentVampiric ? { vampiric: true } : {}),
+                ...(hasEnchantmentVampiric || hasObjectVampiric ? { vampiric: true } : {}),
                 ...(bloodstrikePierceModifier > 0 ? { pierceModifier: bloodstrikePierceModifier } : {}),
                 ...deathMarkEventPayload,
                 ...actionCostPayload,
@@ -1060,8 +1098,9 @@ export function resolveMageWarsObjectAttackEvents(
         }
     }
 
+    const barrierTargetPlayerId = target.targetPlayerId ?? target.ownerId;
     if (
-        targetPlayerId
+        barrierTargetPlayerId
         && attackProfile.rangeKind === 'melee'
         && hasRolledMeleeAttackDice
         && target.damage + accumulatedDamage < target.life
@@ -1071,19 +1110,24 @@ export function resolveMageWarsObjectAttackEvents(
             sourceCommandType,
             timestamp,
             random,
-            targetPlayerId,
+            barrierTargetPlayerId,
             undefined,
             attacker.id,
+            target.targetObjectId,
         ));
     }
 
     if (hasVampiric && vampiricHealingDamage > 0) {
         const vampiricSpellCardId = hasBloodstrikeVampiric
             ? BLOODSTRIKE_SPELL_CARD_ID
-            : VAMPIRIC_ENCHANTMENT_SPELL_CARD_ID;
+            : hasEnchantmentVampiric
+                ? VAMPIRIC_ENCHANTMENT_SPELL_CARD_ID
+                : attacker.sourceSpellCardId;
         const vampiricSourceAbilityId = hasBloodstrikeVampiric
             ? BLOODSTRIKE_SPELL_SOURCE_ID
-            : VAMPIRIC_ENCHANTMENT_SOURCE_ID;
+            : hasEnchantmentVampiric
+                ? VAMPIRIC_ENCHANTMENT_SOURCE_ID
+                : sourceAbilityId;
         events.push({
             type: MAGE_WARS_EVENTS.ARENA_OBJECT_ATTACK_VAMPIRIC_HEALING_AVAILABLE,
             payload: {
@@ -1127,8 +1171,24 @@ export function resolveMageWarsObjectAttackEvents(
             timestamp,
         )
         : undefined;
+    const battleFuryAvailable = !skipBattleFury
+        && !isCounterstrike
+        && attackProfile.rangeKind === 'melee'
+        && attacker.temporaryTraits?.battleFuryRoundNumber === state.core.turnNumber;
     return [
         ...events,
+        ...(battleFuryAvailable ? [{
+            type: MAGE_WARS_EVENTS.BATTLE_FURY_AVAILABLE,
+            payload: {
+                ownerId: attacker.ownerId,
+                attackerObjectId: attacker.id,
+                sourceAbilityId: 'mw.spell.3416.battle-fury',
+                spellCardId: 3416,
+                roundNumber: state.core.turnNumber,
+            },
+            sourceCommandType,
+            timestamp,
+        } satisfies MageWarsEvent] : []),
         ...(counterstrikeEvent ? [counterstrikeEvent] : []),
         ...(guardRemovedEvent ? [guardRemovedEvent] : []),
         ...(counterstrikeSourceObjectId
@@ -1378,18 +1438,28 @@ export function executeCommand(
                 command.payload.manaCost,
             );
             if (!costResolution) return [];
+            const actualCastManaCost = (
+                isMageWarsStatusHealingSpell(costResolution.spell)
+                || isMageWarsToxinPurificationSpell(costResolution.spell)
+                || isMageWarsEnchantmentRelocationSpell(costResolution.spell)
+            )
+                ? command.payload.manaCost
+                : costResolution.manaCost;
             const castMode = resolveMageWarsSpellCastMode(
                 state.sys.phase as MageWarsPhase,
                 caster,
                 costResolution.spell,
+                {
+                    stunned: caster.kind === 'mage' && hasMageWarsStunStatus(player),
+                },
             );
             if (!castMode) return [];
             const objectManaCost = caster.kind === 'arena-object'
-                ? Math.min(state.core.objects[caster.objectId]?.mana ?? 0, costResolution.manaCost)
+                ? Math.min(state.core.objects[caster.objectId]?.mana ?? 0, actualCastManaCost)
                 : undefined;
             const playerManaCost = caster.kind === 'arena-object'
-                ? costResolution.manaCost - (objectManaCost ?? 0)
-                : costResolution.manaCost;
+                ? actualCastManaCost - (objectManaCost ?? 0)
+                : actualCastManaCost;
 
             const targetObject = command.payload.targetObjectId
                 ? getArenaObject(state.core, command.payload.targetObjectId)
@@ -1418,7 +1488,7 @@ export function executeCommand(
                         playerId: command.playerId,
                         caster,
                         spellCardId: command.payload.spellCardId,
-                        manaCost: costResolution.manaCost,
+                        manaCost: actualCastManaCost,
                         castMode,
                         ...(objectManaCost === undefined ? {} : { objectManaCost }),
                         playerManaCost,
@@ -1446,7 +1516,7 @@ export function executeCommand(
                             triggeringPlayerId: command.playerId,
                             caster,
                              spellCardId: command.payload.spellCardId,
-                             manaCost: costResolution.manaCost,
+                             manaCost: actualCastManaCost,
                              ...(objectManaCost === undefined ? {} : { objectManaCost }),
                              playerManaCost,
                             castMode,
@@ -1467,7 +1537,7 @@ export function executeCommand(
                     playerId: command.playerId,
                     caster,
                     spellCardId: command.payload.spellCardId,
-                    manaCost: costResolution.manaCost,
+                    manaCost: actualCastManaCost,
                     castMode,
                     ...(objectManaCost === undefined ? {} : { objectManaCost }),
                     playerManaCost,
@@ -1475,6 +1545,15 @@ export function executeCommand(
                     targetObjectId: command.payload.targetObjectId,
                     targetZoneId: command.payload.targetZoneId,
                     targetWallEdgeId: command.payload.targetWallEdgeId,
+                    ...(command.payload.statusTokenIds === undefined
+                        ? {}
+                        : { statusTokenIds: [...command.payload.statusTokenIds] }),
+                    ...(command.payload.statusTokenAmounts === undefined
+                        ? {}
+                        : { statusTokenAmounts: { ...command.payload.statusTokenAmounts } }),
+                    ...(command.payload.selectedEnchantmentObjectIds === undefined
+                        ? {}
+                        : { selectedEnchantmentObjectIds: [...command.payload.selectedEnchantmentObjectIds] }),
                 },
                 sourceCommandType: command.type,
                 timestamp,
@@ -1487,7 +1566,7 @@ export function executeCommand(
                 command,
                 random,
                 spell: costResolution.spell,
-                manaCost: costResolution.manaCost,
+                manaCost: actualCastManaCost,
             });
 
             return [castEvent, ...abilityEvents];

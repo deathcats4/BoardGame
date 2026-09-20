@@ -259,6 +259,7 @@ export function buildAffectRecords(
         }
         case SU_EVENTS.ONGOING_DETACHED: {
             const payload = (event as OngoingDetachedEvent).payload;
+            if (payload.isDestruction === false) return [];
             const lookup = findCardInPlayByUid(core, payload.cardUid);
             if (!lookup) {
                 if (payload.targetBaseIndex === undefined || !payload.targetKind) return [];

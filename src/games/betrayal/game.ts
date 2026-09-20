@@ -1,5 +1,6 @@
 import { createBaseSystems, createGameEngine } from '../../engine';
 import { registerGameAiRuntime } from '../../engine/ai';
+import type { AiSeatController } from '../../engine/ai/types';
 import { registerCriticalImageResolver } from '../../core';
 import type {
     DomainCore,
@@ -335,7 +336,6 @@ import {
 import {
     cloneBetrayalRoom,
     refreshExplorableRoomSlots,
-    resolveOppositeRoomEdge,
     roomTileAdjustmentSelectionsMatch,
     roomDistanceByLayout,
 } from './roomMapModel';
@@ -1095,6 +1095,7 @@ export interface BetrayalCore {
     scenarioCardConfirmations: Record<string, BetrayalScenarioCardId>;
     phase: BetrayalPhase;
     playerIds: string[];
+    seatControllers?: Record<string, AiSeatController>;
     selectedExplorerByPlayerId: Record<string, string>;
     readyPlayerIds: string[];
     currentPlayer: string;
@@ -1228,6 +1229,14 @@ function cloneCore(core: BetrayalCore): BetrayalCore {
     return {
         ...core,
         playerIds: [...core.playerIds],
+        seatControllers: core.seatControllers
+            ? Object.fromEntries(
+                Object.entries(core.seatControllers).map(([playerId, controller]) => [
+                    playerId,
+                    { ...controller },
+                ]),
+            )
+            : undefined,
         scenarioCandidateIds: [...core.scenarioCandidateIds],
         scenarioCardConfirmations: { ...core.scenarioCardConfirmations },
         selectedExplorerByPlayerId: { ...core.selectedExplorerByPlayerId },
@@ -1740,99 +1749,6 @@ function createBetrayalPlayerView(state: BetrayalCore, viewingPlayerId: PlayerId
         );
     }
     return view;
-}
-
-function removeRoomTileFromDiscoveryDeck(core: BetrayalCore, visualId: BetrayalRoomVisualId): void {
-    const deck = core.roomDiscoveryDeck ?? makeRoomDiscoveryDeckFromFloorPools(core.roomDiscoveryOrderByFloor);
-    const nextDeck = deck
-        .filter((entry) => entry.room.visualId !== visualId)
-        .map(cloneRoomDiscoveryDeckEntry);
-    core.roomDiscoveryDeck = nextDeck;
-    core.roomDiscoveryOrderByFloor = groupRoomDiscoveryDeckByFloor(nextDeck);
-}
-
-function ensureLibraryPresent(core: BetrayalCore): void {
-    const libraryEntry = ROOM_DISCOVERY_DECK_POOL.find((entry) => entry.room.visualId === 'library');
-    if (!libraryEntry) {
-        return;
-    }
-    const existingLibrary = core.rooms.find((room) => room.state === 'discovered' && room.visualId === 'library');
-    if (existingLibrary) {
-        removeRoomTileFromDiscoveryDeck(core, libraryEntry.room.visualId);
-        return;
-    }
-
-    const upperWest = core.rooms.find((room) => room.id === 'upper-west');
-    if (!upperWest) {
-        return;
-    }
-
-    const entryRoomId = upperWest.entryRoomId
-        ?? upperWest.connectedRoomIds.find((roomId) => (
-            core.rooms.some((room) => room.id === roomId && room.state === 'discovered')
-        ));
-    const entryRoom = entryRoomId
-        ? core.rooms.find((room) => room.id === entryRoomId && room.state === 'discovered')
-        : undefined;
-    const entryEdge = upperWest.entryEdge
-        ?? (
-            entryRoom
-                ? entryRoom.doorways.find((doorway) => doorway.connectsToRoomId === upperWest.id)?.edge
-                : undefined
-        )
-        ?? 'west';
-    const libraryTemplate = cloneRoomTemplate(libraryEntry.room);
-    const oriented = orientDoorwaysForPlacement(
-        libraryTemplate.doorways,
-        entryEdge,
-        upperWest.orientationTurns,
-    );
-    const connectionEdge = resolveOppositeRoomEdge(entryEdge);
-    let connectedToEntry = false;
-    const doorways = oriented.doorways.map((doorway) => {
-        if (!connectedToEntry && entryRoom && doorway.edge === connectionEdge) {
-            connectedToEntry = true;
-            return {
-                ...doorway,
-                connectsToRoomId: entryRoom.id,
-            };
-        }
-        return { ...doorway };
-    });
-    if (entryRoom && !connectedToEntry) {
-        doorways.push({
-            edge: connectionEdge,
-            connectsToRoomId: entryRoom.id,
-        });
-    }
-
-    const connectedRoomIds = doorways
-        .map((doorway) => doorway.connectsToRoomId)
-        .filter((roomId): roomId is string => Boolean(roomId));
-    const placedLibrary: BetrayalRoomNode = {
-        ...cloneBetrayalRoom(upperWest),
-        name: libraryTemplate.name,
-        hint: libraryTemplate.hint,
-        tags: [...libraryTemplate.tags],
-        state: 'discovered',
-        discoveryReward: null,
-        visualId: libraryTemplate.visualId,
-        doorways,
-        backVisualId: upperWest.backVisualId,
-        discoveryEffect: libraryTemplate.discoveryEffect,
-        endTurnEffect: libraryTemplate.endTurnEffect,
-        enterEffect: libraryTemplate.enterEffect,
-        entryRoomId: entryRoom?.id,
-        entryEdge,
-        orientationTurns: oriented.orientationTurns,
-        connectedRoomIds: Array.from(new Set(connectedRoomIds)),
-    };
-
-    core.rooms = refreshExplorableRoomSlots([
-        ...core.rooms.filter((room) => room.id !== upperWest.id).map(cloneBetrayalRoom),
-        placedLibrary,
-    ]);
-    removeRoomTileFromDiscoveryDeck(core, libraryTemplate.visualId);
 }
 
 function createInitialRoomLayout(seeds: BetrayalRoomSeed[]): BetrayalRoomNode[] {
@@ -4072,7 +3988,6 @@ function reduceEvent(state: BetrayalCore, event: BetrayalEvent): BetrayalCore {
                     ...core.scenarioCardConfirmations,
                     [event.payload.playerId]: event.payload.candidateId,
                 },
-                activityLog: appendActivity(core, event.payload.logText, 'accent'),
             };
         case EVENTS.SCENARIO_STARTED: {
             core.scenarioId = event.payload.scenarioId;
@@ -4080,7 +3995,6 @@ function reduceEvent(state: BetrayalCore, event: BetrayalEvent): BetrayalCore {
             const explorers = buildScenarioExplorers(core);
             const firstPlayerId = explorers[0]?.playerId ?? core.currentPlayer;
             core.scenarioRuntime = createInitialScenarioRuntimeStatus();
-            ensureLibraryPresent(core);
             const startedCore = replaceExplorers({
                 ...core,
                 phase: 'preHaunt',
@@ -4587,7 +4501,10 @@ const resolveBetrayalPendingEventRollResolutionRecovery = (args: {
     state: MatchState<unknown>;
     phase: string;
 }) => {
-    const core = args.state.core as Partial<Pick<BetrayalCore, 'pendingEventRollResolution' | 'playerIds'>> | undefined;
+    const core = args.state.core as Partial<Pick<
+        BetrayalCore,
+        'pendingEventRollResolution' | 'playerIds' | 'seatControllers'
+    >> | undefined;
     const pendingResolution = core?.pendingEventRollResolution;
     if (!pendingResolution) {
         return null;
@@ -4597,7 +4514,10 @@ const resolveBetrayalPendingEventRollResolutionRecovery = (args: {
     }
 
     const requiredPlayerIds = resolvePendingEventRollResolutionRequiredPlayerIds(
-        { playerIds: core?.playerIds ?? [] },
+        {
+            playerIds: core?.playerIds ?? [],
+            seatControllers: core?.seatControllers,
+        },
         pendingResolution,
     );
     const acknowledgedPlayerIds = new Set(resolvePendingEventRollResolutionAcknowledgedPlayerIds(pendingResolution));

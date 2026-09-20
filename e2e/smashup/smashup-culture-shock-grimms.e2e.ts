@@ -11,6 +11,11 @@ function optionHasMinionUid(option: InteractionOption, minionUid: string): boole
   return !!value && typeof value === 'object' && (value as { minionUid?: unknown }).minionUid === minionUid;
 }
 
+function optionHasCardUid(option: InteractionOption, cardUid: string): boolean {
+  const value = option.value;
+  return !!value && typeof value === 'object' && (value as { cardUid?: unknown }).cardUid === cardUid;
+}
+
 function optionHasTeamworkPlay(option: InteractionOption, cardUid: string, baseIndex: number): boolean {
   const value = option.value;
   return !!value
@@ -86,8 +91,11 @@ test.describe('大杀四方文化冲击格林童话真实入口验证', () => {
       },
     });
 
+    const factionSearch = page.getByTestId('faction-search-input');
+    await expect(factionSearch).toBeVisible({ timeout: 15000 });
+    await factionSearch.fill('格林');
+
     const option = page.getByTestId('faction-option-grimms_fairy_tales');
-    await option.scrollIntoViewIfNeeded({ timeout: 15000 });
     await expect(option).toBeVisible({ timeout: 15000 });
     await expect.poll(async () => option.locator('.atlas-shimmer').count(), {
       message: '格林童话派系卡不应残留 atlas shimmer',
@@ -190,5 +198,82 @@ test.describe('大杀四方文化冲击格林童话真实入口验证', () => {
     });
     await assertCardVisualReady(page, 'deck-gretel');
     await game.screenshot('05-团队合作-格雷特额外打出结算后', testInfo);
+  });
+
+  test('一篮子好东西从真实打牌入口将行动放到牌库顶', async ({ page, game }, testInfo) => {
+    test.setTimeout(120000);
+    await setChineseLocale(page.context());
+    await game.openTestGame('smashup', {
+      p0: 'grimms_fairy_tales,aliens',
+      p1: 'pirates,ninjas',
+      skipFactionSelect: true,
+      skipInitialization: false,
+      seed: 20260714,
+    }, 45000);
+
+    await game.setupScene({
+      gameId: 'smashup',
+      currentPlayer: '0',
+      phase: 'playCards',
+      player0: {
+        hand: [
+          { uid: 'basket', defId: 'grimms_fairy_tales_basket_of_goodies', type: 'action', owner: '0' },
+        ],
+        deck: [
+          { uid: 'deck-minion', defId: 'grimms_fairy_tales_hansel', type: 'minion', owner: '0' },
+          { uid: 'deck-action', defId: 'grimms_fairy_tales_another_story', type: 'action', owner: '0' },
+        ],
+        discard: [],
+        factions: ['grimms_fairy_tales', 'aliens'],
+        minionsPlayed: 0,
+        minionLimit: 1,
+        actionsPlayed: 0,
+        actionLimit: 3,
+        vp: 0,
+      },
+      player1: {
+        hand: [],
+        deck: [],
+        discard: [],
+        factions: ['pirates', 'ninjas'],
+        minionsPlayed: 0,
+        minionLimit: 1,
+        actionsPlayed: 0,
+        actionLimit: 1,
+        vp: 0,
+      },
+      bases: [
+        { defId: 'base_gingerbread_house', minions: [] },
+        { defId: 'base_woodland_cottage', minions: [] },
+      ],
+    });
+
+    await game.waitForPhase('playCards');
+    await assertCardVisualReady(page, 'basket');
+    await game.screenshot('06-一篮子好东西-触发前', testInfo);
+
+    await game.playCard('grimms_fairy_tales_basket_of_goodies');
+    await game.waitForInteraction('grimms_fairy_tales_basket_of_goodies', 10000);
+    await game.screenshot('07-一篮子好东西-选择行动', testInfo);
+    await game.selectInteractionOptionBy(
+      option => optionHasCardUid(option, 'deck-action'),
+      '一篮子好东西把行动放到牌库顶',
+    );
+    await game.waitForNoInteraction(10000);
+    await dismissSpotlightIfPresent(page);
+
+    await expect.poll(async () => {
+      const state = await game.getState();
+      return {
+        deckUids: state.core.players['0']?.deck?.map((card: { uid?: string }) => card.uid) ?? [],
+        discardUids: state.core.players['0']?.discard?.map((card: { uid?: string }) => card.uid) ?? [],
+        interactionOpen: Boolean(state.sys?.interaction?.current),
+      };
+    }, { timeout: 10000 }).toEqual({
+      deckUids: ['deck-action', 'deck-minion'],
+      discardUids: ['basket'],
+      interactionOpen: false,
+    });
+    await game.screenshot('08-一篮子好东西-行动置顶结算后', testInfo);
   });
 });

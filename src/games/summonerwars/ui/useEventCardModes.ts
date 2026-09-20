@@ -56,6 +56,7 @@ const INTERACTIVE_EVENT_BASE_IDS = new Set<string>([
   CARD_IDS.SHADOW_HIDE_IN_DARKNESS,
   CARD_IDS.SHADOW_MARL_GRIMOIRE,
   CARD_IDS.SHADOW_SHADOW_PULSE,
+  CARD_IDS.ZHONGCAI_OBEDIENCE,
 ]);
 
 export function requiresEventInteraction(cardId: string): boolean {
@@ -120,7 +121,7 @@ export function useEventCardModes({
         summonPosition?: CellCoord;
         position?: CellCoord;
       } | undefined;
-      const target = value?.targetPosition ?? value?.summonPosition ?? value?.position;
+      const target = value?.targetPosition ?? value?.summonPosition ?? value?.position ?? value?.newPosition;
       return !!target && target.row === pos.row && target.col === pos.col;
     });
     if (!optionId) return false;
@@ -550,6 +551,20 @@ export function useEventCardModes({
     return eventTargetMode.validTargets;
   }, [eventTargetMode]);
 
+  const zhongcaiObedienceHighlights = useMemo(() => {
+    if (swInteraction?.type === 'zhongcai_obedience_select_unit') {
+      return swInteraction.options
+        .map((option) => (option.value as { targetPosition?: CellCoord } | undefined)?.targetPosition)
+        .filter((position): position is CellCoord => !!position);
+    }
+    if (swInteraction?.type === 'zhongcai_obedience_select_position') {
+      return swInteraction.options
+        .map((option) => (option.value as { newPosition?: CellCoord } | undefined)?.newPosition)
+        .filter((position): position is CellCoord => !!position);
+    }
+    return [];
+  }, [swInteraction]);
+
   const bloodSummonHighlights = useMemo(() => {
     if (!bloodSummonMode) return [];
     if (bloodSummonMode.step === 'selectTarget') {
@@ -956,6 +971,14 @@ export function useEventCardModes({
       return true;
     }
 
+    if (
+      swInteraction?.type === 'zhongcai_obedience_select_unit'
+      || swInteraction?.type === 'zhongcai_obedience_select_position'
+    ) {
+      respondPositionOption({ row: gameRow, col: gameCol });
+      return true;
+    }
+
     // 未匹配任何事件模式
     return false;
   }, [
@@ -1196,6 +1219,16 @@ export function useEventCardModes({
         activated = true;
         break;
       }
+      case CARD_IDS.ZHONGCAI_OBEDIENCE: {
+        const obedienceSummoner = getSummoner(core, myPlayerId as '0' | '1');
+        if (!obedienceSummoner) { failReason = t('eventCard.noSummoner'); break; }
+        const obedienceTargets = getPlayerUnits(core, myPlayerId as '0' | '1')
+          .filter((unit) => unit.card.unitClass === 'common'
+            && manhattanDistance(obedienceSummoner.position, unit.position) <= 3);
+        if (obedienceTargets.length === 0) break;
+        activated = true;
+        break;
+      }
       default: {
         // 无需多步骤交互的事件卡，直接 dispatch
         dispatch(SW_COMMANDS.PLAY_EVENT, { cardId });
@@ -1320,7 +1353,7 @@ export function useEventCardModes({
     // 派生
     clearAllEventModes, hasActiveEventMode,
     // 高亮
-    validEventTargets, bloodSummonHighlights, annihilateHighlights,
+    validEventTargets, zhongcaiObedienceHighlights, bloodSummonHighlights, annihilateHighlights,
     mindControlHighlights, entanglementHighlights, moguSymbioticSelfHealingHighlights, moguReleaseSporesHighlights, shadowPulseHighlights, glacialShiftHighlights,
     sneakHighlights, stunHighlights, hypnoticLureHighlights,
     withdrawHighlights, afterAttackAbilityHighlights, telekinesisHighlights,

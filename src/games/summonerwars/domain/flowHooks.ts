@@ -65,7 +65,7 @@ function hasConfirmablePhaseEndAbility(
 export const PHASE_START_ABILITIES: Record<GamePhase, string[]> = {
   factionSelect: [],
   summon: ['guidance'],
-  move: ['illusion', 'huijin_wildfire'],
+  move: ['illusion', 'huijin_wildfire', 'zhongcai_erase'],
   build: [],
   attack: ['blood_rune', 'ice_shards'],
   magic: [],
@@ -77,7 +77,7 @@ export const PHASE_END_ABILITIES: Record<GamePhase, string[]> = {
   summon: [],
   move: ['mogu_decay'],
   build: [],
-  attack: ['feed_beast', 'mogu_parasite', 'huijin_call_guards', 'shadow_inescapable_doom'],
+  attack: ['feed_beast', 'mogu_parasite', 'huijin_call_guards', 'shadow_inescapable_doom', 'zhongcai_radiant_healing'],
   magic: ['mogu_burst'],
   draw: [],
 };
@@ -327,6 +327,19 @@ export const summonerWarsFlowHooks: FlowHooks<SummonerWarsCore> = {
           events.push({
             type: SW_EVENTS.FUNERAL_PYRE_CHARGED,
             payload: { playerId: nextPlayer, eventCardId: activeEvent.id, charges: (activeEvent.charges ?? 0) - 1 },
+            timestamp,
+          });
+          continue;
+        }
+        if ((cardBaseId === CARD_IDS.ZHONGCAI_HOLY_DECREE || cardBaseId === CARD_IDS.ZHONGCAI_LOYALTY_DECREE)
+          && (activeEvent.charges ?? 0) > 0) {
+          events.push({
+            type: SW_EVENTS.ZHONGCAI_DECREE_PROMPTED,
+            payload: {
+              playerId: nextPlayer,
+              cardId: activeEvent.id,
+              charges: activeEvent.charges ?? 0,
+            },
             timestamp,
           });
           continue;

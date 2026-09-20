@@ -399,11 +399,11 @@ describe('七大恨房间 setup 解析', () => {
             core.handCards.filter((card) => card.faction === factionId)
         );
         expect(factionHandCards('ming').filter((card) => card.status === 'payable')).toHaveLength(3);
-        expect(factionHandCards('ming')).toHaveLength(4);
+        expect(factionHandCards('ming')).toHaveLength(3);
         expect(factionHandCards('mongol')).toHaveLength(6);
         expect(factionHandCards('jin')).toHaveLength(10);
         expect(factionHandCards('ming').map((card) => card.previewRef)).toEqual(
-            QIDAHEN_ATLAS05_TTS_DECK_SEQUENCE_BY_FACTION.ming.slice(0, 4).map((index) => ({
+            QIDAHEN_ATLAS05_TTS_DECK_SEQUENCE_BY_FACTION.ming.slice(0, 3).map((index) => ({
                 type: 'atlas',
                 atlasId: 'qidahen:atlas05-ordinary-hand-preview',
                 index,

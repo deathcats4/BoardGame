@@ -27,7 +27,7 @@ import { CHARACTER_DATA_MAP } from './characters';
 import { playerAbilityHasDamage, playerAbilityNeedsSingleOpponentTarget } from './abilityLookup';
 import { getCurrentRollDice, getCurrentRollOwnerId, isCurrentBonusRollSettlement, resolveCurrentRollContext } from './rollContext';
 import { canRerollBonusDiceSettlement } from './bonusDiceSettlement';
-import { hasUsableDiceRerollPassiveAction } from './passiveAbility';
+import { hasUsableDiceRerollPassiveAction, hasUsableResponseWindowPassiveAction } from './passiveAbility';
 import { hasUsableActiveRollToken } from './activeRollTokens';
 import {
     areTeammates,
@@ -195,7 +195,6 @@ export const isNyraCompanionActive = (
 ): boolean => Boolean(
     player?.characterId === 'lieren'
     && player.companion?.id === 'nyra'
-    && player.companion.hp > 0
     && player.companion.active === true
 );
 
@@ -1156,7 +1155,12 @@ const checkStandardCardPlay = (
         }
 
         if (cond.requireRollConfirmed && !state.rollConfirmed) {
-            if (!hasCurrentDiceTargetForCard(state, card, phase)) {
+            // 骰面响应窗口一旦由骰主确认打开，前一名响应者改骰只会让骰主
+            // 后续重新确认；不能撤销同一窗口对后续响应者的改骰授权。
+            const isContinuedAfterRollConfirmedResponse =
+                responseWindowType === 'afterRollConfirmed'
+                && hasExistingDiceToolEffect(card);
+            if (!isContinuedAfterRollConfirmedResponse && !hasCurrentDiceTargetForCard(state, card, phase)) {
                 return { ok: false, reason: 'requireRollConfirmed' };
             }
         }
@@ -1722,6 +1726,10 @@ export const hasRespondableContent = (
     // 抽牌、建造等“任意时刻”动作不能凭 timing 字样插入奖励骰介入窗口；
     // 无响应时仍回到右侧骰盘普通确认，而不是自动结算。
     if (hasUsableDiceRerollPassiveAction(state, playerId, phase, { responseWindowType: windowType })) {
+        return true;
+    }
+
+    if (hasUsableResponseWindowPassiveAction(state, playerId, phase, { responseWindowType: windowType })) {
         return true;
     }
 

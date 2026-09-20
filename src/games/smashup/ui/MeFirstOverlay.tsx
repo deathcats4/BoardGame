@@ -38,7 +38,7 @@ export const MeFirstOverlay: React.FC<{
     const currentInteraction = G.sys.interaction?.current;
     const handlePass = () => {
         onSelectCard(null);
-        dispatch(SU_COMMANDS.REACTION_PASS, { reason: 'player_pass' });
+        dispatch(SU_COMMANDS.REACTION_PASS);
     };
 
     // 支持 meFirst 和 afterScoring 两种窗口类型

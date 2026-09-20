@@ -40,17 +40,42 @@ import { getArenaObject } from './utils';
 
 export const MAGE_WARS_INTERACTION_SOURCE_IDS = {
     COUNTERSTRIKE_CHOICE: 'mw.counterstrike.choice',
+    BATTLE_FURY_CHOICE: 'mw.battle-fury.choice',
     DEFENSE_CHOICE: 'mw.defense.choice',
     UPKEEP_COST_CHOICE: 'mw.upkeep-cost.choice',
     UPKEEP_HEAL_TRANSFER_CHOICE: 'mw.upkeep-heal-transfer.choice',
     ENCHANTMENT_RESPONSE_REVEAL: 'mw.enchantment-response.reveal',
+    TELEPORT_TRAP_CHOICE: 'mw.teleport-trap.choice',
 } as const;
+
+export type MageWarsBattleFuryChoiceValue =
+    | {
+        action: 'attack';
+        attackerObjectId: string;
+        attackProfileId: string;
+        targetPlayerId?: string;
+        targetObjectId?: string;
+    }
+    | {
+        action: 'pass';
+        attackerObjectId: string;
+    };
 
 export type MageWarsEnchantmentResponseChoiceValue = {
     action: 'reveal';
     responseId: string;
     responseObjectId: string;
     responseCardId: MageWarsHiddenResponseCardId;
+};
+
+export type MageWarsTeleportTrapChoiceValue = {
+    action: 'teleport';
+    sourceObjectId: string;
+    sourceSpellCardId: number;
+    targetObjectId: string;
+    fromZoneId: string;
+    toZoneId: string;
+    distance: number;
 };
 
 export type MageWarsUpkeepCostChoiceValue = {
@@ -143,6 +168,16 @@ function isCounterstrikeChoiceValue(value: unknown): value is MageWarsCounterstr
         && typeof candidate.counterstrikeAttackProfileId === 'string';
 }
 
+function isBattleFuryChoiceValue(value: unknown): value is MageWarsBattleFuryChoiceValue {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<MageWarsBattleFuryChoiceValue>;
+    if (candidate.action === 'pass') return typeof candidate.attackerObjectId === 'string';
+    return candidate.action === 'attack'
+        && typeof candidate.attackerObjectId === 'string'
+        && typeof candidate.attackProfileId === 'string'
+        && (typeof candidate.targetPlayerId === 'string' || typeof candidate.targetObjectId === 'string');
+}
+
 function isDefenseChoiceValue(value: unknown): value is MageWarsDefenseChoiceValue {
     if (!value || typeof value !== 'object') return false;
     const candidate = value as Partial<MageWarsDefenseChoiceValue>;
@@ -202,6 +237,20 @@ function isEnchantmentResponseChoiceValue(value: unknown): value is MageWarsEnch
         && typeof candidate.responseId === 'string'
         && typeof candidate.responseObjectId === 'string'
         && isMageWarsHiddenResponseCardId(candidate.responseCardId);
+}
+
+function isTeleportTrapChoiceValue(value: unknown): value is MageWarsTeleportTrapChoiceValue {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<MageWarsTeleportTrapChoiceValue>;
+    return candidate.action === 'teleport'
+        && typeof candidate.sourceObjectId === 'string'
+        && candidate.sourceSpellCardId === 1907
+        && typeof candidate.targetObjectId === 'string'
+        && typeof candidate.fromZoneId === 'string'
+        && typeof candidate.toZoneId === 'string'
+        && typeof candidate.distance === 'number'
+        && Number.isInteger(candidate.distance)
+        && candidate.distance > 0;
 }
 
 function resolveAttackAfterDefenseChoice(
@@ -443,6 +492,63 @@ export function createMageWarsInteractionSystem(): EngineSystem<MageWarsCore> {
 
             for (const event of ctx.events) {
                 if (isInteractionResolvedEvent(event)) {
+                    if (event.payload.sourceId === MAGE_WARS_INTERACTION_SOURCE_IDS.TELEPORT_TRAP_CHOICE) {
+                        if (!isTeleportTrapChoiceValue(event.payload.value)) continue;
+
+                        const source = nextState.core.objects[event.payload.value.sourceObjectId];
+                        const target = nextState.core.objects[event.payload.value.targetObjectId];
+                        const targetZone = nextState.core.arena.find((zone) => zone.id === event.payload.value.toZoneId);
+                        const sourceZone = source?.anchoredToZoneId
+                            ? nextState.core.arena.find((zone) => zone.id === source.anchoredToZoneId)
+                            : undefined;
+                        const actualDistance = sourceZone && targetZone
+                            ? Math.abs(sourceZone.row - targetZone.row) + Math.abs(sourceZone.col - targetZone.col)
+                            : undefined;
+                        if (
+                            !source
+                            || source.kind !== 'enchantment'
+                            || source.sourceSpellCardId !== 1907
+                            || source.revealed !== true
+                            || !source.anchoredToZoneId
+                            || !target
+                            || target.kind !== 'creature'
+                            || target.zoneId !== event.payload.value.fromZoneId
+                            || !targetZone
+                            || !sourceZone
+                            || actualDistance !== event.payload.value.distance
+                            || actualDistance <= 0
+                            || actualDistance > 2
+                        ) {
+                            continue;
+                        }
+
+                        events.push({
+                            type: MAGE_WARS_EVENTS.SPELL_TELEPORT_RESOLVED,
+                            payload: {
+                                playerId: source.ownerId,
+                                spellCardId: 1907,
+                                sourceAbilityId: 'mw.spell.1907.teleport-trap',
+                                targetObjectId: target.id,
+                                fromZoneId: target.zoneId,
+                                toZoneId: targetZone.id,
+                                distance: actualDistance,
+                            },
+                            sourceCommandType: ctx.command.type,
+                            timestamp: event.timestamp,
+                        });
+                        events.push({
+                            type: MAGE_WARS_EVENTS.ARENA_OBJECT_DEFEATED,
+                            payload: {
+                                objectId: source.id,
+                                ownerId: source.ownerId,
+                                sourceAbilityId: 'mw.spell.1907.teleport-trap',
+                                spellCardId: 1907,
+                            },
+                            sourceCommandType: ctx.command.type,
+                            timestamp: event.timestamp,
+                        });
+                        continue;
+                    }
                     if (event.payload.sourceId === MAGE_WARS_INTERACTION_SOURCE_IDS.ENCHANTMENT_RESPONSE_REVEAL) {
                         if (!isEnchantmentResponseChoiceValue(event.payload.value)) continue;
                         const frame = getActiveResolutionFrame(nextState);
@@ -581,6 +687,44 @@ export function createMageWarsInteractionSystem(): EngineSystem<MageWarsCore> {
                             counterstrikeSourceObjectId: event.payload.value.counterstrikeSourceObjectId,
                             isCounterstrike: true,
                         }));
+                        continue;
+                    }
+                    if (event.payload.sourceId === MAGE_WARS_INTERACTION_SOURCE_IDS.BATTLE_FURY_CHOICE) {
+                        if (!isBattleFuryChoiceValue(event.payload.value)) continue;
+                        const attacker = nextState.core.objects[event.payload.value.attackerObjectId];
+                        if (
+                            !attacker
+                            || attacker.temporaryTraits?.battleFuryExtraAttackAvailable !== true
+                        ) {
+                            continue;
+                        }
+                        events.push({
+                            type: MAGE_WARS_EVENTS.BATTLE_FURY_CONSUMED,
+                            payload: {
+                                ownerId: attacker.ownerId,
+                                attackerObjectId: attacker.id,
+                                sourceAbilityId: 'mw.spell.3416.battle-fury',
+                                spellCardId: 3416,
+                            },
+                            sourceCommandType: ctx.command.type,
+                            timestamp: event.timestamp,
+                        });
+                        if (event.payload.value.action === 'attack') {
+                            events.push(...resolveMageWarsObjectAttackEvents({
+                                state: nextState,
+                                sourceCommandType: ctx.command.type,
+                                timestamp: event.timestamp,
+                                random: ctx.random,
+                                attackerObjectId: attacker.id,
+                                attackProfileId: event.payload.value.attackProfileId,
+                                targetPlayerId: event.payload.value.targetPlayerId,
+                                targetObjectId: event.payload.value.targetObjectId,
+                                actionCost: 'none',
+                                allowCounterstrikeOpportunity: true,
+                                removeGuardAfterMelee: true,
+                                skipBattleFury: true,
+                            }));
+                        }
                         continue;
                     }
                     if (event.payload.sourceId !== MAGE_WARS_INTERACTION_SOURCE_IDS.DEFENSE_CHOICE) continue;

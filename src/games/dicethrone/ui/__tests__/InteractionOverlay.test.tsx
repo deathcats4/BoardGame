@@ -29,7 +29,7 @@ vi.mock('react-i18next', () => ({
                 'interaction.gunslingerTheLaw': '选择至多 2 位目标玩家',
                 'interaction.selectStatusToTransfer': '选择要移除的状态效果',
                 'interaction.transferSelectTarget': '选择目标玩家',
-                'interaction.selectDeckCardToAddToHand': '从抽牌堆选择 1 张牌加入手牌',
+                'interaction.selectDeckCardToAddToHand': '从牌库选择 {{count}} 张牌加入手牌',
                 'interaction.cardPoolSearchPlaceholder': '搜索牌名或关键词',
                 'interaction.cardPoolSearchClear': '清空搜索',
                 'interaction.cardPoolSearchEmpty': '没有匹配的牌',
@@ -53,7 +53,9 @@ vi.mock('react-i18next', () => ({
             if (key === 'interaction.cardPoolFilterResultCount') {
                 return `显示 ${_params?.visible ?? 0} / ${_params?.total ?? 0}`;
             }
-            return translations[key] || key;
+            return (translations[key] || key).replace(/\{\{(\w+)\}\}/g, (_, name: string) => (
+                String(_params?.[name] ?? `{{${name}}}`)
+            ));
         },
         i18n: {
             exists: () => false,
@@ -817,9 +819,9 @@ describe('InteractionOverlay', () => {
                 />
             );
 
-            expect(screen.getByText('从抽牌堆选择 1 张牌加入手牌')).toBeInTheDocument();
+            expect(screen.getByText('从牌库选择 1 张牌加入手牌')).toBeInTheDocument();
             expect(screen.getByTestId('dt-card-pool-overlay')).toHaveAttribute('data-card-pool-layout', 'center-stage');
-            expect(screen.getByTestId('dt-card-pool-overlay')).toHaveAttribute('data-card-pool-hand-protection', 'preserve-visible-hand');
+            expect(screen.getByTestId('dt-card-pool-overlay')).toHaveAttribute('data-card-pool-hand-protection', 'shared-stage-visible-hand');
             expect(screen.getByTestId('dt-card-pool-overlay')).toHaveAttribute('data-card-pool-browse-mode', 'grid-scroll');
             expect(screen.getByTestId('dt-card-pool-overlay').className).toContain('pointer-events-none');
             expect(screen.getByTestId('dt-card-pool-overlay').className).not.toContain('bg-black');
@@ -831,7 +833,9 @@ describe('InteractionOverlay', () => {
             expect(screen.getByTestId('dt-card-pool-backdrop').className).toContain('border-y');
             expect(screen.getByTestId('dt-card-pool-title').className).toContain('text-center');
             expect(screen.getByTestId('dt-card-pool-selection')).toHaveAttribute('data-card-pool-kind', 'deck');
+            expect(screen.getByTestId('dt-card-pool-selection')).toHaveAttribute('data-card-pool-visible-rows', 'two');
             expect(screen.getByTestId('dt-card-pool-selection').className).toContain('scrollbar-thin');
+            expect(screen.getByTestId('dt-card-pool-selection').className).toContain('max-h-[min(40vh,28rem)]');
             expect(screen.getByTestId('dt-card-pool-selection').className).toContain('overflow-y-auto');
             expect(screen.getByTestId('dt-card-pool-selection').className).not.toContain('overflow-x-auto');
             expect(screen.getByTestId('dt-card-pool-track').className).toContain('justify-center');
@@ -868,6 +872,20 @@ describe('InteractionOverlay', () => {
 
             fireEvent.click(targetOption);
             expect(onSelectHandCard).toHaveBeenCalledWith('card-vampire-lord-gushing-blood');
+        });
+
+        it('抽牌标题应使用交互传入的数量，而不是把数量写死', () => {
+            render(
+                <InteractionOverlay
+                    interaction={{ ...deckCardInteraction, selectCount: 2 }}
+                    players={playersWithDeckCards}
+                    currentPlayerId="0"
+                    onSelectHandCard={vi.fn()}
+                    {...mockHandlers}
+                />
+            );
+
+            expect(screen.getByText('从牌库选择 2 张牌加入手牌')).toBeInTheDocument();
         });
 
         it('大牌库候选应显示 DiceThrone 自己的搜索框并真实过滤卡面集合', () => {

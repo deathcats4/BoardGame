@@ -239,7 +239,7 @@ const BETRAYAL_BASIC_SETUP_AND_TURN: TutorialManifest = {
         {
             id: 'view-book',
             content: 'game-betrayal:tutorial.basicSetup.steps.viewBook',
-            highlightTarget: 'betrayal-inventory-omen-book-magnify',
+            highlightTarget: 'betrayal-inventory-omen-book',
             position: 'top',
             infoStep: true,
             viewAs: '0',
@@ -358,6 +358,7 @@ const BETRAYAL_OMEN_CONFIRMATION_AND_HAUNT_RISK: TutorialManifest = {
 
 const createBetrayalHeroReaderAndFirstObjectiveSteps = (
     heroTurnWaitEquivalentStepIds: string[],
+    includeFirstObjective = true,
 ): TutorialManifest['steps'] => [
     {
         id: 'haunt-hero-reader',
@@ -379,7 +380,11 @@ const createBetrayalHeroReaderAndFirstObjectiveSteps = (
         id: 'haunt-hero-reader-goal',
         content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroReaderGoal',
         highlightTarget: 'betrayal-scenario-book-section-special',
-        position: 'left',
+        avoidOverlapSelectors: [
+            '[data-tutorial-protected-region="scenario-book"]',
+        ],
+        tooltipMaxWidth: 280,
+        position: 'right',
         infoStep: true,
         viewAs: '0',
     },
@@ -387,7 +392,11 @@ const createBetrayalHeroReaderAndFirstObjectiveSteps = (
         id: 'haunt-hero-reader-close',
         content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroReaderClose',
         highlightTarget: 'betrayal-scenario-reader-close',
-        position: 'top',
+        avoidOverlapSelectors: [
+            '[data-tutorial-protected-region="scenario-book"]',
+        ],
+        tooltipMaxWidth: 280,
+        position: 'right',
         requireAction: true,
         allowedCommands: [],
         viewAs: '0',
@@ -408,56 +417,60 @@ const createBetrayalHeroReaderAndFirstObjectiveSteps = (
             'Teammate 2 repeats the formal turn handoff after the hero reader; player 0 has no input until the turn returns.',
         ),
     },
-    {
-        id: 'open-library-move-after-goal',
-        content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.openLibraryMoveAfterGoal',
-        highlightTarget: 'betrayal-action-move',
-        position: 'top',
-        requireAction: true,
-        allowedCommands: [],
-        viewAs: '0',
-    },
-    {
-        id: 'move-to-library-after-goal',
-        content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.moveToLibraryAfterGoal',
-        highlightTarget: 'betrayal-room-upper-west',
-        position: 'top',
-        requireAction: true,
-        allowedCommands: [BETRAYAL_COMMANDS.MOVE_TO_ROOM],
-        allowedTargets: ['upper-west'],
-        advanceOnEvents: [{ type: 'EXPLORER_MOVED', match: { playerId: '0', roomId: 'upper-west' } }],
-        viewAs: '0',
-    },
-    {
-        id: 'hero-study-name-roll',
-        content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameRoll',
-        highlightTarget: 'betrayal-action-use',
-        position: 'top',
-        requireAction: true,
-        allowedCommands: [BETRAYAL_COMMANDS.STUDY_MUMMY_NAME],
-        randomPolicy: { mode: 'fixed', values: [3] },
-        advanceOnEvents: [{ type: 'MUMMY_NAME_STUDIED', match: { playerId: '0', success: true } }],
-        viewAs: '0',
-    },
-    {
-        id: 'hero-study-name-result',
-        content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameResult',
-        highlightTarget: 'betrayal-recent-roll-panel',
-        highlightFrame: 'none',
-        position: 'left',
-        requireAction: true,
-        allowedCommands: [BETRAYAL_COMMANDS.ACKNOWLEDGE_RECENT_ROLL],
-        advanceOnEvents: [{ type: 'RECENT_ROLL_ACKNOWLEDGED', match: { isFullyAcknowledged: true } }],
-        viewAs: '0',
-    },
-    {
-        id: 'hero-study-name-closeout',
-        content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameCloseout',
-        highlightTarget: 'betrayal-action-endTurn',
-        position: 'left',
-        infoStep: true,
-        viewAs: '0',
-    },
+    ...(includeFirstObjective
+        ? [
+            {
+                id: 'open-library-move-after-goal',
+                content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.openLibraryMoveAfterGoal',
+                highlightTarget: 'betrayal-action-move',
+                position: 'top' as const,
+                requireAction: true,
+                allowedCommands: [],
+                viewAs: '0',
+            },
+            {
+                id: 'move-to-library-after-goal',
+                content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.moveToLibraryAfterGoal',
+                highlightTarget: 'betrayal-room-upper-west',
+                position: 'top' as const,
+                requireAction: true,
+                allowedCommands: [BETRAYAL_COMMANDS.MOVE_TO_ROOM],
+                allowedTargets: ['upper-west'],
+                advanceOnEvents: [{ type: 'EXPLORER_MOVED', match: { playerId: '0', roomId: 'upper-west' } }],
+                viewAs: '0',
+            },
+            {
+                id: 'hero-study-name-roll',
+                content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameRoll',
+                highlightTarget: 'betrayal-action-use',
+                position: 'top' as const,
+                requireAction: true,
+                allowedCommands: [BETRAYAL_COMMANDS.STUDY_MUMMY_NAME],
+                randomPolicy: { mode: 'fixed', values: [3] },
+                advanceOnEvents: [{ type: 'MUMMY_NAME_STUDIED', match: { playerId: '0', success: true } }],
+                viewAs: '0',
+            },
+            {
+                id: 'hero-study-name-result',
+                content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameResult',
+                highlightTarget: 'betrayal-recent-roll-panel',
+                highlightFrame: 'none' as const,
+                position: 'left' as const,
+                requireAction: true,
+                allowedCommands: [BETRAYAL_COMMANDS.ACKNOWLEDGE_RECENT_ROLL],
+                advanceOnEvents: [{ type: 'RECENT_ROLL_ACKNOWLEDGED', match: { isFullyAcknowledged: true } }],
+                viewAs: '0',
+            },
+            {
+                id: 'hero-study-name-closeout',
+                content: 'game-betrayal:tutorial.hauntNaturalTrigger.steps.heroStudyNameCloseout',
+                highlightTarget: 'betrayal-action-endTurn',
+                position: 'left' as const,
+                infoStep: true,
+                viewAs: '0',
+            },
+        ]
+        : []),
 ];
 
 const BETRAYAL_HAUNT_NATURAL_TRIGGER_FLOW: TutorialManifest = {
@@ -651,6 +664,7 @@ const BETRAYAL_TRADE_AND_AGREEMENT: TutorialManifest = {
             infoStep: true,
             viewAs: '0',
             aiDelayMs: 2500,
+            advanceOnEvents: [{ type: 'POSSESSION_TRADED' }],
             aiActions: [
                 {
                     commandType: BETRAYAL_COMMANDS.RESOLVE_TRADE_AGREEMENT,
@@ -732,7 +746,7 @@ const BETRAYAL_HAUNT_ACTIONS_AND_FINISH: TutorialManifest = {
 
 const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
     id: 'basic-setup-and-turn',
-    revision: 3,
+    revision: 7,
     numPlayers: 3,
     allowManualSkip: true,
     stepValidator: validateBetrayalBasicSetupStep,
@@ -863,7 +877,10 @@ const BETRAYAL_MAIN_PLAYER_PATH: TutorialManifest = {
                 'Teammate 1 repeats formal exploration and acknowledgement after player 0 ended the turn; the next visible step is the hero reader.',
             ),
         },
-        ...createBetrayalHeroReaderAndFirstObjectiveSteps(['end-turn-from-upper-landing']),
+        ...createBetrayalHeroReaderAndFirstObjectiveSteps(
+            ['end-turn-from-upper-landing'],
+            false,
+        ),
     ],
 };
 

@@ -25,7 +25,7 @@ import { canPlayActionFromDiscard } from './discardActionPlayability';
 import { canPlayFromDiscard } from './discardPlayability';
 import { canActivateSpecialFromDiscard } from './discardSpecialAbilities';
 import { getTitanByUid, isSpecialLimitBlocked } from './abilityHelpers';
-import { canUseActiveBaseAbility, getActiveBaseAbilityOptions, hasActiveBaseAbility, type BaseAbilityContext } from './baseAbilities';
+import { canUseActiveBaseAbility, getActiveBaseAbilityOptions, getActiveBaseAbilitySources, type BaseAbilityContext } from './baseAbilities';
 import {
     getActionPlayTargetMode,
     getActionPlayRestrictionError,
@@ -42,6 +42,7 @@ import {
     getActionLikeResponseWindowTiming,
     canUseBaseLimitedMinionQuota,
     canUseSameNameMinionQuota,
+    findSpecificExtraActionPlay,
     findSpecificExtraMinionPlay,
     getMaxRemainingBaseLimitedPowerQuota,
     getMaxRemainingGlobalPowerLimitedQuota,
@@ -1102,6 +1103,14 @@ export function validate(
             }
             const def = getCardDef(card.defId) as ActionCardDef | FusionCardDef | undefined;
             if (!def) return { valid: false, error: '卡牌定义不存在' };
+            if (fromStored && (player.specificExtraActionPlays?.length ?? 0) > 0 && !findSpecificExtraActionPlay(player, {
+                cardUid: card.uid,
+                defId: card.defId,
+                targetBaseIndex: command.payload.targetBaseIndex,
+                targetMinionUid: command.payload.targetMinionUid,
+            })) {
+                return { valid: false, error: '该额外行动只能打出指定卡牌' };
+            }
             const immediateExtraAction = getImmediateExtraContext(options, command.playerId, 'action');
             const immediateExtraActionValidation = validateImmediateExtraActionUse(immediateExtraAction, {
                 cardUid: card.uid,
@@ -1267,31 +1276,46 @@ export function validate(
             const base = core.bases[baseIndex];
             if (!base) return { valid: false, error: '无效的基地索引' };
 
-            if (!hasActiveBaseAbility(base.defId)) {
+            const activeSources = getActiveBaseAbilitySources(core, baseIndex);
+            if (activeSources.length === 0) {
                 return { valid: false, error: '该基地没有可主动使用的能力' };
             }
 
-            const activeOptions = getActiveBaseAbilityOptions(base.defId);
-            if (activeOptions?.oncePerTurn) {
-                const used = core.usedBaseAbilitiesThisTurn ?? [];
-                if (used.some(entry => entry.playerId === command.playerId && entry.baseIndex === baseIndex && entry.baseDefId === base.defId)) {
-                    return { valid: false, error: '该基地能力本回合已使用' };
+            const used = core.usedBaseAbilitiesThisTurn ?? [];
+            const allActiveSourcesUsedThisTurn = activeSources.length > 0 && activeSources.every(sourceDefId => {
+                const activeOptions = getActiveBaseAbilityOptions(sourceDefId);
+                return activeOptions?.oncePerTurn === true && used.some(entry => (
+                    entry.playerId === command.playerId
+                    && entry.baseIndex === baseIndex
+                    && entry.baseDefId === sourceDefId
+                ));
+            });
+            const canUse = activeSources.some(sourceDefId => {
+                const activeOptions = getActiveBaseAbilityOptions(sourceDefId);
+                if (activeOptions?.oncePerTurn && used.some(entry => (
+                    entry.playerId === command.playerId
+                    && entry.baseIndex === baseIndex
+                    && entry.baseDefId === sourceDefId
+                ))) {
+                    return false;
                 }
-            }
-
-            const baseAbilityContext: BaseAbilityContext = {
-                state: core,
-                matchState: state,
-                baseIndex,
-                baseDefId: base.defId,
-                playerId: command.playerId,
-                targetBaseIndex,
-                targetMinionUid,
-                now: core.turnNumber ?? 0,
-            };
-            const canUse = canUseActiveBaseAbility(base.defId, baseAbilityContext);
+                const baseAbilityContext: BaseAbilityContext = {
+                    state: core,
+                    matchState: state,
+                    baseIndex,
+                    baseDefId: sourceDefId,
+                    playerId: command.playerId,
+                    targetBaseIndex,
+                    targetMinionUid,
+                    now: core.turnNumber ?? 0,
+                };
+                return canUseActiveBaseAbility(sourceDefId, baseAbilityContext);
+            });
             if (!canUse) {
-                return { valid: false, error: '当前不能使用该基地能力' };
+                return {
+                    valid: false,
+                    error: allActiveSourcesUsedThisTurn ? '该基地能力本回合已使用' : '当前不能使用该基地能力',
+                };
             }
 
             return { valid: true };

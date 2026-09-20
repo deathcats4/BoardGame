@@ -38,6 +38,7 @@ import {
     cloneUseEffect,
     type UseEffectProfile,
 } from './possessionEffects';
+import { resolveHumanAcknowledgementPlayerIds } from './acknowledgementReadModel';
 import { resolveRecommendedAction } from './recommendedActionReadModel';
 import { BETRAYAL_SCENARIO_CONFIGS } from './scenarioConfig';
 import { consumeNextNonCombatTraitReplacementAfterTraitRoll } from './traitRollModel';
@@ -163,12 +164,7 @@ function createPendingEventRollResolution(core: BetrayalCore, input: {
     const nextPendingEventChoice = input.nextPendingEventChoice
         ? clonePendingEventChoice(input.nextPendingEventChoice)
         : undefined;
-    const configuredRequiredPlayerIds = input.requiredPlayerIds?.filter((playerId) => playerId.length > 0) ?? [];
-    const requiredPlayerIds = configuredRequiredPlayerIds.length > 0
-        ? [...configuredRequiredPlayerIds]
-        : core.playerIds.length > 0
-            ? [...core.playerIds]
-            : [input.playerId];
+    const requiredPlayerIds = resolveHumanAcknowledgementPlayerIds(core, input.playerId);
     return {
         rollId: input.rollId,
         playerId: input.playerId,
@@ -465,7 +461,7 @@ export function applyBetrayalEventRolledState(
         && (eventDiscovery.resolutionSteps?.length ?? 0) > 1
         ? createPendingCardResolutionQueue({
             playerId: event.payload.playerId,
-            requiredPlayerIds: core.playerIds,
+            requiredPlayerIds: [event.payload.playerId],
             roomId: core.currentExplorer.roomId,
             timestamp: event.timestamp,
             deckKind: 'event',

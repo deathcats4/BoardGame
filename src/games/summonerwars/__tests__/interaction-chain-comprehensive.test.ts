@@ -36,6 +36,7 @@ import { buildSummonerWarsAiLegalActions } from '../ai';
 import { resolveNextLocalAiAction } from '../../../engine/ai';
 import { engineConfig } from '../game';
 import { shouldBlockHandInteraction } from '../ui/handInteractionBusy';
+import { CHAMPION_UNITS_ZHONGCAI, COMMON_UNITS_ZHONGCAI } from '../config/factions/zhongcai';
 
 // ============================================================================
 // 测试辅助
@@ -2171,6 +2172,47 @@ describe('SummonerWars 系统交互桥接回归', () => {
     expect(duplicateResponse.state.core.board[structurePos.row][structurePos.col].structure).toBeUndefined();
     expect(duplicateResponse.state.core.board[shiftedPos.row][shiftedPos.col].structure?.owner).toBe('0');
     expect(duplicateResponse.events.filter(e => e.type === SW_EVENTS.UNIT_PUSHED)).toHaveLength(0);
+  });
+});
+
+describe('仲裁抹消交互收口', () => {
+  it('选择抹消目标后关闭交互并写入本回合失能状态', () => {
+    resetInstanceCounter();
+    const core = createInitializedCore(['0', '1'], testRandom(), { faction0: 'zhongcai', faction1: 'necromancer' });
+    clearRect(core, [2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5]);
+    core.phase = 'summon';
+    core.currentPlayer = '0';
+    const source = putUnit(core, { row: 4, col: 3 }, CHAMPION_UNITS_ZHONGCAI[2], '0');
+    const target = putUnit(core, { row: 4, col: 5 }, COMMON_UNITS_ZHONGCAI[0], '0');
+    let state: MatchState<SummonerWarsCore> = {
+      core,
+      sys: createInitialSystemState(['0', '1'], engineConfig.systems as any),
+    };
+
+    const advanced = runGamePipeline(state, {
+      type: FLOW_COMMANDS.ADVANCE_PHASE,
+      playerId: '0',
+      payload: {},
+    });
+    expect(advanced.success).toBe(true);
+    state = advanced.state;
+    expect(getSwCurrentType(state)).toBe('activated_ability_target');
+    expect((state.sys.interaction.current?.data as { sw?: { abilityId?: string; sourceUnitId?: string } } | undefined)?.sw).toMatchObject({
+      abilityId: 'zhongcai_erase',
+      sourceUnitId: source.instanceId,
+    });
+
+    const picked = runGamePipeline(state, {
+      type: INTERACTION_COMMANDS.RESPOND,
+      playerId: '0',
+      payload: {
+        interactionId: state.sys.interaction.current!.id,
+        optionId: `pos:${target.position.row},${target.position.col}`,
+      },
+    });
+    expect(picked.success).toBe(true);
+    expect(picked.state.sys.interaction.current).toBeUndefined();
+    expect(picked.state.core.board[target.position.row][target.position.col].unit?.suppressedUntilTurnEnd).toBe(true);
   });
 });
 

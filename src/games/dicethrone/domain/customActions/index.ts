@@ -15,6 +15,7 @@ import { registerCursedPirateCustomActions } from './cursed_pirate';
 import { registerTianshiCustomActions } from './tianshi';
 import { registerLierenCustomActions } from './lieren';
 import { registerVampireLordCustomActions } from './vampire_lord';
+import { registerZhizhuxiaCustomActions } from './zhizhuxia';
 
 let initialized = false;
 
@@ -44,6 +45,7 @@ export function initializeCustomActions(): void {
     registerTianshiCustomActions();
     registerLierenCustomActions();
     registerVampireLordCustomActions();
+    registerZhizhuxiaCustomActions();
 
     initialized = true;
 }
@@ -65,3 +67,4 @@ export { registerCursedPirateCustomActions } from './cursed_pirate';
 export { registerTianshiCustomActions } from './tianshi';
 export { registerLierenCustomActions } from './lieren';
 export { registerVampireLordCustomActions } from './vampire_lord';
+export { registerZhizhuxiaCustomActions } from './zhizhuxia';

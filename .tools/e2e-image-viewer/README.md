@@ -5,7 +5,7 @@
 ## 使用
 
 ```powershell
-node scripts/verify/open-e2e-image-viewer.mjs --dir "test-results/evidence-screenshots/<game>/<test>/<case>"
+node scripts/verify/open-verified-image.mjs --dir "test-results/evidence-screenshots/<game>/<test>/<case>"
 ```
 
 常用参数：
@@ -17,9 +17,13 @@ node scripts/verify/open-e2e-image-viewer.mjs --dir "test-results/evidence-scree
 - `--reopen`：目录已经打开过时仍强制再打开浏览器。
 - `--port <端口>`：指定本地查看器端口，默认从 `4867` 起。
 
-`npm run verify:e2e-images -- <目录>` 可作无选项快捷入口；带 `--no-open`、`--reopen`、`--port` 时优先直接调用上面的 `node` 入口，避免 npm 把参数当成自己的配置解析。
+项目只保留 `scripts/verify/open-verified-image.mjs` 作为网页查看器入口；查看器服务本身是内部实现，不直接作为项目命令调用。
 
-查看器打开后的地址栏只使用短 `key`，真实本地目录保存在工具状态文件里；这不影响按目录复用窗口。目录已打开时，后续打开同目录会返回 `ALREADY_OPEN=true`，并通过自动刷新同步新的焦点图。传入 `--focus` 时，列表读取必须锁定这个焦点所在的传入目录，不得再自动跳到最新子目录。传入 `--files` 时，页面刷新和自动刷新都只能保留这批媒体。
+查看器打开后的地址栏只使用短 `key`，这个 `key` 统一代表截图目录，真实本地目录保存在工具状态文件里；不得把图片文件名或手工别名当成 key。目录内同时生成 `index.html`，它是无需查看器进程即可双击打开的长期入口，页面刷新会重新加载目录内固定文件的当前内容。目录已打开时，后续打开同目录会返回 `ALREADY_OPEN=true`，并通过自动刷新同步新的焦点图。传入 `--focus` 时，列表读取必须锁定这个焦点所在的传入目录，不得再自动跳到最新子目录；`focus` / `show` 只表示目录内的临时展示状态，不改变目录 key。传入 `--files` 时，页面刷新和自动刷新都只能保留这批媒体。
+
+用户可见网址必须直接使用脚本返回的 `VIEWER_URL`。不要手工拼接、修改或替换 `?key=`、`focus`、`show`、`files` 参数；需要筛选媒体时，通过 `--focus` / `--files` 传给 `scripts/verify/open-verified-image.mjs`，再原样输出脚本结果。
+
+长期交付时同时保留脚本返回的 `OFFLINE_VIEWER_FILE`。网页端口不可达时，不更换目录 key，也不把临时图片 URL 当成长期入口，直接打开同一目录内的 `index.html`。
 
 ## 中文索引
 
@@ -37,6 +41,7 @@ node scripts/verify/open-e2e-image-viewer.mjs --dir "test-results/evidence-scree
 
 - 拖拽画布或图片：平移画布。
 - 滚轮：以鼠标位置为中心缩放。
+- 放大不设人为上限；继续滚轮或按 `+` 可放大，放大后用拖拽查看局部细节。
 - `适配`：把当前目录的图片铺到窗口可见区。
 - `重置`：回到默认缩放和位置。
 - 单击图片：选中图片。
@@ -46,4 +51,4 @@ node scripts/verify/open-e2e-image-viewer.mjs --dir "test-results/evidence-scree
 
 - 这是项目默认网页看图工具，但不是绕过验收的入口。
 - 候选图、失败图和过程图可以在这里诊断，但不能因此变成最终验收图。
-- 最终用户展示仍要先创建 PASS 清单，再走 `scripts/verify/open-verified-image.mjs`；该脚本默认调用本工具，不再默认调用 PureRef。
+- 最终用户展示仍要先创建 PASS 清单，再走 `scripts/verify/open-verified-image.mjs`；目录查看、PASS 校验、焦点和媒体筛选都从这一条入口进入。
