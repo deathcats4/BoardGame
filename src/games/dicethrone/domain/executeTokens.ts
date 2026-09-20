@@ -293,7 +293,13 @@ export function executeTokenCommand(
                 } as DiceThroneEvent);
                 events.push({
                     type: 'COMPANION_HEALTH_CHANGED',
-                    payload: { playerId: command.playerId, companionId: 'nyra', delta: 2, sourceAbilityId: TOKEN_IDS.NYRAS_BOND },
+                    payload: {
+                        playerId: command.playerId,
+                        companionId: 'nyra',
+                        delta: 2,
+                        active: player.companion?.active === true,
+                        sourceAbilityId: TOKEN_IDS.NYRAS_BOND,
+                    },
                     sourceCommandType: command.type,
                     timestamp: timestamp + 0.001,
                 } as DiceThroneEvent);
@@ -311,7 +317,13 @@ export function executeTokenCommand(
                 ) break;
                 events.push({
                     type: 'COMPANION_HEALTH_CHANGED',
-                    payload: { playerId: command.playerId, companionId: 'nyra', delta: -pendingDamage.currentDamage, sourceAbilityId: pendingDamage.sourceAbilityId },
+                    payload: {
+                        playerId: command.playerId,
+                        companionId: 'nyra',
+                        delta: -pendingDamage.currentDamage,
+                        active: player.companion?.active === true,
+                        sourceAbilityId: pendingDamage.sourceAbilityId,
+                    },
                     sourceCommandType: command.type,
                     timestamp,
                 } as DiceThroneEvent);
@@ -359,7 +371,13 @@ export function executeTokenCommand(
                 } as DiceThroneEvent);
                 events.push({
                     type: 'COMPANION_HEALTH_CHANGED',
-                    payload: { playerId: command.playerId, companionId: 'nyra', delta: -amount, sourceAbilityId: pendingDamage.sourceAbilityId },
+                    payload: {
+                        playerId: command.playerId,
+                        companionId: 'nyra',
+                        delta: -amount,
+                        active: player.companion?.active === true,
+                        sourceAbilityId: pendingDamage.sourceAbilityId,
+                    },
                     sourceCommandType: command.type,
                     timestamp: timestamp + 0.001,
                 } as DiceThroneEvent);
@@ -496,6 +514,10 @@ export function executeTokenCommand(
                 console.warn('[DiceThrone] USE_TOKEN: missing attack context');
                 break;
             }
+            if (tokenDef.activeUse.requiresUnblockable && pendingDamage.unblockable !== true) {
+                console.warn('[DiceThrone] USE_TOKEN: token requires unblockable damage');
+                break;
+            }
             if (
                 typeof tokenDef.activeUse.minimumAttackDamage === 'number'
                 && pendingDamage.originalDamage < tokenDef.activeUse.minimumAttackDamage
@@ -508,7 +530,7 @@ export function executeTokenCommand(
                 playerId,
                 tokenId,
                 pendingDamage.responseType,
-                { damageScope: pendingDamage.damageScope },
+                { damageScope: pendingDamage.damageScope, unblockable: pendingDamage.unblockable },
             );
             const allowedConsumeAmounts = getTokenUseOptions(tokenDef, availableAmount);
             if (!allowedConsumeAmounts.includes(amount)) {
@@ -546,6 +568,8 @@ export function executeTokenCommand(
                     actualDamage: 0,
                     sourceAbilityId: 'retribution-reflect',
                     sourcePlayerId: pendingDamage.targetPlayerId,
+                    damageScope: 'direct',
+                    damageOrigin: 'token',
                     reflectFromPendingDamage: true,
                     sourceCommandType: command.type,
                 });
@@ -616,6 +640,7 @@ export function executeTokenCommand(
                             sourceAbilityId: payload.sourceAbilityId,
                             sourcePlayerId: payload.sourcePlayerId,
                             damageScope: payload.damageScope,
+                            damageOrigin: payload.damageOrigin ?? 'token',
                             unblockable: payload.unblockable,
                             sourceCommandType: customEvent.sourceCommandType,
                         });
@@ -711,6 +736,8 @@ export function executeTokenCommand(
                     state,
                     pendingDamage.targetPlayerId,
                     pendingDamage.damageScope,
+                    undefined,
+                    pendingDamage.unblockable,
                 ) || hasBeforeDamageReceivedCard(state, pendingDamage.targetPlayerId) || hasNyraRedirect;
                 if (hasDefenderResponse) {
                     // 切换到防御方响应

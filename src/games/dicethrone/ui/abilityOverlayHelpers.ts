@@ -16,6 +16,7 @@ import { ARTIFICER_CARDS } from '../heroes/artificer/cards';
 import { TIANSHI_CARDS } from '../heroes/tianshi/cards';
 import { LIEREN_CARDS } from '../heroes/lieren/cards';
 import { VAMPIRE_LORD_CARDS } from '../heroes/vampire_lord/cards';
+import { ZHIZHUXIA_CARDS } from '../heroes/zhizhuxia/cards';
 import type { HeroState } from '../domain/types';
 import { getSlotBaseAbilityIdForCharacter } from './abilitySlotMapping';
 
@@ -36,6 +37,7 @@ export const HERO_CARDS_MAP: Record<string, AbilityCard[]> = {
     tianshi: TIANSHI_CARDS,
     lieren: LIEREN_CARDS,
     vampire_lord: VAMPIRE_LORD_CARDS,
+    zhizhuxia: ZHIZHUXIA_CARDS,
 };
 
 export function getSlotAbilityId(

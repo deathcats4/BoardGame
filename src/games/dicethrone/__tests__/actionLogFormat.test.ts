@@ -25,7 +25,8 @@ import type {
 } from '../domain/types';
 import { DICETHRONE_CARD_ATLAS_IDS, STATUS_IDS, TOKEN_IDS } from '../domain/ids';
 import { RESOURCE_IDS } from '../domain/resources';
-import { createHeroMatchup, createInitializedState, createSetupWithHand, fixedRandom, fistAttackAbilityId, getCardById, cmd, testSystems } from './test-utils';
+import { advanceTo, createHeroMatchup, createInitializedState, createQueuedRandom, createSetupWithHand, fixedRandom, fistAttackAbilityId, getCardById, cmd, testSystems } from './test-utils';
+import type { CommandInput } from './test-utils';
 import { formatDiceThroneActionEntry } from '../game';
 import { DiceThroneDomain } from '../domain';
 import { createBonusRollContextFromSettlement } from '../domain/rollContext';
@@ -899,6 +900,48 @@ describe('formatDiceThroneActionEntry', () => {
             tokenLabel: 'tokens.mesmerize.name',
             amount: 1,
         });
+    });
+
+    it('同一毫秒内连续改骰和重投，每一步都应保留独立玩家日志', () => {
+        const pipelineConfig = { domain: DiceThroneDomain, systems: testSystems };
+        const playerIds: PlayerId[] = ['0', '1'];
+        const random = createQueuedRandom([4, 2, 3, 5, 6, 6, 1, 2]);
+        let state = createSetupWithHand(['card-me-too'], {
+            cp: 10,
+            mutate: (core) => {
+                core.players['1'].hand = [];
+                core.players['0'].deck = [];
+                core.players['1'].deck = [];
+            },
+        })(playerIds, random);
+
+        const run = (input: CommandInput, timestamp: number) => {
+            const result = executePipeline(
+                pipelineConfig,
+                state,
+                { ...input, timestamp } as DiceThroneCommand,
+                random,
+                playerIds,
+            );
+            expect(result.success).toBe(true);
+            state = result.state as MatchState<DiceThroneCore>;
+        };
+
+        for (const input of advanceTo('offensiveRoll')) {
+            run(input, 10);
+        }
+        run(cmd('ROLL_DICE', '0'), 11);
+        run(cmd('PLAY_CARD', '0', { cardId: 'card-me-too' }), 12);
+        run(cmd('MODIFY_DIE', '0', { dieId: 4, newValue: 6 }), 100);
+        run(cmd('MODIFY_DIE', '0', { dieId: 0, newValue: 6 }), 100);
+
+        const modifiedEntries = state.sys.actionLog.entries.filter(entry => entry.kind === 'DIE_MODIFIED');
+        expect(modifiedEntries).toHaveLength(2);
+        expect(modifiedEntries.map(entry => entry.id)).toEqual([
+            expect.stringContaining('DIE_MODIFIED-0-event-'),
+            expect.stringContaining('DIE_MODIFIED-0-event-'),
+        ]);
+        expect(new Set(modifiedEntries.map(entry => entry.id)).size).toBe(2);
     });
 
     it('奖励骰出现、修改和被动重投临时骰应写入可区分的操作日志', () => {

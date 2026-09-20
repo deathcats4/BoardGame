@@ -163,7 +163,7 @@ const VAMPIRE_LORD_HERO_CARDS: AbilityCard[] = [
         ...vampireLordCardRef(21),
         effects: [
             grantBloodPower(1, cardText('card-vampire-lord-gushing-blood', 'description')),
-            grantMesmerize(cardText('card-vampire-lord-gushing-blood', 'description')),
+            customAction('gain-cp', cardText('card-vampire-lord-gushing-blood', 'description'), { amount: 1 }),
         ],
     },
     {

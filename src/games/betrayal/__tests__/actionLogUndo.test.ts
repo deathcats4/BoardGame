@@ -245,6 +245,35 @@ describe('小黑屋操作日志与撤回', () => {
         );
     });
 
+    it('确认剧本卡只推进角色选择状态，不写入可见活动日志', () => {
+        let state = setupState();
+        for (const playerId of playerIds) {
+            state = runCommand(state, {
+                type: BETRAYAL_COMMANDS.SELECT_EXPLORER,
+                playerId,
+                payload: { explorerId: findAvailableExplorerId(state) },
+                timestamp: Number(playerId) + 1,
+            });
+        }
+
+        state = runCommand(state, {
+            type: BETRAYAL_COMMANDS.PROPOSE_SCENARIO_CARD,
+            playerId: '0',
+            payload: { candidateId: 'friends-forever' },
+            timestamp: 10,
+        });
+        state = runCommand(state, {
+            type: BETRAYAL_COMMANDS.CONFIRM_SCENARIO_CARD,
+            playerId: '0',
+            payload: {},
+            timestamp: 11,
+        });
+
+        expect(state.core.scenarioCardConfirmations['0']).toBe('friends-forever');
+        expect(state.core.activityLog.some((entry) => entry.text.includes('确认剧本卡'))).toBe(false);
+        expect(state.sys.actionLog.entries.some((entry) => entry.kind === BETRAYAL_COMMANDS.CONFIRM_SCENARIO_CARD)).toBe(false);
+    });
+
     it('正式日志命令都有公开摘要且不复写私密参数', () => {
         const core = createStartedFirstScenarioCore();
         const state: MatchState<BetrayalCore> = {

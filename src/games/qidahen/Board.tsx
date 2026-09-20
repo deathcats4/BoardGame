@@ -12,6 +12,7 @@ import {
     type ZoomPanViewportState,
     type ZoomPanViewportZoomAnchorArgs,
 } from '../../components/game/framework';
+import { UI_Z_INDEX } from '../../core';
 import type { CardPreviewRef } from '../../core/types';
 import { INTERACTION_COMMANDS } from '../../engine/systems/InteractionSystem';
 import type { GameBoardProps } from '../../engine/transport/protocol';
@@ -1160,7 +1161,7 @@ const HandInteractionTray: React.FC<{
                                 ? t('board.handInteraction.armamentPaymentStatus', {
                                     cost: selectedAction.cost,
                                     selected: core.selectedPaymentCardIds.length,
-                                    defaultValue: '需选 {{cost}} 张军备牌 · 已选 {{selected}} 张',
+                                    defaultValue: '已选 {{selected}} / 2 · 含 1 张军备牌 + 弃 1 张手牌',
                                 })
                                 : t('board.handInteraction.actionPaymentStatus', {
                                     cost: selectedAction.cost,
@@ -1181,7 +1182,7 @@ const HandInteractionTray: React.FC<{
                                     })
                                 : selectedAction.id === 'upgrade-armament'
                                 ? t('board.handInteraction.armamentPaymentHint', {
-                                    defaultValue: '点选要使用的军备牌；先作为升级军备打出，结算后才进入弃牌堆。',
+                                    defaultValue: '当前已选军备牌；再选 1 张手牌作为弃牌成本。确认后军备牌升 1 级，弃牌进入弃牌堆。',
                                 })
                                 : t('board.handInteraction.actionPaymentHint', {
                                     defaultValue: '点击底部手牌选择要弃掉的牌；再次点击已选手牌可取消该张。',
@@ -1478,6 +1479,7 @@ const QidahenCardMagnifyOverlay: React.FC<{
         overlayClassName="bg-black/46"
         overlayTestId="qidahen-card-magnify-overlay"
         closeLabel="关闭查看"
+        zIndex={UI_Z_INDEX.cardPreviewTooltip}
         closeButtonClassName="!-top-11 min-h-11 !border !border-white/60 !bg-black/80 px-5 !text-white !shadow-lg hover:!bg-black/95"
     >
         {target ? (
@@ -4814,6 +4816,7 @@ const ActionsZone: React.FC<{
                                         key={mode}
                                         type="button"
                                         data-testid={`qidahen-post-battle-mode-${mode}`}
+                                        data-tutorial-id={mode === 'besiege' ? 'qidahen-post-battle-choice-entry' : undefined}
                                         className="min-h-[52px] border-[3px] px-3 py-2 text-[13px] font-black transition hover:-translate-y-0.5 active:translate-y-0.5"
                                         onClick={() => setPostBattleMode(mode)}
                                         style={{ borderColor: UI_STYLE.mapInk, background: UI_SURFACE.paper, color: UI_STYLE.ink, boxShadow: UI_SURFACE.hardShadow, borderRadius: 3 }}
@@ -4860,6 +4863,7 @@ const ActionsZone: React.FC<{
                                             type="button"
                                             aria-pressed={selected}
                                             data-testid={`qidahen-post-battle-choice-${choice.id}`}
+                                            data-tutorial-id={choice.id === 'besiege' ? 'qidahen-post-battle-choice-entry' : undefined}
                                             className="inline-flex min-h-[52px] items-start justify-between gap-3 border-[3px] px-3 py-2 text-left text-[12px] font-black transition hover:-translate-y-0.5 active:translate-y-0.5"
                                             onClick={() => setDraftPostBattleChoiceId(choice.id)}
                                             style={{ borderColor: selected ? UI_STYLE.cinnabar : UI_STYLE.mapInk, background: selected ? UI_SURFACE.paperPressed : UI_SURFACE.paper, color: UI_STYLE.ink, boxShadow: UI_SURFACE.hardShadow, borderRadius: 3 }}
@@ -4928,6 +4932,7 @@ const HandCard: React.FC<{
     height?: number;
     overlapPx?: number;
     onClick?: () => void;
+    onMagnify?: (target: QidahenMagnifyTarget) => void;
 }> = ({
     card,
     locale,
@@ -4938,7 +4943,11 @@ const HandCard: React.FC<{
     height = CARD_DIMENSIONS.hand.height,
     overlapPx = getQidahenHandCardOverlapPx(totalCards),
     onClick,
+    onMagnify,
 }) => {
+    const longPressTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressResetTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const longPressActivatedRef = React.useRef(false);
     const disabled = card.status === 'disabled';
     const cardKindBadgeKind = getQidahenHandCardBadgeKind(card);
     const cardKindBadge = cardKindBadgeKind
@@ -4947,6 +4956,63 @@ const HandCard: React.FC<{
     const selectedTransform = selected
         ? `translateY(-${HAND_CARD_SELECTED_LIFT}px) scale(${HAND_CARD_SELECTED_SCALE})`
         : undefined;
+    const clearLongPressTimer = React.useCallback(() => {
+        if (longPressTimerRef.current != null) {
+            window.clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        if (longPressResetTimerRef.current != null) {
+            window.clearTimeout(longPressResetTimerRef.current);
+            longPressResetTimerRef.current = null;
+        }
+    }, []);
+    const inspectTarget = {
+        previewRef: card.previewRef,
+        title: card.label,
+        rawWidth: CARD_DIMENSIONS.hand.rawWidth,
+        rawHeight: CARD_DIMENSIONS.hand.rawHeight,
+    } satisfies QidahenMagnifyTarget;
+
+    React.useEffect(() => () => {
+        clearLongPressTimer();
+    }, [clearLongPressTimer]);
+
+    const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+        clearLongPressTimer();
+        longPressActivatedRef.current = false;
+        if (event.pointerType !== 'touch' || disabled || !onMagnify) {
+            return;
+        }
+        longPressTimerRef.current = window.setTimeout(() => {
+            longPressTimerRef.current = null;
+            longPressActivatedRef.current = true;
+            onMagnify(inspectTarget);
+        }, 620);
+    };
+
+    const handlePointerEnd = () => {
+        clearLongPressTimer();
+        if (longPressActivatedRef.current) {
+            longPressResetTimerRef.current = window.setTimeout(() => {
+                longPressActivatedRef.current = false;
+                longPressResetTimerRef.current = null;
+            }, 500);
+        }
+    };
+
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (longPressActivatedRef.current) {
+            if (longPressResetTimerRef.current != null) {
+                window.clearTimeout(longPressResetTimerRef.current);
+                longPressResetTimerRef.current = null;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            longPressActivatedRef.current = false;
+            return;
+        }
+        onClick?.();
+    };
 
     return (
         <div
@@ -4970,12 +5036,23 @@ const HandCard: React.FC<{
                 available={Boolean(onClick)}
                 data-testid={`qidahen-hand-card-${card.id}`}
                 data-tutorial-id={getQidahenHandCardTutorialTargetId(card)}
+                data-qidahen-hand-card-touch-inspect="long-press"
                 tabIndex={disabled ? -1 : 0}
                 className={`z-20 h-full w-full origin-bottom rounded-[9px] bg-transparent hover:z-50 hover:brightness-[1.03] ${selected ? 'brightness-[1.08]' : 'hover:-translate-y-[18px]'}`}
-                onClick={onClick}
+                onClick={handleClick}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerEnd}
+                onPointerCancel={handlePointerEnd}
+                onPointerLeave={handlePointerEnd}
+                onContextMenu={(event) => {
+                    if (longPressActivatedRef.current) {
+                        event.preventDefault();
+                    }
+                }}
                 style={{
                     background: 'transparent',
                     borderRadius: 9,
+                    touchAction: 'manipulation',
                 }}
             >
                 <span
@@ -5251,6 +5328,7 @@ const HandZone: React.FC<{
                                 width={handCardWidth}
                                 height={handCardHeight}
                                 overlapPx={handCardOverlapPx}
+                                onMagnify={onMagnifyCard}
                                 onClick={selectableForHandLimit
                                     ? () => onToggleHandLimitDiscardCard(card.id)
                                     : selectableForSunYuanhua

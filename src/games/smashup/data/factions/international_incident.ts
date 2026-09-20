@@ -31,20 +31,20 @@ export const MUSKETEERS_ACTIONS: ActionCardDef[] = [
     { id: 'musketeers_on_a_roll', type: 'action', subtype: 'standard', name: '连连获胜', nameEn: 'On a Roll', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 12 } },
     { id: 'musketeers_make_way', type: 'action', subtype: 'standard', name: '让路', nameEn: 'Make Way', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 13 } },
     { id: 'musketeers_en_garde', type: 'action', subtype: 'standard', name: '预备姿势', nameEn: 'En Garde', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], playNeedsMinion: true, playTargetMinionController: 'any', count: 2, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 14 } },
-    { id: 'musketeers_biding_time', type: 'action', subtype: 'standard', name: '等待时间', nameEn: 'Biding Time', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], playNeedsMinion: true, playTargetMinionController: 'any', count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 15 } },
-    { id: 'musketeers_to_battle', type: 'action', subtype: 'standard', name: '奋斗！', nameEn: 'To Battle!', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 16 } },
+    { id: 'musketeers_biding_time', type: 'action', subtype: 'standard', name: '等待时机', nameEn: 'Biding Time', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], playNeedsMinion: true, playTargetMinionController: 'any', count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 15 } },
+    { id: 'musketeers_to_battle', type: 'action', subtype: 'standard', name: '投入战斗！', nameEn: 'To Battle!', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 16 } },
     { id: 'musketeers_one_for_all', type: 'action', subtype: 'standard', name: '一为全', nameEn: 'One for All', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 2, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 19 } },
     { id: 'musketeers_last_stand', type: 'action', subtype: 'special', name: '最后一搏', nameEn: 'Last Stand', faction: MUSKETEERS, abilityTags: ['special'], count: 1, specialTiming: 'beforeScoring', specialNeedsBase: true, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 21 } },
     { id: 'musketeers_all_for_one', type: 'action', subtype: 'ongoing', name: '全为一', nameEn: 'All for One', faction: MUSKETEERS, abilityTags: ['onPlay', 'ongoing'], ongoingTarget: 'minion', playNeedsMinion: true, playTargetMinionController: 'any', count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 23 } },
-    { id: 'musketeers_token_of_affection', type: 'action', subtype: 'standard', name: '亲情的象征', nameEn: 'Token of Affection', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 24 } },
+    { id: 'musketeers_token_of_affection', type: 'action', subtype: 'standard', name: '情谊信物', nameEn: 'Token of Affection', faction: MUSKETEERS, abilityTags: ['onPlay', 'extra'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 24 } },
 ];
 
 export const MUSKETEERS_MINIONS: MinionCardDef[] = [
-    { id: 'musketeers_porthos', type: 'minion', name: 'Porthos', nameEn: 'Porthos', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 17 } },
-    { id: 'musketeers_athos', type: 'minion', name: 'Athos', nameEn: 'Athos', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 18 } },
+    { id: 'musketeers_porthos', type: 'minion', name: '波尔托斯', nameEn: 'Porthos', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 17 } },
+    { id: 'musketeers_athos', type: 'minion', name: '阿多斯', nameEn: 'Athos', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 18 } },
     { id: 'musketeers_young_musketeer', type: 'minion', name: '年轻的火枪手', nameEn: 'Young Musketeer', faction: MUSKETEERS, power: 3, abilityTags: ['ongoing'], count: 5, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 20 } },
-    { id: 'musketeers_dartagnan', type: 'minion', name: "D'Artagnan", nameEn: "D'Artagnan", faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 22 } },
-    { id: 'musketeers_aramis', type: 'minion', name: 'Aramis', nameEn: 'Aramis', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 25 } },
+    { id: 'musketeers_dartagnan', type: 'minion', name: '达达尼昂', nameEn: "D'Artagnan", faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 22 } },
+    { id: 'musketeers_aramis', type: 'minion', name: '阿拉密斯', nameEn: 'Aramis', faction: MUSKETEERS, power: 4, abilityTags: ['ongoing'], count: 1, previewRef: { type: 'atlas', atlasId: CARD_ATLAS, index: 25 } },
 ];
 
 export const MOUNTIES_ACTIONS: ActionCardDef[] = [

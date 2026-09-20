@@ -61,6 +61,9 @@ export const STATUS_IDS = {
 
     /** 女猎手：流血 */
     BLEED: 'bleed',
+
+    /** 蜘蛛侠：落网 */
+    WEBBED: 'webbed',
 } as const;
 
 export type StatusId = (typeof STATUS_IDS)[keyof typeof STATUS_IDS];
@@ -151,6 +154,10 @@ export const TOKEN_IDS = {
     BLOOD_POWER: 'blood_power',
     /** 吸血鬼领主：催眠 / 凝视 */
     MESMERIZE: 'mesmerize',
+
+    /** 蜘蛛侠：连击 / 隐形 */
+    COMBO: 'combo',
+    INVISIBLE: 'invisible',
 } as const;
 
 export type TokenId = (typeof TOKEN_IDS)[keyof typeof TOKEN_IDS];
@@ -315,6 +322,21 @@ export const LIEREN_DICE_FACE_IDS = {
 export type LierenDiceFaceId = (typeof LIEREN_DICE_FACE_IDS)[keyof typeof LIEREN_DICE_FACE_IDS];
 
 // ============================================================================
+// 骰面 ID（蜘蛛侠）
+// ============================================================================
+
+export const ZHIZHUXIA_DICE_FACE_IDS = {
+    /** 拳：骰子 1、2、3 */
+    FIST: 'fist',
+    /** 蛛网：骰子 4、5 */
+    WEB: 'web',
+    /** 红蜘蛛：骰子 6 */
+    SPIDER: 'spider',
+} as const;
+
+export type ZhizhuxiaDiceFaceId = (typeof ZHIZHUXIA_DICE_FACE_IDS)[keyof typeof ZHIZHUXIA_DICE_FACE_IDS];
+
+// ============================================================================
 // 骰面 ID（吸血鬼领主）
 // ============================================================================
 
@@ -402,6 +424,7 @@ export const DICETHRONE_CARD_ATLAS_IDS = {
     TIANSHI: 'dicethrone:tianshi-cards',
     LIEREN: 'dicethrone:lieren-cards',
     VAMPIRE_LORD: 'dicethrone:vampire_lord-cards',
+    ZHIZHUXIA: 'dicethrone:zhizhuxia-cards',
 } as const;
 
 export const DICETHRONE_HAND_CARD_ATLAS_IDS = {
@@ -426,4 +449,5 @@ export const DICETHRONE_STATUS_ATLAS_IDS = {
     TIANSHI: 'dicethrone:tianshi-status',
     LIEREN: 'dicethrone:lieren-status',
     VAMPIRE_LORD: 'dicethrone:vampire_lord-status',
+    ZHIZHUXIA: 'dicethrone:zhizhuxia-status',
 } as const;

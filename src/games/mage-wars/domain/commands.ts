@@ -36,6 +36,9 @@ export interface MageWarsCastSpellCommand extends Command<typeof MAGE_WARS_COMMA
         newTargetZoneId?: ArenaZoneId;
         pushToZoneId?: ArenaZoneId;
         boundSpellCardId?: number;
+        statusTokenIds?: StatusTokenId[];
+        statusTokenAmounts?: Partial<Record<StatusTokenId, number>>;
+        selectedEnchantmentObjectIds?: string[];
         chainLightningTargets?: Array<{
             targetObjectId: string;
         }>;

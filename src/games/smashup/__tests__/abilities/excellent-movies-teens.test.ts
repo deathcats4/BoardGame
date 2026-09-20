@@ -576,21 +576,38 @@ describe('动作英雄代表性玩法行为', () => {
             FIXED_RANDOM,
         );
         const limitEvent = chosen.events.find(event => event.type === SU_EVENTS.LIMIT_MODIFIED) as any;
+        const extraPrompt = getSimpleChoicePrompt(chosen.finalState, 'smashup_immediate_extra_action');
 
         expect(getPromptOptions(prompt).map((option: any) => option.id)).toEqual(['skip', 'stored-action-0']);
         expect(limitEvent?.payload).toEqual(expect.objectContaining({
             limitType: 'action',
+            playTiming: 'immediate',
             restrictToCardUid: 'stored-action',
             restrictToCardDefId: 'action_heroes_collateral_damage',
         }));
-        expect(chosen.finalState.core.players['0'].actionLimit).toBe(2);
+        expect(chosen.finalState.core.players['0'].actionLimit).toBe(1);
+        expect(getPromptOptions(extraPrompt).map((option: any) => option.value?.cardUid ?? (option.value?.skip ? 'skip' : undefined))).toEqual([
+            'stored-action',
+            'skip',
+        ]);
 
-        const played = runCommand(chosen.finalState, {
-            type: SU_COMMANDS.PLAY_ACTION,
-            playerId: '0',
-            payload: { cardUid: 'stored-action', fromStored: true, targetBaseIndex: 0 },
-        } as any, FIXED_RANDOM);
+        const selectedStored = respondToPromptOption(
+            chosen.finalState,
+            (option: any) => option.value?.cardUid === 'stored-action',
+            'play stored action immediately',
+            '0',
+            FIXED_RANDOM,
+        );
+        const basePrompt = getSimpleChoicePrompt(selectedStored.finalState, 'smashup_immediate_extra_action_base');
+        const played = respondToPromptOption(
+            selectedStored.finalState,
+            (option: any) => option.value?.baseIndex === 0,
+            'choose base for stored action',
+            '0',
+            FIXED_RANDOM,
+        );
 
+        expect(getPromptOptions(basePrompt).some((option: any) => option.value?.baseIndex === 0)).toBe(true);
         expect(played.success).toBe(true);
         expect(played.finalState.core.players['0'].storedCards).toBeUndefined();
         expect(played.finalState.core.players['0'].discard.map(card => card.uid)).toContain('stored-action');
@@ -3070,6 +3087,115 @@ describe('怨灵捕手代表性 Wraith 行动玩法行为', () => {
         );
         expect(getPromptOptions(extraPrompt).map(option => option.value?.cardUid ?? (option.value?.skip ? 'skip' : undefined)))
             .toEqual(['stored-minion', 'skip']);
+    });
+
+    it('已归约的恶魔犬摧毁事件仍能恢复暂存随从的额外出牌机会', () => {
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', {
+                    storedCards: [{
+                        ...makeCard('stored-minion', 'teens_prep', 'minion', '0'),
+                        storedByPlayerId: '0',
+                        storedUnderUid: 'dogs',
+                        storedUnderDefId: 'wraithrustlers_demon_dogs',
+                    }] as any,
+                }),
+                '1': makePlayer('1'),
+            },
+            bases: [makeBase({
+                defId: 'base_the_jungle',
+                ongoingActions: [{
+                    uid: 'dogs',
+                    defId: 'wraithrustlers_demon_dogs',
+                    ownerId: '0',
+                }],
+            })],
+        });
+        const detached = {
+            type: SU_EVENTS.ONGOING_DETACHED,
+            payload: {
+                cardUid: 'dogs',
+                defId: 'wraithrustlers_demon_dogs',
+                ownerId: '0',
+                reason: 'wraithrustlers_unlicensed_nuclear_accelerator',
+                isDestruction: true,
+                targetBaseIndex: 0,
+                targetKind: 'ongoing',
+                sourcePlayerId: '0',
+                sourceCardUid: 'accelerator',
+                sourceDefId: 'wraithrustlers_unlicensed_nuclear_accelerator',
+                sourceControllerId: '0',
+                sourceBaseIndex: 0,
+            },
+            timestamp: 11,
+        } as any;
+        const reducedCore = applyEvents(core, [detached]);
+        const processed = postProcessSystemEvents(
+            reducedCore,
+            [detached],
+            FIXED_RANDOM,
+            makeMatchState(reducedCore),
+            { inputEventsAlreadyReduced: true },
+        );
+
+        expect(processed.events).toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.LIMIT_MODIFIED,
+            payload: expect.objectContaining({
+                specificCardUid: 'stored-minion',
+                restrictToBase: 0,
+                playTiming: 'immediate',
+            }),
+        }));
+    });
+
+    it('芬克曼转移古苏美尔神时，不应把转移误判成摧毁', () => {
+        const storedDog = {
+            ...makeCard('stored-dog', 'wraithrustlers_demon_dogs', 'minion', '0'),
+            storedByPlayerId: '0',
+            storedUnderUid: 'god',
+            storedUnderDefId: 'wraithrustlers_ancient_sumerian_god',
+        };
+        const core = makeState({
+            players: {
+                '0': makePlayer('0', { storedCards: [storedDog] as any }),
+                '1': makePlayer('1'),
+            },
+            bases: [
+                makeBase({
+                    defId: 'base_the_jungle',
+                    minions: [makeMinion('funkman', 'wraithrustlers_funkman', '0', 5)],
+                    ongoingActions: [{
+                        uid: 'god',
+                        defId: 'wraithrustlers_ancient_sumerian_god',
+                        ownerId: '0',
+                    }],
+                }),
+                makeBase('base_tar_pits'),
+            ],
+        });
+
+        const special = invokeRegisteredAbilityContract(
+            'wraithrustlers_funkman',
+            'special',
+            makeAbilityContext(core, 'wraithrustlers_funkman', 'funkman', 0, { targetBaseIndex: 0 }),
+        );
+        const moved = respondToPromptOption(
+            special.matchState!,
+            option => option.value?.cardUid === 'god' && option.value?.targetBaseIndex === 1,
+            '转移古苏美尔神',
+            '0',
+            FIXED_RANDOM,
+        );
+
+        expect(moved.finalState.core.bases[0].ongoingActions).toEqual([]);
+        expect(moved.finalState.core.bases[1].ongoingActions.map(action => action.uid)).toEqual(['god']);
+        expect(moved.finalState.core.players['0'].storedCards).toEqual([
+            expect.objectContaining({ uid: 'stored-dog', storedUnderUid: 'god' }),
+        ]);
+        expect(moved.events).not.toContainEqual(expect.objectContaining({
+            type: SU_EVENTS.STORED_CARD_RELEASED,
+            payload: expect.objectContaining({ cardUid: 'stored-dog' }),
+        }));
     });
 
     it('恶魔狗存放弱随从必须由玩家从手牌或弃牌堆选择；被摧毁后释放为限定额外随从', () => {

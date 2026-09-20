@@ -483,4 +483,85 @@ test.describe('SmashUp - 迪士尼四派系代表性交互', () => {
 
         await game.screenshot('frozen-elsa-talent-resolved', testInfo);
     });
+
+    test('冰雪奇缘堆雪人从真实页面只允许弃牌堆中的指定角色', async ({ page, game }, testInfo) => {
+        test.setTimeout(90000);
+
+        await game.openTestGame('smashup', {
+            p0: 'frozen,big_hero_6',
+            p1: 'lion_king,mulan',
+            skipFactionSelect: true,
+            skipInitialization: false,
+        }, 45000);
+
+        await game.setupScene({
+            gameId: 'smashup',
+            currentPlayer: '0',
+            phase: 'playCards',
+            player0: {
+                factions: ['frozen', 'big_hero_6'],
+                hand: [
+                    { uid: 'snowman-card', defId: 'frozen_do_you_want_to_build_a_snowman', type: 'action', owner: '0' },
+                ],
+                deck: [],
+                discard: [
+                    { uid: 'snowman-snowgie', defId: 'frozen_snowgie', type: 'minion', owner: '0' },
+                    { uid: 'snowman-olaf', defId: 'frozen_olaf', type: 'minion', owner: '0' },
+                    { uid: 'snowman-anna', defId: 'frozen_anna', type: 'minion', owner: '0' },
+                ],
+                minionsPlayed: 0,
+                minionLimit: 1,
+                actionsPlayed: 0,
+                actionLimit: 1,
+            },
+            player1: {
+                factions: ['lion_king', 'mulan'],
+                hand: [],
+                deck: [],
+                discard: [],
+            },
+            bases: [
+                {
+                    defId: 'base_arendelle',
+                    minions: [],
+                    ongoingActions: [],
+                },
+            ],
+        });
+
+        await expect(page.locator('[data-card-uid="snowman-card"]')).toBeVisible({ timeout: 15000 });
+        await game.screenshot('frozen-snowman-ready', testInfo);
+
+        await game.playCard('frozen_do_you_want_to_build_a_snowman');
+        await game.waitForInteraction('disney_four_factions_prompt', 10000);
+        await expect(page.getByText('你想和我堆个雪人吗：选择要额外打出的角色')).toBeVisible({ timeout: 10000 });
+
+        const options = await game.getInteractionOptions() as InteractionOption[];
+        expect(options.map(option => option.value?.minionUid)).toEqual(['snowman-snowgie', 'snowman-olaf']);
+        expect(options.some(option => option.value?.minionUid === 'snowman-anna')).toBe(false);
+        await game.screenshot('frozen-snowman-prompt', testInfo);
+
+        await game.selectInteractionOptionBy(
+            (option: InteractionOption) => option?.value?.minionUid === 'snowman-snowgie',
+            '堆雪人选择迷你雪人',
+        );
+        await game.waitForNoInteraction(10000);
+
+        await expect.poll(async () => {
+            const state = await game.getState() as SmashUpHarnessState;
+            return {
+                snowgieOnBase: state.core.bases[0].minions.some(minion => minion.uid === 'snowman-snowgie'),
+                olafInDiscard: state.core.players['0'].discard.some(card => card.uid === 'snowman-olaf'),
+                annaInDiscard: state.core.players['0'].discard.some(card => card.uid === 'snowman-anna'),
+                interactionOpen: Boolean(state.sys?.interaction?.current),
+            };
+        }, { timeout: 10000 }).toEqual({
+            snowgieOnBase: true,
+            olafInDiscard: true,
+            annaInDiscard: true,
+            interactionOpen: false,
+        });
+
+        await game.screenshot('frozen-snowman-resolved', testInfo);
+    });
 });

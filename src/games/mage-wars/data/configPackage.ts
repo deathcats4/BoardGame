@@ -67,9 +67,9 @@ export type MageWarsMageAbilityStatusTokenScope = 'single-status-type' | 'multip
 export type MageWarsStatusTokenRemovalCostRule = 'fixed' | 'target-creature-level' | 'none';
 export type MageWarsConfigSpellSemanticsAbilityKind = 'visible-object-enchantment' | 'visible-area-enchantment' | 'hidden-response-enchantment';
 export type MageWarsConfigSpellResponseKind = 'quick-spell-counter' | 'target-spell-counter' | 'attack-reversal';
-export type MageWarsConfigSpellContinuousModifierStat = 'life' | 'armor' | 'meleeDice' | 'attackDice';
+export type MageWarsConfigSpellContinuousModifierStat = 'life' | 'armor' | 'meleeDice' | 'rangedDice' | 'attackDice';
 export type MageWarsConfigSpellModifierOperation = 'add';
-export type MageWarsConfigSpellGrantedTraitId = 'slow' | 'regeneration' | 'counterstrike' | 'vampiric' | 'restrained' | 'death-mark' | 'aegis' | 'mental-calm';
+export type MageWarsConfigSpellGrantedTraitId = 'slow' | 'regeneration' | 'counterstrike' | 'vampiric' | 'restrained' | 'death-mark' | 'aegis' | 'mental-calm' | 'flying' | 'remove-flying' | 'channeling' | 'swift' | 'elusive' | 'limited-life';
 export type MageWarsConfigCombatAction = 'quick' | 'full';
 export type MageWarsConfigCombatRangeKind = 'melee' | 'ranged';
 export type MageWarsConfigDamageType = '火焰' | '水流' | '圣光' | '闪电' | '毒素' | '精神' | '风力' | '霜冻' | 'aether';
@@ -171,17 +171,19 @@ export interface MageWarsConfigSpellGrantedTrait {
     value?: number;
 }
 
+export interface MageWarsConfigSpellDirectDamageEffect {
+    kind: 'direct-damage';
+    amount: number;
+    damageType: MageWarsConfigDamageType;
+}
+
 export type MageWarsConfigSpellUpkeepEffectKind =
     | 'direct-damage'
     | 'mana-cost'
     | 'heal-controller-mage-transfer-damage';
 
 export type MageWarsConfigSpellUpkeepEffect =
-    | {
-        kind: 'direct-damage';
-        amount: number;
-        damageType: MageWarsConfigDamageType;
-    }
+    | MageWarsConfigSpellDirectDamageEffect
     | {
         kind: 'mana-cost';
         amount: number;
@@ -191,6 +193,8 @@ export type MageWarsConfigSpellUpkeepEffect =
         maxHealing: number;
     };
 
+export type MageWarsConfigSpellMovementEffect = MageWarsConfigSpellDirectDamageEffect;
+
 export interface MageWarsConfigSpellSemantics {
     abilityKind: MageWarsConfigSpellSemanticsAbilityKind;
     attachment?: MageWarsConfigSpellAttachmentSemantics;
@@ -198,6 +202,7 @@ export interface MageWarsConfigSpellSemantics {
     continuousModifiers?: MageWarsConfigSpellContinuousModifier[];
     grants?: MageWarsConfigSpellGrantedTrait[];
     upkeepEffects?: MageWarsConfigSpellUpkeepEffect[];
+    movementEffects?: MageWarsConfigSpellMovementEffect[];
     unsupportedRules?: string[];
 }
 
@@ -774,7 +779,7 @@ function readSpellContinuousModifierStat(
     value: unknown,
     context: string,
 ): MageWarsConfigSpellContinuousModifierStat {
-    if (value === 'life' || value === 'armor' || value === 'meleeDice' || value === 'attackDice') return value;
+    if (value === 'life' || value === 'armor' || value === 'meleeDice' || value === 'rangedDice' || value === 'attackDice') return value;
     throw new Error(`invalid Mage Wars spell semantics modifier stat at ${context}`);
 }
 
@@ -793,6 +798,12 @@ function readSpellGrantedTraitId(value: unknown, context: string): MageWarsConfi
         || value === 'death-mark'
         || value === 'aegis'
         || value === 'mental-calm'
+        || value === 'flying'
+        || value === 'remove-flying'
+        || value === 'channeling'
+        || value === 'swift'
+        || value === 'elusive'
+        || value === 'limited-life'
     ) return value;
     throw new Error(`invalid Mage Wars spell semantics granted trait at ${context}`);
 }
@@ -860,6 +871,17 @@ function readOptionalSpellGrantedTraits(
     });
 }
 
+function readSpellDirectDamageEffect(
+    data: Record<string, unknown>,
+    context: string,
+): MageWarsConfigSpellDirectDamageEffect {
+    return {
+        kind: 'direct-damage',
+        amount: assertPositiveInteger(data.amount, `${context}.amount`),
+        damageType: readDamageType(data.damageType, `${context}.damageType`),
+    };
+}
+
 function readOptionalSpellUpkeepEffects(
     value: unknown,
     context: string,
@@ -885,11 +907,24 @@ function readOptionalSpellUpkeepEffects(
         if (data.kind !== 'direct-damage') {
             throw new Error(`invalid Mage Wars spell upkeep effect kind at ${context}[${index}].kind`);
         }
-        return {
-            kind: 'direct-damage',
-            amount: assertPositiveInteger(data.amount, `${context}[${index}].amount`),
-            damageType: readDamageType(data.damageType, `${context}[${index}].damageType`),
-        };
+        return readSpellDirectDamageEffect(data, `${context}[${index}]`);
+    });
+}
+
+function readOptionalSpellMovementEffects(
+    value: unknown,
+    context: string,
+): MageWarsConfigSpellMovementEffect[] | undefined {
+    if (value === undefined) return undefined;
+    if (!Array.isArray(value)) {
+        throw new Error(`invalid Mage Wars spell movement effects at ${context}`);
+    }
+    return value.map((entry, index) => {
+        const data = assertRecord(entry, `${context}[${index}]`);
+        if (data.kind !== 'direct-damage') {
+            throw new Error(`invalid Mage Wars spell movement effect kind at ${context}[${index}].kind`);
+        }
+        return readSpellDirectDamageEffect(data, `${context}[${index}]`);
     });
 }
 
@@ -900,6 +935,7 @@ function readOptionalSpellSemantics(
     if (value === undefined) return undefined;
     const data = assertRecord(value, context);
     const upkeepEffects = readOptionalSpellUpkeepEffects(data.upkeepEffects, `${context}.upkeepEffects`);
+    const movementEffects = readOptionalSpellMovementEffects(data.movementEffects, `${context}.movementEffects`);
     const abilityKind = readSpellSemanticsAbilityKind(data.abilityKind, `${context}.abilityKind`);
     const responseKind = readOptionalSpellResponseKind(data.responseKind, `${context}.responseKind`);
     if (abilityKind === 'hidden-response-enchantment' && responseKind === undefined) {
@@ -918,6 +954,7 @@ function readOptionalSpellSemantics(
         ),
         grants: readOptionalSpellGrantedTraits(data.grants, `${context}.grants`),
         ...(upkeepEffects === undefined ? {} : { upkeepEffects }),
+        ...(movementEffects === undefined ? {} : { movementEffects }),
         unsupportedRules: readOptionalStringArray(data.unsupportedRules, `${context}.unsupportedRules`),
     };
 }

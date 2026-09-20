@@ -103,11 +103,20 @@
         }
       }
     },
+    "dicethrone/ability-cards-zhizhuxia.atlas": {
+      "variants": {
+        "json": {
+          "sha256": "f1f0c4e83b8e389677fef53278b308d31848c5aacbcd2ae425cb36102f7c5313",
+          "bytes": 2183,
+          "mime": "application/json"
+        }
+      }
+    },
     "mage-wars/apprentice-spell-atlases": {
       "variants": {
         "json": {
-          "sha256": "dcacd3b182bb8572fe7279e9df162014ebf548f22b719b5a410e5d514e7ed1ec",
-          "bytes": 33426,
+          "sha256": "9448951c557d0b007769a69b24ec0e370234da174ff28ba71592861afa0253d2",
+          "bytes": 33122,
           "mime": "application/json"
         }
       }

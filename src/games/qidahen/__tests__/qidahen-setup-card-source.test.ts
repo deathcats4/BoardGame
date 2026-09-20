@@ -127,11 +127,9 @@ it('剧本一开局正式手牌会消费 atlas05 通过验收的普通手牌身�
             'qidahen-atlas05-1631-northeast-army',
             'qidahen-atlas05-1644-wuzhen-chaoha',
             'qidahen-atlas05-1643-silver',
-            'qidahen-atlas05-1626-artillery-tech',
         ]);
         expect(factionHandCards(core, 'ming')[0]?.previewRef.index).toBeGreaterThanOrEqual(31);
-        expect(factionHandCards(core, 'ming')[3]?.cardKind).toBe('armament');
-        expect(factionHandCards(core, 'ming')[3]?.armamentId).toBe('artillery-tech');
+        expect(factionHandCards(core, 'ming').some((card) => card.cardKind === 'armament')).toBe(false);
         expect(factionHandCards(core, 'jin').some((card) => card.cardKind === 'armament')).toBe(true);
     });
 

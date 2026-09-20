@@ -49,6 +49,7 @@ const HEAVY_TASK_GUARD_WAIT_TIMEOUT_MS = 30 * 60 * 1000;
 const HEAVY_TASK_GUARD_WAIT_POLL_MS = 10 * 1000;
 const E2E_RUNTIME_WAIT_TIMEOUT_MS = 30 * 60 * 1000;
 const E2E_RUNTIME_WAIT_POLL_MS = 10 * 1000;
+const E2E_PROCESS_TIMEOUT_MS = 30 * 60 * 1000;
 const CRITICAL_MEMORY_PERCENT = 1;
 const CRITICAL_MEMORY_SAMPLE_COUNT = 3;
 const CRITICAL_MEMORY_SAMPLE_INTERVAL_MS = 2000;
@@ -207,7 +208,7 @@ export function shouldTerminateForCriticalMemory({
         && consecutiveSamples >= requiredSamples;
 }
 
-function terminateProcessTree(pid, logger = console) {
+function terminateProcessTree(pid, logger = console, logPrefix = 'e2e-memory-watchdog') {
     if (!Number.isInteger(pid) || pid <= 0) {
         return;
     }
@@ -217,8 +218,9 @@ function terminateProcessTree(pid, logger = console) {
             stdio: 'ignore',
             shell: false,
         }));
-        if (result.error) {
-            logger.warn?.(`[e2e-memory-watchdog] taskkill 失败: ${result.error.message}`);
+        if (result.error || result.status !== 0) {
+            const detail = result.error?.message ?? `status=${result.status ?? 'null'}`;
+            logger.warn?.(`[${logPrefix}] taskkill 失败: ${detail}`);
         }
         return;
     }
@@ -227,7 +229,7 @@ function terminateProcessTree(pid, logger = console) {
         process.kill(pid, 'SIGTERM');
     } catch (error) {
         if (error?.code !== 'ESRCH') {
-            logger.warn?.(`[e2e-memory-watchdog] 终止 Playwright 失败: ${error instanceof Error ? error.message : String(error)}`);
+            logger.warn?.(`[${logPrefix}] 终止 Playwright 失败: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 }
@@ -288,24 +290,52 @@ async function run(command, args, env) {
         shell: false,
     }, env));
     const watchdog = startCriticalMemoryWatchdog(child.pid);
+    const processTimeoutMs = parsePositiveIntegerEnv(
+        'BG_E2E_PROCESS_TIMEOUT_MS',
+        E2E_PROCESS_TIMEOUT_MS,
+    );
 
     return await new Promise((resolve, reject) => {
+        let settled = false;
+        let processTimedOut = false;
+        const processTimeout = setTimeout(() => {
+            processTimedOut = true;
+            console.error(
+                `[e2e-process-timeout] Playwright 进程超过 ${Math.ceil(processTimeoutMs / 60_000)} 分钟未退出，终止当前进程树。`,
+            );
+            terminateProcessTree(child.pid, console, 'e2e-process-timeout');
+        }, processTimeoutMs);
+
+        const finish = (exitCode) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            clearTimeout(processTimeout);
+            watchdog.stop();
+            resolve(exitCode);
+        };
+
         child.once('error', (error) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            clearTimeout(processTimeout);
             watchdog.stop();
             reject(error);
         });
         child.once('exit', (code) => {
-            watchdog.stop();
-            if (watchdog.wasTriggered()) {
-                resolve(1);
+            if (processTimedOut || watchdog.wasTriggered()) {
+                finish(1);
                 return;
             }
             if (typeof code === 'number' && code !== 0) {
-                resolve(code);
+                finish(code);
                 return;
             }
             console.log('✅ Playwright 进程已结束。');
-            resolve(0);
+            finish(0);
         });
     });
 }

@@ -53,6 +53,33 @@ function markPhaseReady(core: MageWarsCore, playerId: string): MageWarsCore {
         : { ...core, phaseReadyPlayerIds: [...ready, playerId] };
 }
 
+function collectAttachedArenaObjectIds(core: MageWarsCore, rootObjectId: string): Set<string> {
+    const objectIds = new Set<string>([rootObjectId]);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const object of Object.values(core.objects)) {
+            if (object.anchoredToObjectId && objectIds.has(object.anchoredToObjectId) && !objectIds.has(object.id)) {
+                objectIds.add(object.id);
+                changed = true;
+            }
+        }
+    }
+    return objectIds;
+}
+
+function removeArenaObjectPlacement(core: MageWarsCore, rootObjectId: string): MageWarsCore {
+    const objectIds = collectAttachedArenaObjectIds(core, rootObjectId);
+    return {
+        ...core,
+        arena: core.arena.map((zone) => ({
+            ...zone,
+            objectIds: zone.objectIds.filter((objectId) => !objectIds.has(objectId)),
+            conjurationIds: zone.conjurationIds.filter((objectId) => !objectIds.has(objectId)),
+        })),
+    };
+}
+
 function recordDeathMarkAttackUse(
     core: MageWarsCore,
     sourceObjectIds: string[] | undefined,
@@ -245,6 +272,17 @@ export function reduceEvent(core: MageWarsCore, event: MageWarsEvent): MageWarsC
                 mana: Math.max(0, player.mana - event.payload.amount),
             }));
 
+        case MAGE_WARS_EVENTS.MANA_TRANSFERRED: {
+            const afterDrain = updatePlayer(core, event.payload.fromPlayerId, (player) => ({
+                ...player,
+                mana: Math.max(0, player.mana - event.payload.amount),
+            }));
+            return updatePlayer(afterDrain, event.payload.toPlayerId, (player) => ({
+                ...player,
+                mana: player.mana + event.payload.amount,
+            }));
+        }
+
         case MAGE_WARS_EVENTS.SPELL_CAST_STARTED:
             if (event.payload.caster.kind === 'arena-object') {
                 const objectManaCost = event.payload.objectManaCost ?? 0;
@@ -393,8 +431,79 @@ export function reduceEvent(core: MageWarsCore, event: MageWarsEvent): MageWarsC
                 applyTemporaryTraitGain(object, event.payload)
             ));
 
+        case MAGE_WARS_EVENTS.BATTLE_FURY_AVAILABLE:
+            return updateArenaObject(core, event.payload.attackerObjectId, (object) => (
+                object.temporaryTraits?.battleFuryRoundNumber === event.payload.roundNumber
+                    ? {
+                        ...object,
+                        temporaryTraits: {
+                            ...object.temporaryTraits,
+                            battleFuryExtraAttackAvailable: true,
+                        },
+                    }
+                    : object
+            ));
+
+        case MAGE_WARS_EVENTS.BATTLE_FURY_CONSUMED:
+            return updateArenaObject(core, event.payload.attackerObjectId, (object) => (
+                clearTemporaryTraits(object, ['battleFury'])
+            ));
+
         case MAGE_WARS_EVENTS.ARENA_OBJECT_SUMMONED:
-            return addArenaObject(core, event.payload.object);
+            {
+                const nextSequence = core.nextObjectSequence
+                    ?? Math.max(
+                        0,
+                        ...Object.values(core.objects).map((object) => object.createdAtSequence ?? 0),
+                    ) + 1;
+                const object = {
+                    ...event.payload.object,
+                    createdAtSequence: event.payload.object.createdAtSequence ?? nextSequence,
+                    createdAtTimestamp: event.payload.object.createdAtTimestamp ?? event.timestamp,
+                };
+                return {
+                    ...addArenaObject(core, object),
+                    nextObjectSequence: Math.max(nextSequence + 1, core.nextObjectSequence ?? 0),
+                };
+            }
+
+        case MAGE_WARS_EVENTS.ARENA_OBJECT_BANISHED: {
+            const target = core.objects[event.payload.objectId];
+            if (!target || target.kind !== 'creature') return core;
+            const detached = removeArenaObjectPlacement(core, target.id);
+            return updateArenaObject(detached, target.id, (object) => ({
+                ...object,
+                banished: {
+                    remainingTokens: event.payload.remainingTokens,
+                    returnToZoneId: event.payload.returnToZoneId,
+                    sourceSpellCardId: event.payload.spellCardId,
+                },
+            }));
+        }
+
+        case MAGE_WARS_EVENTS.ARENA_OBJECT_BANISH_TICKED: {
+            const target = core.objects[event.payload.objectId];
+            if (!target?.banished) return core;
+            if (target.banished.remainingTokens > 1) {
+                return updateArenaObject(core, target.id, (object) => ({
+                    ...object,
+                    banished: {
+                        ...object.banished!,
+                        remainingTokens: object.banished!.remainingTokens - 1,
+                    },
+                }));
+            }
+            const restored = moveArenaObject(
+                core,
+                target.id,
+                target.banished.returnToZoneId,
+                target.banished.returnToZoneId,
+            );
+            return updateArenaObject(restored, target.id, (object) => {
+                const { banished: _banished, ...restoredObject } = object;
+                return restoredObject;
+            });
+        }
 
         case MAGE_WARS_EVENTS.WALL_SUMMONED:
             return {
@@ -515,14 +624,53 @@ export function reduceEvent(core: MageWarsCore, event: MageWarsEvent): MageWarsC
                     event.payload.fromZoneId,
                     event.payload.toZoneId,
                 );
-            return updateArenaObject(moved, event.payload.objectId, (object) => ({
-                ...object,
-                ownerId: event.payload.ownerId,
-                zoneId: event.payload.toZoneId,
-                anchoredToPlayerId: event.payload.targetPlayerId,
-                anchoredToObjectId: event.payload.targetObjectId,
-                anchoredToZoneId: event.payload.targetZoneId,
-            }));
+            const nextSequence = moved.nextObjectSequence
+                ?? Math.max(
+                    0,
+                    ...Object.values(moved.objects).map((object) => object.createdAtSequence ?? 0),
+                ) + 1;
+            return {
+                ...updateArenaObject(moved, event.payload.objectId, (object) => ({
+                    ...object,
+                    ownerId: event.payload.ownerId,
+                    zoneId: event.payload.toZoneId,
+                    anchoredToPlayerId: event.payload.targetPlayerId,
+                    anchoredToObjectId: event.payload.targetObjectId,
+                    anchoredToZoneId: event.payload.targetZoneId,
+                    createdAtSequence: nextSequence,
+                    createdAtTimestamp: event.timestamp,
+                })),
+                nextObjectSequence: Math.max(nextSequence + 1, moved.nextObjectSequence ?? 0),
+            };
+        }
+
+        case MAGE_WARS_EVENTS.ENCHANTMENT_REATTACHED: {
+            const moved = event.payload.fromZoneId === event.payload.toZoneId
+                ? core
+                : moveArenaObject(
+                    core,
+                    event.payload.objectId,
+                    event.payload.fromZoneId,
+                    event.payload.toZoneId,
+                );
+            const nextSequence = moved.nextObjectSequence
+                ?? Math.max(
+                    0,
+                    ...Object.values(moved.objects).map((object) => object.createdAtSequence ?? 0),
+                ) + 1;
+            return {
+                ...updateArenaObject(moved, event.payload.objectId, (object) => ({
+                    ...object,
+                    ownerId: event.payload.ownerId,
+                    zoneId: event.payload.toZoneId,
+                    anchoredToPlayerId: event.payload.targetPlayerId,
+                    anchoredToObjectId: event.payload.targetObjectId,
+                    anchoredToZoneId: event.payload.targetZoneId,
+                    createdAtSequence: nextSequence,
+                    createdAtTimestamp: event.timestamp,
+                })),
+                nextObjectSequence: Math.max(nextSequence + 1, moved.nextObjectSequence ?? 0),
+            };
         }
 
         case MAGE_WARS_EVENTS.GUARD_GAINED:
@@ -718,11 +866,13 @@ export function reduceEvent(core: MageWarsCore, event: MageWarsEvent): MageWarsC
                 guarding: false,
             }));
             const resetActions = (event.payload.objectIds ?? []).reduce((nextCore, objectId) => (
-                updateArenaObject(nextCore, objectId, (object) => ({
-                    ...object,
-                    actionReady: true,
-                    guarding: false,
-                }))
+                updateArenaObject(nextCore, objectId, (object) => object.banished
+                    ? object
+                    : {
+                        ...object,
+                        actionReady: true,
+                        guarding: false,
+                    })
                 ), resetPlayer);
             const resetPlayerDefense = updatePlayer(resetActions, event.payload.playerId, clearPlayerDefenseUsesThisRound);
             return Object.values(resetPlayerDefense.objects).reduce((nextCore, object) => (

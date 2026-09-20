@@ -385,8 +385,8 @@
     "thumbnails/compressed/cover": {
       "variants": {
         "webp": {
-          "sha256": "d823beab60262d4d746c3735398bf55fabd66414a4090201642ae8787c099aa5",
-          "bytes": 324948,
+          "sha256": "c13348027c453a2d764acb469bfa2b802634a92d8e2bb72682db06a0492fcdb3",
+          "bytes": 337418,
           "mime": "image/webp"
         }
       }
@@ -394,8 +394,8 @@
     "thumbnails/cover": {
       "variants": {
         "png": {
-          "sha256": "1d3b1fe0fa0363718399054c878fdb263099aef7fb96be004c7d4bd5a2be4bc3",
-          "bytes": 2757985,
+          "sha256": "c6c6077e8682075fde56c6dc9ff24603295f0c148cea3ba06f41e0421d951a77",
+          "bytes": 2936443,
           "mime": "image/png"
         }
       }

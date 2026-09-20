@@ -1,5 +1,11 @@
 # 《环游世界：国际事件》59 对象 effect atom 矩阵
 
+## 2026-09-18 当前审计回写
+
+- 本轮复核对象仍是 4 个派系：相扑手 `sumo_wrestlers`、火枪手 `musketeers`、骑警 `mounties`、摔角手 `luchadors`，合计 51 张卡牌 + 8 张基地；对象主源仍为 `src/games/smashup/data/factions/international_incident.ts` 与本文原有 59 行矩阵。
+- 当前结论保持 `representative_only / in_progress`：L2 对象矩阵、共享流程和 14 条真实入口 E2E 证据有效，但 L3/L4 仍是代表链，且本地资源到远端公开 URL 的 `HEAD 200` 仍未闭合。没有把 14 条 E2E 外推为 59 个对象全部完成，也没有移除 `ids.ts` 中四个派系的 `in_progress`。
+- 本轮新增的审计口径是“每个对象必须回到候选生成、payload、执行入口、最终权威状态和流程清理”；未列为 `representative-passed` 的对象继续留在残余范围。
+
 ## 结论口径
 
 - 本文件建立 51 张卡牌 + 8 张基地的对象级规则子句 / effect atom / 共享消费合同矩阵，作为 `add-smashup-international-incident-factions` 的 2026-07-15 审计补证。

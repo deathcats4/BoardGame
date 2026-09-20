@@ -15,6 +15,7 @@ const CHARACTER_ASSET_DIR: Record<string, string> = {
     cursed_pirate: 'cursed',
     artificer: 'artificial',
     vampire_lord: 'xixuegui',
+    zhizhuxia: 'zhizhuxia',
 };
 
 const getCharacterAssetBase = (charId: string = 'monk') => (

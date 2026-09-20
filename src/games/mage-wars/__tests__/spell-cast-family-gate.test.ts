@@ -13,8 +13,8 @@ import {
 } from './helpers/domainFlowHarness';
 
 describe('mage-wars spell cast family gate', () => {
-    it('rejects standard spellbook spells that are not admitted by a spell-cast Choice family', () => {
-        const unsupportedSpellId = 1804;
+    it('rejects standard spellbook spells that remain blocked from a spell-cast Choice family', () => {
+        const unsupportedSpellId = 1811;
         const baseState = setupState('creatureAction');
         const target = makeArenaObject('unsupported-curse-target', '1', PLAYER_ZERO_START_ZONE);
         const state: MatchState<MageWarsCore> = {
@@ -23,7 +23,7 @@ describe('mage-wars spell cast family gate', () => {
                 withPreparedPlayerMage(
                     baseState.core,
                     '0',
-                    MAGE_IDS.WARLOCK_APPRENTICE,
+                    MAGE_IDS.WIZARD_APPRENTICE,
                     [unsupportedSpellId],
                     20,
                 ),
@@ -36,7 +36,7 @@ describe('mage-wars spell cast family gate', () => {
             playerId: '0',
             payload: {
                 spellCardId: unsupportedSpellId,
-                manaCost: 5,
+                manaCost: 2,
                 targetObjectId: target.id,
             },
         })).toBe('spellRequiresCodeSupport');

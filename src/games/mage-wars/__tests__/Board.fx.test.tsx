@@ -1938,7 +1938,7 @@ describe('MageWarsBoard spell cast choices', () => {
                     actionReady: true,
                     quickcastReady: true,
                     preparedSpellSlots: 1,
-                    preparedSpellCardIds: [1707],
+                    preparedSpellCardIds: [2206],
                 },
             },
             arena: baseCore.arena.map((zone) => ({
@@ -2468,7 +2468,7 @@ describe('MageWarsBoard spell cast choices', () => {
         );
 
         const blockedPreparedCard = container.querySelector<HTMLButtonElement>(
-            '[data-testid="mage-wars-desktop-prepared-card"][data-source-card-id="1707"]',
+            '[data-testid="mage-wars-desktop-prepared-card"][data-source-card-id="2206"]',
         );
         expect(blockedPreparedCard).not.toBeNull();
         expect(blockedPreparedCard?.getAttribute('data-primary-action')).toBe('true');
@@ -2487,14 +2487,14 @@ describe('MageWarsBoard spell cast choices', () => {
         expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('true');
 
         const inspectButton = blockedPreparedCard?.parentElement?.querySelector<HTMLButtonElement>(
-            '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="1707"]',
+            '[data-testid="mage-wars-card-inspect-button"][data-source-card-id="2206"]',
         );
         expect(inspectButton).not.toBeNull();
 
         fireEvent.click(inspectButton!);
 
         expect(screen.getByTestId('mage-wars-card-magnify-overlay').getAttribute('aria-hidden')).toBe('false');
-        expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('1707');
+        expect(screen.getByTestId('mage-wars-card-magnify-content').getAttribute('data-source-card-id')).toBe('2206');
     });
 
     it('casts Leather Gloves on own mage from the spell ChoiceRequest player target command', async () => {

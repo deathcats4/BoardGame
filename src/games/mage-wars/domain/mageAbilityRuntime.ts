@@ -127,12 +127,17 @@ export function resolveMageWarsMageAbilityActionTrack(
 export function resolveMageWarsStatusRemovalCost(
     targetObject: MageWarsArenaObjectState,
     statusTokenIds: readonly StatusTokenId[],
+    statusTokenAmounts: Partial<Record<StatusTokenId, number>> = {},
 ): { manaCost: number } | { error: string } {
     let manaCost = 0;
     for (const statusTokenId of statusTokenIds) {
         const currentAmount = getStatusTokenAmount(targetObject, statusTokenId);
         if (currentAmount <= 0) {
             return { error: 'targetMissingStatusToken' };
+        }
+        const requestedAmount = statusTokenAmounts[statusTokenId] ?? currentAmount;
+        if (!Number.isInteger(requestedAmount) || requestedAmount <= 0 || requestedAmount > currentAmount) {
+            return { error: 'invalidStatusTokenAmount' };
         }
 
         const statusToken = requireMageWarsStatusTokenFromConfig(statusTokenId);
@@ -144,14 +149,14 @@ export function resolveMageWarsStatusRemovalCost(
             if (typeof sourceSpell?.level !== 'number') {
                 return { error: 'missingTargetCreatureLevel' };
             }
-            manaCost += currentAmount * sourceSpell.level;
+            manaCost += requestedAmount * sourceSpell.level;
             continue;
         }
         if (statusToken.removalCostRule !== 'fixed' || statusToken.removalCost === undefined) {
             return { error: 'unsupportedStatusRemovalCostRule' };
         }
 
-        manaCost += currentAmount * statusToken.removalCost;
+        manaCost += requestedAmount * statusToken.removalCost;
     }
     return { manaCost };
 }

@@ -61,6 +61,9 @@ export type TokenUseEffectType =
     | 'removeDebuff'          // 移除负面状态（净化）
     | 'custom';               // 只消耗 Token 并交给 customActionId 处理
 
+/** 伤害的现实来源，用于区分技能区、手牌、Token/状态和系统伤害。 */
+export type DamageOrigin = 'ability' | 'card' | 'token' | 'status' | 'system';
+
 /**
  * Token 使用效果
  */
@@ -256,6 +259,8 @@ export interface EffectAction {
     unblockable?: boolean;
     /** 伤害来源范围（用于区分攻击伤害与直接伤害） */
     damageScope?: 'attack' | 'direct';
+    /** 伤害现实来源（用于派系规则按技能/卡牌/Token/状态分流） */
+    damageOrigin?: DamageOrigin;
     // 其他可选参数
     [key: string]: unknown;
 }
@@ -316,6 +321,10 @@ export interface ActiveUseConfig {
     requiresAttackDamage?: boolean;
     /** 仅允许原始攻击伤害至少达到该值时使用 */
     minimumAttackDamage?: number;
+    /** 仅允许在不可防御伤害窗口使用（蜘蛛侠“隐形”） */
+    requiresUnblockable?: boolean;
+    /** 仅允许在指定防御技能已选中时，于防御掷骰阶段使用。 */
+    requiresDefenseAbilityId?: string;
     /** 主动使用时需要额外触发的 custom action */
     customActionId?: string;
     /** 是否要求当前可操作骰区里存在对手骰子 */

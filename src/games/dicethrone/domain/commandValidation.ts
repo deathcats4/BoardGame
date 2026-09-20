@@ -1480,7 +1480,17 @@ const validateUseToken = (
         return fail('invalid_token_timing');
     }
 
-    const availableAmount = getUsableTokenAmountForTiming(state, playerId, cmd.payload.tokenId, pendingDamage.responseType);
+    const availableAmount = getUsableTokenAmountForTiming(
+        state,
+        playerId,
+        cmd.payload.tokenId,
+        pendingDamage.responseType,
+        {
+            damageScope: pendingDamage.damageScope,
+            originalDamageOverride: pendingDamage.originalDamage,
+            unblockable: pendingDamage.unblockable,
+        },
+    );
     if (availableAmount <= 0) {
         return fail('invalid_amount');
     }

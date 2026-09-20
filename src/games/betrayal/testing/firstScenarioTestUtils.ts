@@ -571,6 +571,14 @@ export function createStartedFirstScenarioTutorialCore(
   playerIds: string[] = ["0", "1", "2"],
 ): BetrayalCore {
   const core = createStartedFirstScenarioCore(playerIds);
+  core.seatControllers = Object.fromEntries(
+    core.playerIds.map((playerId, index) => [
+      playerId,
+      index === 0
+        ? { type: "human" as const }
+        : { type: "local-ai" as const, minimumActionDelayMs: 0 },
+    ]),
+  );
   setFixtureExplorerInventory(core, "0", [
     { id: "rope", name: "兔脚", kind: "item" },
     { id: "omen-book", name: "书本", kind: "omen" },
@@ -929,8 +937,8 @@ function createScenarioHauntCore(
   core = acknowledgePendingCardResolutions(core);
 
   setScenarioTestTurnMovement(core, 6);
+  setFixtureDiscoveredRoomVisual(core, "upper-west", "upper", "library");
   if (scenarioCardId === "crimson-jack-returns") {
-    setFixtureDiscoveredRoomVisual(core, "upper-west", "upper", "library");
     setFixtureDiscoveredRoomVisual(core, "ground-north", "ground", "kitchen");
     setFixtureDiscoveredRoomVisual(core, "basement-east", "basement", "chasm");
   }
@@ -1029,6 +1037,7 @@ function completeMummyMonsterPreparationForAttackSlot(
 
 export function createMummyReadyToBanishCore(): BetrayalCore {
   let core = createFirstScenarioHauntCore();
+  setFixtureDiscoveredRoomVisual(core, "upper-west", "upper", "library");
   const heroId = "0";
   const studyRandom = createBetrayalScriptedRandom(3, 3, 3, 3);
   const learnRandom = createBetrayalScriptedRandom(3, 3, 3, 3);
@@ -1368,6 +1377,7 @@ export function createDustHauntCore(
   if (core.phase !== "haunt" || !core.scenarioRuntime.dust) {
     throw new Error("山屋灰尘作祟夹具未生成事件选择或 dust 运行态");
   }
+  setFixtureDiscoveredRoomVisual(core, "upper-west", "upper", "library");
   return core;
 }
 

@@ -1,6 +1,7 @@
 /* @vitest-environment happy-dom */
 import React from 'react';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -4003,6 +4004,61 @@ describe('Betrayal Board foundation', () => {
         expect(screen.getByTestId('betrayal-inventory-preview-overlay')).toBeVisible();
         fireEvent.click(screen.getByTestId('betrayal-inventory-preview-overlay-close'));
         expect(screen.getByTestId('betrayal-inventory-preview-overlay')).not.toBeVisible();
+    });
+
+    it('触屏长按持有物打开牌面且不误触发本体选择，普通点击仍保留主动作', () => {
+        vi.useFakeTimers();
+        const forcedPointer = window as Window & { __BG_FORCE_COARSE_POINTER__?: boolean };
+        const previousForcedPointer = forcedPointer.__BG_FORCE_COARSE_POINTER__;
+        forcedPointer.__BG_FORCE_COARSE_POINTER__ = true;
+
+        try {
+            const core = createBetrayalFoundationCore(['0', '1', '2', '3']);
+            core.currentExplorer = {
+                ...core.currentExplorer,
+                inventory: [{ id: 'rope', name: '兔脚', kind: 'item' }],
+            };
+            core.currentExplorerInventory = [...core.currentExplorer.inventory];
+            core.turnStartInventoryCardIds = ['rope'];
+
+            render(
+                <HarnessBoard
+                    initialCore={core}
+                    matchData={defaultMatchData}
+                />,
+            );
+
+            const card = screen.getByTestId('betrayal-inventory-rope');
+            act(() => {
+                fireEvent.pointerDown(card, {
+                    pointerType: 'touch',
+                    clientX: 24,
+                    clientY: 24,
+                });
+                vi.advanceTimersByTime(500);
+                fireEvent.pointerUp(card, {
+                    pointerType: 'touch',
+                    clientX: 24,
+                    clientY: 24,
+                });
+            });
+
+            expect(screen.getByTestId('betrayal-inventory-preview-overlay')).toBeVisible();
+            fireEvent.click(card);
+            expect(card).not.toHaveAttribute('aria-pressed', 'true');
+
+            fireEvent.click(screen.getByTestId('betrayal-inventory-preview-overlay-close'));
+            expect(screen.getByTestId('betrayal-inventory-preview-overlay')).not.toBeVisible();
+            fireEvent.click(card);
+            expect(card).toHaveAttribute('aria-pressed', 'true');
+        } finally {
+            if (previousForcedPointer === undefined) {
+                delete forcedPointer.__BG_FORCE_COARSE_POINTER__;
+            } else {
+                forcedPointer.__BG_FORCE_COARSE_POINTER__ = previousForcedPointer;
+            }
+            vi.useRealTimers();
+        }
     });
 
     it('被动持有物选中后保留使用按钮禁用原因', () => {

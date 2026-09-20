@@ -188,12 +188,28 @@ test.describe("山屋惊魂基本流程", () => {
     ).toBeDisabled();
     await expect(scenarioReaderNextZone).toBeEnabled();
     await expect(
-      scenarioReaderDialog.getByRole("button", { name: "上一页" }),
-    ).toHaveClass(/bg-transparent/);
+      scenarioReaderDialog
+        .getByTestId("betrayal-scenario-book")
+        .getByTestId("betrayal-scenario-reader-prev-zone"),
+    ).toBeVisible();
     await expect(
-      scenarioReaderDialog.getByRole("button", { name: "下一页" }),
-    ).toHaveClass(/bg-transparent/);
+      scenarioReaderDialog
+        .getByTestId("betrayal-scenario-book")
+        .getByTestId("betrayal-scenario-reader-next-zone"),
+    ).toBeVisible();
+    await expect(
+      scenarioReaderDialog
+        .getByTestId("betrayal-scenario-book")
+        .getByTestId("betrayal-scenario-reader-close"),
+    ).toBeVisible();
     await saveScreenshot(page, SCENARIO_SELECT_DETAIL_SCREENSHOT);
+    await page.evaluate(() => {
+      (
+        window as Window & {
+          __BG_HOME_V2_E2E_HOLD_PROGRESS__?: number;
+        }
+      ).__BG_HOME_V2_E2E_HOLD_PROGRESS__ = 0.5;
+    });
     await scenarioReaderNextZone.click();
     const turningSheet = scenarioReaderDialog.getByTestId(
       "betrayal-scenario-book-turning-sheet",
@@ -215,6 +231,13 @@ test.describe("山屋惊魂基本流程", () => {
     await expect(flipStage).toHaveAttribute("data-turn-animating", "true");
     await expect(flipStage).toHaveAttribute("data-turn-plugin-animating", "true");
     await saveScreenshot(page, SCENARIO_SELECT_DETAIL_TURNING_SCREENSHOT);
+    await page.evaluate(() => {
+      delete (
+        window as Window & {
+          __BG_HOME_V2_E2E_HOLD_PROGRESS__?: number;
+        }
+      ).__BG_HOME_V2_E2E_HOLD_PROGRESS__;
+    });
     await expect(turningSheet).toHaveCount(0, { timeout: 2000 });
     await expect(
       scenarioReaderDialog.getByTestId(
@@ -738,6 +761,13 @@ test.describe("山屋惊魂基本流程", () => {
     };
     await expectMobileBookContentReachable("剧本首页");
     await saveScreenshot(page, MOBILE_SCENARIO_DETAIL_SCREENSHOT);
+    await mobileScenarioReaderDialog.evaluate(() => {
+      (
+        window as Window & {
+          __BG_HOME_V2_E2E_HOLD_PROGRESS__?: number;
+        }
+      ).__BG_HOME_V2_E2E_HOLD_PROGRESS__ = 0.5;
+    });
     await mobileScenarioReaderNextZone.click();
     const mobileTurningSheet = mobileScenarioReaderDialog.getByTestId(
       "betrayal-scenario-book-turning-sheet",
@@ -748,6 +778,13 @@ test.describe("山屋惊魂基本流程", () => {
       "forward",
     );
     await saveScreenshot(page, MOBILE_SCENARIO_DETAIL_TURNING_SCREENSHOT);
+    await mobileScenarioReaderDialog.evaluate(() => {
+      delete (
+        window as Window & {
+          __BG_HOME_V2_E2E_HOLD_PROGRESS__?: number;
+        }
+      ).__BG_HOME_V2_E2E_HOLD_PROGRESS__;
+    });
     await expect(mobileTurningSheet).toHaveCount(0, { timeout: 2000 });
     await expect(
       mobileScenarioReaderDialog.getByTestId(

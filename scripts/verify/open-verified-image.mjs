@@ -11,7 +11,7 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.m4v', '.mkv']);
 const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS]);
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
-const E2E_IMAGE_VIEWER_ENTRY = path.join(PROJECT_ROOT, 'scripts', 'verify', 'open-e2e-image-viewer.mjs');
+const E2E_IMAGE_VIEWER_ENTRY = path.join(PROJECT_ROOT, '.tools', 'e2e-image-viewer', 'server.mjs');
 const OPEN_STATE_PATH = path.join(PROJECT_ROOT, 'test-results', 'evidence-screenshots', '.open-verified-image-state.json');
 const OPEN_HISTORY_LIMIT = 50;
 const FINAL_DISPLAY_PURPOSE = 'final-user-visible-delivery';
@@ -29,11 +29,19 @@ const usage = () => {
   node scripts/verify/open-verified-image.mjs --pass-manifest <本轮要求达标清单.json> --path <00-sequence-index.png> --path <01-labeled-*.png>
   node scripts/verify/open-verified-image.mjs --pass-manifest <本轮要求达标清单.json> --paths <00-sequence-index.png> <01-labeled-*.png> <02-labeled-*.png> ...
   node scripts/verify/open-verified-image.mjs --pass-manifest <本轮要求达标清单.json> --latest [目录]
+  node scripts/verify/open-verified-image.mjs --dir <端到端证据目录> [--focus <文件>] [--files <文件...>] [--no-open]
 
 选项:
   --path <路径>     指定图片/GIF/视频；可重复传入多次，默认用本地网页查看器代理打开
   --paths <路径...> 依次指定多张图片/GIF/视频；默认用本地网页查看器代理打开，要求同一目录
   --latest [目录]   递归查找目录下最后修改的一张图片/GIF/视频，默认 test-results/evidence-screenshots
+  --dir <目录>      直接查看端到端证据目录；这是本项目唯一的网页查看器入口
+  --focus <文件>    目录模式打开后聚焦指定媒体
+  --files <文件...> 目录模式只展示指定媒体
+  --port <端口>     目录模式指定网页查看器端口
+  --reopen          目录模式强制重新打开浏览器
+  --no-open         只注册目录并输出 VIEWER_URL，不打开浏览器
+  --verbose         输出逐张媒体和查看器诊断信息
   --viewer <web|system|pureref>  指定查看器；默认 web。pureref 只保留为显式旧通道
   --web             等同于 --viewer web
   --pureref         等同于 --viewer pureref；非默认
@@ -121,10 +129,16 @@ const parseArgs = (argv) => {
         path: null,
         paths: [],
         latest: null,
+        dir: null,
+        focus: null,
+        files: [],
+        port: null,
         viewer: process.env.BG_IMAGE_VIEWER ?? 'web',
         dryRun: false,
         confirmedPass: false,
         forceReopen: false,
+        noOpen: false,
+        verbose: false,
         passManifest: null,
         help: false,
     };
@@ -145,6 +159,58 @@ const parseArgs = (argv) => {
         }
         if (current === '--force-reopen') {
             parsed.forceReopen = true;
+            continue;
+        }
+        if (current === '--reopen') {
+            parsed.forceReopen = true;
+            continue;
+        }
+        if (current === '--no-open') {
+            parsed.noOpen = true;
+            continue;
+        }
+        if (current === '--verbose') {
+            parsed.verbose = true;
+            continue;
+        }
+        if (current === '--dir') {
+            const directory = argv[index + 1] ?? null;
+            if (!directory) {
+                throw new Error('--dir 缺少取值');
+            }
+            parsed.dir = directory;
+            index += 1;
+            continue;
+        }
+        if (current === '--focus') {
+            const focus = argv[index + 1] ?? null;
+            if (!focus) {
+                throw new Error('--focus 缺少取值');
+            }
+            parsed.focus = focus;
+            index += 1;
+            continue;
+        }
+        if (current === '--files') {
+            while (argv[index + 1] && !argv[index + 1].startsWith('--')) {
+                parsed.files.push(argv[index + 1]);
+                index += 1;
+            }
+            if (parsed.files.length === 0) {
+                throw new Error('--files 缺少取值');
+            }
+            continue;
+        }
+        if (current === '--port') {
+            const port = argv[index + 1] ?? null;
+            if (!port) {
+                throw new Error('--port 缺少取值');
+            }
+            if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+                throw new Error('--port 必须是 1-65535 的整数');
+            }
+            parsed.port = port;
+            index += 1;
             continue;
         }
         if (current === '--pass-manifest') {
@@ -410,7 +476,40 @@ const validatePassManifest = (manifestPath, imagePaths, viewer) => {
     }
     validateLabeledImagesPreserveSourcePixels(manifest, imagePaths, viewer);
 
-    console.log(`PASS_MANIFEST=${resolvedManifestPath}`);
+    return resolvedManifestPath;
+};
+
+const parseKeyValueOutput = (stdout) => {
+    const fields = {};
+    for (const line of String(stdout ?? '').split(/\r?\n/)) {
+        const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+        if (match) fields[match[1]] = match[2];
+    }
+    return fields;
+};
+
+const printCompactOutput = ({ stdout, mediaCount, mediaDirectory, passManifest = null, dryRun = false, verbose = false }) => {
+    const fields = parseKeyValueOutput(stdout);
+    if (verbose) {
+        if (passManifest) console.log(`PASS_MANIFEST=${passManifest}`);
+        if (stdout?.trim()) console.log(stdout.trim());
+        return fields;
+    }
+
+    const lines = [];
+    if (passManifest) lines.push(`PASS_MANIFEST=${passManifest}`);
+    const resolvedMediaCount = Number.isInteger(mediaCount) ? mediaCount : Number(fields.MEDIA_COUNT);
+    if (Number.isInteger(resolvedMediaCount)) lines.push(`MEDIA_COUNT=${resolvedMediaCount}`);
+    if (mediaDirectory) lines.push(`MEDIA_DIRECTORY=${mediaDirectory}`);
+    for (const key of ['DIRECTORY_KEY', 'DIRECTORY_PATH', 'OFFLINE_VIEWER_FILE', 'VIEWER_URL']) {
+        if (fields[key]) lines.push(`${key}=${fields[key]}`);
+    }
+    for (const key of ['OPENED_BROWSER', 'ALREADY_OPEN', 'OPEN_BROWSER']) {
+        if (fields[key]) lines.push(`${key}=${fields[key]}`);
+    }
+    if (dryRun) lines.push('DRY_RUN=true');
+    if (lines.length > 0) console.log(lines.join('\n'));
+    return fields;
 };
 
 const fileSignature = (targetPath) => {
@@ -581,7 +680,7 @@ const resolveSingleMediaDirectory = (imagePaths) => {
     return path.dirname(imagePaths[0]);
 };
 
-const openImagesWithWebViewer = (imagePaths, { forceReopen = false } = {}) => {
+const openImagesWithWebViewer = (imagePaths, { forceReopen = false, passManifest = null, verbose = false } = {}) => {
     const directory = resolveSingleMediaDirectory(imagePaths);
     const args = [
         E2E_IMAGE_VIEWER_ENTRY,
@@ -602,16 +701,53 @@ const openImagesWithWebViewer = (imagePaths, { forceReopen = false } = {}) => {
         stdio: 'pipe',
     });
     const stdout = result.stdout?.trim() ?? '';
-    if (stdout) {
-        console.log(stdout);
-    }
     if (result.status !== 0) {
         const stderr = result.stderr?.trim();
         throw new Error(stderr || stdout || `网页查看器打开失败，退出码: ${result.status}`);
     }
-    const reused = stdout.includes('ALREADY_OPEN=true');
-    console.log(`${reused ? 'REUSED_WITH_WEB_VIEWER' : 'OPENED_WITH_WEB_VIEWER'}=${directory}`);
-    return { reused };
+    const fields = printCompactOutput({
+        stdout,
+        mediaCount: imagePaths.length,
+        mediaDirectory: directory,
+        passManifest,
+        verbose,
+    });
+    return { reused: fields.ALREADY_OPEN === 'true', fields };
+};
+
+const openDirectoryWithWebViewer = ({ dir, focus, files, port, noOpen, forceReopen, verbose }) => {
+    const args = [
+        E2E_IMAGE_VIEWER_ENTRY,
+        '--dir',
+        dir,
+    ];
+    if (focus) {
+        args.push('--focus', focus);
+    }
+    if (files.length > 0) {
+        args.push('--files', ...files);
+    }
+    if (port) {
+        args.push('--port', port);
+    }
+    if (noOpen) {
+        args.push('--no-open');
+    }
+    if (forceReopen) {
+        args.push('--reopen');
+    }
+    const result = spawnSync(process.execPath, args, {
+        cwd: PROJECT_ROOT,
+        env: process.env,
+        encoding: 'utf8',
+        stdio: 'pipe',
+    });
+    const stdout = result.stdout?.trim() ?? '';
+    if (result.status !== 0) {
+        const stderr = result.stderr?.trim();
+        throw new Error(stderr || stdout || `网页查看器打开失败，退出码: ${result.status}`);
+    }
+    printCompactOutput({ stdout, mediaCount: files.length > 0 ? files.length : null, verbose });
 };
 
 const main = () => {
@@ -622,15 +758,28 @@ const main = () => {
         process.exit(0);
     }
 
+    if (parsed.dir) {
+        if (parsed.path || parsed.paths.length > 0 || parsed.latest || parsed.passManifest) {
+            throw new Error('目录查看模式不能同时传入图片路径、--latest 或 --pass-manifest；请使用同一条目录入口');
+        }
+        if (parsed.viewer.toLowerCase() !== 'web') {
+            throw new Error('目录查看模式只支持项目唯一的网页查看器入口');
+        }
+        openDirectoryWithWebViewer(parsed);
+        return;
+    }
+
     if (!parsed.path && parsed.paths.length === 0 && !parsed.latest) {
         usage();
         throw new Error('必须提供 --path、--paths 或 --latest');
     }
 
     const resolvedImages = resolveTargetImages(parsed);
-    for (const resolvedImage of resolvedImages) {
-        console.log(`RESOLVED_MEDIA=${resolvedImage}`);
-        console.log(`${isVideoFile(resolvedImage) ? 'RESOLVED_VIDEO' : 'RESOLVED_IMAGE'}=${resolvedImage}`);
+    if (parsed.verbose) {
+        for (const resolvedImage of resolvedImages) {
+            console.log(`RESOLVED_MEDIA=${resolvedImage}`);
+            console.log(`${isVideoFile(resolvedImage) ? 'RESOLVED_VIDEO' : 'RESOLVED_IMAGE'}=${resolvedImage}`);
+        }
     }
 
     const normalizedViewer = parsed.viewer.toLowerCase();
@@ -646,14 +795,23 @@ const main = () => {
         throw new Error('拒绝打开：--confirmed-pass 已废弃，不能单独作为开图依据；请提供 --pass-manifest。');
     }
 
+    let resolvedManifestPath = null;
     if (parsed.passManifest) {
-        validatePassManifest(parsed.passManifest, resolvedImages, normalizedViewer);
+        resolvedManifestPath = validatePassManifest(parsed.passManifest, resolvedImages, normalizedViewer);
     } else if (!parsed.dryRun) {
-        validatePassManifest(parsed.passManifest, resolvedImages, normalizedViewer);
+        resolvedManifestPath = validatePassManifest(parsed.passManifest, resolvedImages, normalizedViewer);
     }
 
     if (parsed.dryRun) {
-        console.log(`RESOLVED_VIEWER=${normalizedViewer}`);
+        const directories = [...new Set(resolvedImages.map((imagePath) => path.dirname(imagePath).toLowerCase()))];
+        printCompactOutput({
+            mediaCount: resolvedImages.length,
+            mediaDirectory: directories.length === 1 ? path.dirname(resolvedImages[0]) : null,
+            passManifest: resolvedManifestPath,
+            dryRun: true,
+            verbose: parsed.verbose,
+        });
+        if (parsed.verbose) console.log(`RESOLVED_VIEWER=${normalizedViewer}`);
         return;
     }
 
@@ -662,19 +820,26 @@ const main = () => {
         imagePaths: resolvedImages,
         viewer: normalizedViewer,
         forceReopen: parsed.forceReopen,
+        verbose: parsed.verbose,
     });
 
     if (openRecord.duplicate && normalizedViewer !== 'web') {
-        for (const resolvedImage of resolvedImages) {
-            console.log(`REUSED_MEDIA=${resolvedImage}`);
-            console.log(`${isVideoFile(resolvedImage) ? 'REUSED_VIDEO' : 'REUSED_IMAGE'}=${resolvedImage}`);
+        if (parsed.verbose) {
+            for (const resolvedImage of resolvedImages) {
+                console.log(`REUSED_MEDIA=${resolvedImage}`);
+                console.log(`${isVideoFile(resolvedImage) ? 'REUSED_VIDEO' : 'REUSED_IMAGE'}=${resolvedImage}`);
+            }
         }
         return;
     }
 
     let reused = false;
     if (normalizedViewer === 'web') {
-        const webResult = openImagesWithWebViewer(resolvedImages, { forceReopen: parsed.forceReopen });
+        const webResult = openImagesWithWebViewer(resolvedImages, {
+            forceReopen: parsed.forceReopen,
+            passManifest: resolvedManifestPath,
+            verbose: parsed.verbose,
+        });
         reused = webResult.reused;
     } else if (normalizedViewer === 'pureref') {
         openImagesWithPureRef(resolvedImages);
@@ -684,10 +849,17 @@ const main = () => {
 
     recordSuccessfulOpen(openRecord);
 
-    for (const resolvedImage of resolvedImages) {
-        const prefix = reused ? 'REUSED' : 'OPENED';
-        console.log(`${prefix}_MEDIA=${resolvedImage}`);
-        console.log(`${isVideoFile(resolvedImage) ? `${prefix}_VIDEO` : `${prefix}_IMAGE`}=${resolvedImage}`);
+    if (parsed.verbose) {
+        for (const resolvedImage of resolvedImages) {
+            const prefix = reused ? 'REUSED' : 'OPENED';
+            console.log(`${prefix}_MEDIA=${resolvedImage}`);
+            console.log(`${isVideoFile(resolvedImage) ? `${prefix}_VIDEO` : `${prefix}_IMAGE`}=${resolvedImage}`);
+        }
+    } else if (normalizedViewer !== 'web') {
+        console.log(`PASS_MANIFEST=${resolvedManifestPath}`);
+        console.log(`MEDIA_COUNT=${resolvedImages.length}`);
+        console.log(`MEDIA_DIRECTORY=${path.dirname(resolvedImages[0])}`);
+        console.log(`${reused ? 'ALREADY_OPEN' : 'OPENED'}=true`);
     }
 };
 

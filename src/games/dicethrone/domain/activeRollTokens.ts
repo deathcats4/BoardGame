@@ -46,6 +46,14 @@ const canUseActiveRollTokenDef = (
     const player = state.players[playerId];
     if (!player) return null;
 
+    const requiredDefenseAbilityId = tokenDef.activeUse.requiresDefenseAbilityId;
+    if (
+        requiredDefenseAbilityId
+        && (phase !== 'defensiveRoll' || state.pendingAttack?.defenseAbilityId !== requiredDefenseAbilityId)
+    ) {
+        return null;
+    }
+
     const allowedAmounts = getTokenUseOptions(tokenDef, player.tokens[tokenDef.id] ?? 0);
     const defaultAmount = allowedAmounts[0];
     if (!defaultAmount) return null;

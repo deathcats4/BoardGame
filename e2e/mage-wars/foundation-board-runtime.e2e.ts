@@ -3274,7 +3274,7 @@ test.describe('Mage Wars foundation runtime board', () => {
         }
     });
 
-    test('移动横屏真实入口加载正式牌桌素材并落验收截图', async ({ context, page }) => {
+    test('移动横屏真实入口沿用桌面牌桌构图并等比缩放', async ({ context, page }) => {
         test.setTimeout(60_000);
         await page.setViewportSize({ width: 844, height: 390 });
         const diagnostics = await openMageWarsBoard(context, page, 'mage-wars-foundation-runtime-board-mobile');
@@ -3284,6 +3284,9 @@ test.describe('Mage Wars foundation runtime board', () => {
         const layoutAudit = await page.evaluate(() => {
             const board = document.querySelector<HTMLElement>('[data-testid="mage-wars-board"]');
             const boardRect = board?.getBoundingClientRect();
+            const selfHud = document.querySelector<HTMLElement>('[data-testid="mage-wars-mage-hud-self"]');
+            const opponentHud = document.querySelector<HTMLElement>('[data-testid="mage-wars-mage-hud-opponent"]');
+            const rootStyle = getComputedStyle(document.documentElement);
             return {
                 viewport: {
                     width: window.innerWidth,
@@ -3303,11 +3306,30 @@ test.describe('Mage Wars foundation runtime board', () => {
                         bottom: boardRect.bottom,
                     }
                     : null,
+                hudDensity: {
+                    self: selfHud?.getAttribute('data-mage-wars-hud-density') ?? null,
+                    opponent: opponentHud?.getAttribute('data-mage-wars-hud-density') ?? null,
+                },
+                shell: {
+                    designWidth: rootStyle.getPropertyValue('--mobile-board-shell-design-width').trim(),
+                    designHeight: rootStyle.getPropertyValue('--mobile-board-shell-design-height').trim(),
+                    scale: Number.parseFloat(rootStyle.getPropertyValue('--mobile-board-shell-scale')),
+                },
             };
         });
         expect(layoutAudit.board).not.toBeNull();
-        expect(layoutAudit.board!.width).toBeGreaterThanOrEqual(820);
-        expect(layoutAudit.board!.height).toBeGreaterThanOrEqual(370);
+        const expectedScale = Math.min(844 / 1920, 390 / 1080);
+        expect(layoutAudit.shell.designWidth).toBe('1920px');
+        expect(layoutAudit.shell.designHeight).toBe('1080px');
+        expect(layoutAudit.shell.scale).toBeCloseTo(expectedScale, 5);
+        expect(layoutAudit.board!.width).toBeCloseTo(1920 * expectedScale, 1);
+        expect(layoutAudit.board!.height).toBeCloseTo(1080 * expectedScale, 1);
+        expect(layoutAudit.board!.x).toBeCloseTo((844 - 1920 * expectedScale) / 2, 1);
+        expect(layoutAudit.board!.y).toBeCloseTo(0, 1);
+        expect(layoutAudit.board!.right).toBeLessThanOrEqual(844 + 1);
+        expect(layoutAudit.board!.bottom).toBeLessThanOrEqual(390 + 1);
+        expect(layoutAudit.hudDensity.self).toBe('full');
+        expect(layoutAudit.hudDensity.opponent).toBe('full');
         expect(layoutAudit.document.scrollWidth).toBeLessThanOrEqual(layoutAudit.viewport.width + 2);
 
         await mkdir(dirname(MOBILE_SCREENSHOT_PATH), { recursive: true });

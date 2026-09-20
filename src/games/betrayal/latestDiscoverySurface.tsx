@@ -116,6 +116,10 @@ export function BetrayalLatestDiscoverySurface({
       shouldDockRollModifierInPhoneCorner ||
       hasRollModifierActionSlot,
   );
+  const displayedDiscoveryDetail = discovery.detail
+    .replace(/[；;]\s*没有事件、物品或预兆发现牌[。.]?\s*$/, "")
+    .replace(/^没有事件、物品或预兆发现牌[。.]?\s*$/, "")
+    .trim();
 
   return (
     <div
@@ -196,7 +200,7 @@ export function BetrayalLatestDiscoverySurface({
         ) : null}
         <span className="sr-only" data-testid="betrayal-discovery-detail">
           {displayedKindLabel} {displayedTitle} {displaySummary}{" "}
-          {discovery.detail ?? ""}
+          {displayedDiscoveryDetail}
         </span>
         {resolutionSteps.length > 0 ? (
           <ol

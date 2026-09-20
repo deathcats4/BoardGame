@@ -5,7 +5,7 @@
 
 import type { PlayerId, RandomFn, GameEvent } from '../../../engine/types';
 import { createDamageCalculation, type DamageCalculationConfig, type PassiveTriggerHandler } from '../../../engine/primitives/damageCalculation';
-import type { EffectAction, RollDieConditionalEffect, RollDieDefaultEffect } from './tokenTypes';
+import type { DamageOrigin, EffectAction, RollDieConditionalEffect, RollDieDefaultEffect } from './tokenTypes';
 
 export type { RollDieConditionalEffect, RollDieDefaultEffect };
 import type { AbilityEffect, EffectTiming, EffectResolutionContext } from './combat';
@@ -58,6 +58,8 @@ export interface EffectContext {
     timestamp?: number;
     /** 是否为防御技能上下文（防御反击伤害不触发 Token 响应窗口） */
     isDefensiveContext?: boolean;
+    /** 当前效果的现实伤害来源。卡牌上下文显式标为 card，其余技能默认 ability。 */
+    damageOrigin?: DamageOrigin;
 }
 
 // ============================================================================
@@ -523,6 +525,7 @@ function resolveEffectAction(
     switch (action.type) {
         case 'damage': {
             const resolvedDamageScope = ctx.isDefensiveContext ? 'direct' : action.damageScope ?? 'attack';
+            const resolvedDamageOrigin = action.damageOrigin ?? ctx.damageOrigin ?? 'ability';
             const isAttackDamage = resolvedDamageScope === 'attack';
             const parleyStacks = state.players[attackerId]?.statusEffects[STATUS_IDS.PARLEY] ?? 0;
             if (isAttackDamage && parleyStacks > 0) {
@@ -556,8 +559,12 @@ function resolveEffectAction(
                         isUltimate: state.pendingAttack.isUltimate,
                     }
                     : undefined;
-                const dazzlePercent = isCurrentAttackDamage
-                    ? state.pendingAttack?.dazzleDamagePercent
+                const damagePercentModifiers = isCurrentAttackDamage
+                    ? [state.pendingAttack?.dazzleDamagePercent, state.pendingAttack?.zhizhuxiaDamagePercent]
+                        .filter((value): value is number => typeof value === 'number')
+                    : [];
+                const combinedDamagePercent = damagePercentModifiers.length > 0
+                    ? damagePercentModifiers.reduce((sum, value) => sum + value, 0)
                     : undefined;
                 const bonusDamageSources = isCurrentAttackDamage
                     ? (state.pendingAttack?.bonusDamageSources ?? [])
@@ -588,13 +595,17 @@ function resolveEffectAction(
                         source: 'attack_modifier',
                         description: 'actionLog.damageSource.attackModifier',
                     }] : []),
-                    ...(typeof dazzlePercent === 'number' ? [{
+                    ...(typeof combinedDamagePercent === 'number' ? [{
                         id: '__tianshi_dazzle__',
                         type: 'percent' as const,
-                        value: dazzlePercent,
+                        value: combinedDamagePercent,
                         priority: 19,
-                        source: STATUS_IDS.DAZZLE,
-                        description: 'tokens.dazzle.name',
+                        source: state.pendingAttack?.zhizhuxiaDamagePercent !== undefined && state.pendingAttack?.dazzleDamagePercent === undefined
+                            ? 'spider-sense'
+                            : STATUS_IDS.DAZZLE,
+                        description: state.pendingAttack?.zhizhuxiaDamagePercent !== undefined && state.pendingAttack?.dazzleDamagePercent === undefined
+                            ? 'tokens.invisible.name'
+                            : 'tokens.dazzle.name',
                     }] : []),
                 ];
                 const calc = createDamageCalculation({
@@ -652,6 +663,7 @@ function resolveEffectAction(
                                 actualDamage: finalDamage,
                                 sourceAbilityId,
                                 damageScope: resolvedDamageScope,
+                                damageOrigin: resolvedDamageOrigin,
                                 ...(passiveModifiers.length > 0 ? { modifiers: passiveModifiers } : {}),
                                 ...(action.unblockable ? { unblockable: true } : {}),
                             },
@@ -679,6 +691,7 @@ function resolveEffectAction(
                         actualDamage,
                         sourceAbilityId,
                         damageScope: resolvedDamageScope,
+                        damageOrigin: resolvedDamageOrigin,
                         ...(passiveModifiers.length > 0 ? { modifiers: passiveModifiers } : {}),
                         breakdown: result.breakdown,
                         ...(action.unblockable ? { unblockable: true } : {}),
@@ -907,6 +920,7 @@ function resolveEffectAction(
                     const handledEvent = handledEvents[i];
                     if (handledEvent.type === 'DAMAGE_DEALT') {
                         const dmgPayload = (handledEvent as DamageDealtEvent).payload;
+                        dmgPayload.damageOrigin = dmgPayload.damageOrigin ?? ctx.damageOrigin ?? 'ability';
                         const damageScope = dmgPayload.damageScope ?? (
                             ctx.isDefensiveContext ? 'direct' : state.pendingAttack ? 'attack' : 'direct'
                         );
@@ -914,8 +928,13 @@ function resolveEffectAction(
                             && !ctx.isDefensiveContext
                             && state.pendingAttack?.attackerId === attackerId
                             && state.pendingAttack?.defenderId === dmgPayload.targetId;
-                        if (isCurrentAttackDamage && typeof state.pendingAttack?.dazzleDamagePercent === 'number') {
-                            const multiplier = Math.max(0, 1 + state.pendingAttack.dazzleDamagePercent / 100);
+                        const currentAttackPercent = isCurrentAttackDamage
+                            ? [state.pendingAttack?.dazzleDamagePercent, state.pendingAttack?.zhizhuxiaDamagePercent]
+                                .filter((value): value is number => typeof value === 'number')
+                                .reduce((sum, value) => sum + value, 0)
+                            : undefined;
+                        if (isCurrentAttackDamage && typeof currentAttackPercent === 'number') {
+                            const multiplier = Math.max(0, 1 + currentAttackPercent / 100);
                             dmgPayload.amount = Math.ceil(dmgPayload.amount * multiplier);
                             dmgPayload.actualDamage = Math.min(
                                 dmgPayload.amount,
@@ -1162,12 +1181,14 @@ function resolveConditionalEffect(
     }
 
     if (typeof effect.companionHeal === 'number' && effect.companionHeal > 0) {
+        const companion = state.players[ctx.attackerId]?.companion;
         events.push({
             type: 'COMPANION_HEALTH_CHANGED',
             payload: {
                 playerId: ctx.attackerId,
                 companionId: 'nyra',
                 delta: effect.companionHeal,
+                active: companion?.active === true,
                 sourceAbilityId,
             },
             sourceCommandType: 'ABILITY_EFFECT',
@@ -1272,12 +1293,14 @@ function resolveDefaultEffect(
     }
 
     if (typeof effect.companionHeal === 'number' && effect.companionHeal > 0) {
+        const companion = state.players[ctx.attackerId]?.companion;
         events.push({
             type: 'COMPANION_HEALTH_CHANGED',
             payload: {
                 playerId: ctx.attackerId,
                 companionId: 'nyra',
                 delta: effect.companionHeal,
+                active: companion?.active === true,
                 sourceAbilityId,
             },
             sourceCommandType: 'ABILITY_EFFECT',

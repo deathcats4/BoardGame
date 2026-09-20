@@ -89,8 +89,8 @@
       "sunYuanhuaHint": "Click a hand card at the bottom to discard it.",
       "confirmSunYuanhua": "Confirm tech",
       "skipSunYuanhua": "Skip Sun Yuanhua tech",
-      "armamentPaymentStatus": "Select {{cost}} armament card(s) · Selected {{selected}}",
-      "armamentPaymentHint": "Select the armament card to use; it is played as an armament upgrade first, then goes to the discard pile after resolving.",
+      "armamentPaymentStatus": "Selected {{selected}} / 2 · 1 armament + discard 1 card",
+      "armamentPaymentHint": "The armament card is already selected; choose 1 more hand card to discard. The armament upgrades by 1 level, and the discard goes to the discard pile.",
       "confirmUseArmament": "Use and upgrade",
       "selectedTacticCard": "Selected tactic card \"{{card}}\"",
       "tacticCardHint": "Click Play Tactic Card to confirm. Click this hand card again to cancel the selection.",
@@ -380,21 +380,17 @@
   "tutorial": {
     "basic": {
       "title": "Opening, Wheel, And The First Turn",
-      "description": "The formal opening resolves hand limit, the shared wheel push, one hand action, and one wheel-result action.",
+      "description": "Start at the first real decision: push the shared wheel, read its result, then complete one hand action.",
       "steps": {
         "welcome": "Seven Hatreds has three victory paths: control 16 regions at New Year, capture an opponent's capital, or reach 3 prestige first.",
-        "handLimit": "At the start of every turn, check hand limit first. Ming may keep 15 cards; Later Jin and the Mongols may keep 10. Pick the excess card from the hand area and confirm the discard.",
-        "handResource": "Cards are your main resource. Event cards resolve when played, armament cards need one extra discard, tactic cards are used only in battle, and silver cards serve only as payment.",
-        "wheelFirst": "After the hand-limit check, the shared wheel is next. It has not moved yet. Moving it by 1, 2, or 3 spaces decides whether other players draw and which wheel-result action this turn will use.",
-        "wheelMove": "Now choose how far to push the shared wheel. This is only the wheel push, not the wheel-result action; use the free 1-space move for the smallest example.",
-        "afterWheel": "Once the shared wheel push is resolved, this turn still has two parts left: one hand action and one wheel-result action. The current player chooses which of those two parts to do first.",
+        "wheelFirst": "Once the formal opening is complete, the first real decision of this turn is the shared wheel push. Moving it by 1, 2, or 3 spaces decides whether other players draw and which wheel-result action this turn will use.",
+        "wheelMove": "Now choose how far to push the shared wheel. Click the free 1-space move; in this setup it moves from Military Farm to Recruit / Train, whose effect resolves immediately.",
+        "wheelResult": "The wheel has landed on Recruit / Train, and its result is already resolved. Return to this turn's hand action and click Grant Pardon to continue.",
         "pickAction": "Hand action: Grant Pardon. Choose the action first, not a map region; the target troop and receiving Ming region are chosen in the next step.",
         "chooseGrantPardonTarget": "Choose the pardon target on the map: click Shanhaiguan to move 1 Later Jin troop out of Jinzhou into that adjacent Ming-controlled region.",
         "payCards": "The target is locked. Now discard 3 cards to pay for Grant Pardon; the map changes only after payment resolves.",
         "actionResult": "Jinzhou loses an enemy troop, and Shanhaiguan gains a Ming troop. Hand resources have turned into direct board control.",
-        "moraleLevel": "The number on each troop is both level and morale. Higher level means stronger dice in battle; only when a troop falls to 0 does it rout away.",
-        "wheelAction": "The wheel-result action is now resolved. Wherever the shared wheel lands, it takes you into Reclaim and Farm, Diplomacy and Hire, Attack and Dispatch, or Recruit and Train.",
-        "finish": "The first-turn skeleton is: check hand limit, push the shared wheel, then complete one hand action and one wheel-result action."
+        "finish": "This real first-turn segment is complete: push the shared wheel, read the Recruit / Train result, then spend 3 cards to resolve Grant Pardon."
       }
     },
     "attackAndBattle": {
@@ -421,7 +417,7 @@
         "defendCity": "Click Hold City now. The defender moves up to 2 troops and 2 population into Shanhaiguan, while the units left outside keep fighting.",
         "cityBattle": "After the defenders enter the city, click Rear Guard in the right battle panel to resolve the city battle. City battle resolves artillery first, then cavalry and infantry; cavalry takes a -1 penalty here.",
         "cityResult": "The city-battle result tells you whether the city defenders were cleared. Even if the attacker wins, the battle still closes through siege or occupation.",
-        "besiegeChoice": "Click Besiege This Region now. Besieging leaves Ming pressure outside the city, but Shanhaiguan control stays with the defender for the moment.",
+        "besiegeChoice": "Click Besiege first to open the siege options, then click Besiege This Region to confirm. Besieging leaves Ming pressure outside the city, but Shanhaiguan control stays with the defender for the moment.",
         "occupyChoice": "Compare the occupation result: if you choose occupation, Shanhaiguan actually changes to Ming control and clears both city and siege states.",
         "finish": "The main point of this chapter: winning the city battle is only the first half. The final siege-or-occupy choice decides the city's state."
       }

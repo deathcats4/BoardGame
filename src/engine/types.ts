@@ -391,6 +391,16 @@ export interface TutorialStepSnapshot {
     visual?: TutorialStepVisual;
     highlightTarget?: string;
     /**
+     * CSS selectors for continuous reading surfaces or other protected regions
+     * that the tutorial card must avoid covering when choosing a placement.
+     */
+    avoidOverlapSelectors?: string[];
+    /**
+     * Optional maximum width for dense layouts where the tooltip must fit
+     * beside a protected reading surface without covering it.
+     */
+    tooltipMaxWidth?: number;
+    /**
      * Controls only the tutorial-drawn frame around the target.
      * Use `none` when the target is already a self-explanatory game object
      * and an extra rectangle would read as fake UI.

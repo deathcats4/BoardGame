@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { OptimizedImage } from "../../components/common/media/OptimizedImage";
+import { useTouchInspectGesture } from "../../hooks/ui/useTouchInspectGesture";
 import { PossessionAtlasFrame } from "./atlasFrameSurface";
 import type { BetrayalInventoryCard } from "./game";
 import {
@@ -81,6 +82,14 @@ export function BetrayalInventoryCardSurface({
   const isFocus = layout === "focus";
   const isPreview = layout === "preview";
   const isCompact = layout === "compact";
+  const {
+    getTouchInspectProps,
+    shouldBlockInspectClick,
+  } = useTouchInspectGesture<string, null>({
+    enabled: !isPreview && Boolean(onPreview),
+    onInspect: (cardId) => onPreview?.(cardId),
+  });
+  const touchInspectProps = getTouchInspectProps(item.id, null);
   const resolvedTradeStatus = readOnly ? null : tradeStatus;
   const resolvedDisabledReason =
     disabledReason ?? resolvedTradeStatus?.reason ?? null;
@@ -149,6 +158,9 @@ export function BetrayalInventoryCardSurface({
           if (isPreview) {
             return;
           }
+          if (shouldBlockInspectClick(item.id)) {
+            return;
+          }
           if (readOnly) {
             onPreview?.(item.id);
             return;
@@ -187,6 +199,12 @@ export function BetrayalInventoryCardSurface({
               : `${item.name} · ${rulesSummary} · 点击选择`
         }
         disabled={isCardDisabled}
+        onPointerDown={touchInspectProps.onPointerDown}
+        onPointerMove={touchInspectProps.onPointerMove}
+        onPointerUp={touchInspectProps.onPointerUp}
+        onPointerCancel={touchInspectProps.onPointerCancel}
+        onPointerLeave={touchInspectProps.onPointerLeave}
+        data-touch-inspect-enabled={!isPreview && Boolean(onPreview) ? "true" : undefined}
         className={`pointer-events-auto relative w-full overflow-visible text-left outline-none transition focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed ${showSelectedState ? "" : "focus-visible:ring-0"} ${isCardDisabled ? "cursor-not-allowed" : buttonOutlineClass}`}
         aria-pressed={isPreview || readOnly ? undefined : isSelected}
       >
@@ -481,7 +499,7 @@ export function BetrayalInventoryCardSurface({
             event.stopPropagation();
             onPreview?.(item.id);
           }}
-          className={`pointer-events-auto absolute ${isCompact ? "right-1 top-1 h-7 w-7" : "right-2 top-2 h-8 w-8"} z-[80] inline-flex items-center justify-center rounded-[5px] border border-[rgba(238,204,126,0.52)] bg-[rgba(18,15,12,0.86)] text-[#f3dfab] opacity-100 shadow-[0_8px_18px_rgba(0,0,0,0.34)] transition hover:border-[#f1d68d] hover:bg-[rgba(35,27,18,0.94)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#efd17c] md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100`}
+          className={`betrayal-inventory-card-magnify pointer-events-auto absolute ${isCompact ? "right-1 top-1 h-7 w-7" : "right-2 top-2 h-8 w-8"} z-[80] inline-flex items-center justify-center rounded-[5px] border border-[rgba(238,204,126,0.52)] bg-[rgba(18,15,12,0.86)] text-[#f3dfab] shadow-[0_8px_18px_rgba(0,0,0,0.34)] transition hover:border-[#f1d68d] hover:bg-[rgba(35,27,18,0.94)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#efd17c]`}
         >
           <Search size={isCompact ? 13 : 16} aria-hidden="true" />
         </button>

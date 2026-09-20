@@ -398,6 +398,7 @@ function handleResolveCardEffectsOnSelectedOpponent({
         state,
         damageDealt: 0,
         timestamp,
+        damageOrigin: 'card',
     }, { random }));
 
     return events;

@@ -215,6 +215,16 @@ function formatDiceThroneActionEntry({
     const entries: ActionLogEntry[] = [];
     const tokenDefinitions = core.tokenDefinitions ?? [];
     const shouldRecordCommandEntry = afterEventsRound === 0;
+    const eventStreamEntryIdByEvent = new Map<GameEvent, number>();
+    for (const eventStreamEntry of state.sys?.eventStream?.entries ?? []) {
+        eventStreamEntryIdByEvent.set(eventStreamEntry.event, eventStreamEntry.id);
+    }
+    const getEventLogIdentity = (event: GameEvent, eventIndex: number, entryTimestamp: number): string => {
+        const eventStreamId = eventStreamEntryIdByEvent.get(event);
+        return eventStreamId === undefined
+            ? `${entryTimestamp}-${eventIndex}`
+            : `event-${eventStreamId}`;
+    };
 
     // i18n segment 工厂：延迟翻译，渲染时由客户端 useTranslation 翻译
     const i18nSeg = (
@@ -1149,6 +1159,7 @@ function formatDiceThroneActionEntry({
             const modifiedKey = target === 'pendingBonusDie'
                 ? 'actionLog.bonusDieModified'
                 : 'actionLog.dieModified';
+            const eventIdentity = getEventLogIdentity(event, index, entryTimestamp);
             
             const segments: ActionLogSegment[] = [
                 i18nSeg(modifiedKey, {
@@ -1164,7 +1175,7 @@ function formatDiceThroneActionEntry({
             }
             
             entries.push({
-                id: `DIE_MODIFIED-${playerId}-${entryTimestamp}-${index}`,
+                id: `DIE_MODIFIED-${playerId}-${eventIdentity}`,
                 timestamp: entryTimestamp,
                 actorId: playerId,
                 kind: 'DIE_MODIFIED',
@@ -1182,6 +1193,7 @@ function formatDiceThroneActionEntry({
             const rerollKey = target === 'pendingBonusDie'
                 ? 'actionLog.bonusDieRerolled'
                 : 'actionLog.dieRerolled';
+            const eventIdentity = getEventLogIdentity(event, index, entryTimestamp);
             
             const segments: ActionLogSegment[] = [
                 i18nSeg(rerollKey, {
@@ -1197,7 +1209,7 @@ function formatDiceThroneActionEntry({
             }
             
             entries.push({
-                id: `DIE_REROLLED-${playerId}-${entryTimestamp}-${index}`,
+                id: `DIE_REROLLED-${playerId}-${eventIdentity}`,
                 timestamp: entryTimestamp,
                 actorId: playerId,
                 kind: 'DIE_REROLLED',
@@ -1289,8 +1301,9 @@ function formatDiceThroneActionEntry({
         if (event.type === 'BONUS_DIE_REROLLED') {
             const bonusDieEvent = event as BonusDieRerolledEvent;
             const { dieIndex, oldValue, newValue, playerId } = bonusDieEvent.payload;
+            const eventIdentity = getEventLogIdentity(event, index, entryTimestamp);
             entries.push({
-                id: `BONUS_DIE_REROLLED-${playerId}-${entryTimestamp}-${index}`,
+                id: `BONUS_DIE_REROLLED-${playerId}-${eventIdentity}`,
                 timestamp: entryTimestamp,
                 actorId: playerId,
                 kind: 'BONUS_DIE_REROLLED',

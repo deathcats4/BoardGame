@@ -25,6 +25,7 @@ import { ARTIFICER_ABILITIES, ARTIFICER_TOKENS, ARTIFICER_INITIAL_TOKENS, ARTIFI
 import { TIANSHI_ABILITIES, TIANSHI_TOKENS, TIANSHI_INITIAL_TOKENS, TIANSHI_INITIAL_STATUS_EFFECTS, getTianshiStartingDeck } from '../heroes/tianshi';
 import { LIEREN_ABILITIES, LIEREN_TOKENS, LIEREN_INITIAL_TOKENS, LIEREN_INITIAL_STATUS_EFFECTS, getLierenStartingDeck } from '../heroes/lieren';
 import { VAMPIRE_LORD_ABILITIES, VAMPIRE_LORD_TOKENS, VAMPIRE_LORD_INITIAL_TOKENS, VAMPIRE_LORD_INITIAL_STATUS_EFFECTS, VAMPIRE_LORD_PASSIVE_ABILITIES, getVampireLordStartingDeck } from '../heroes/vampire_lord';
+import { ZHIZHUXIA_ABILITIES, ZHIZHUXIA_TOKENS, ZHIZHUXIA_INITIAL_TOKENS, ZHIZHUXIA_INITIAL_STATUS_EFFECTS, ZHIZHUXIA_PASSIVE_ABILITIES, getZhizhuxiaStartingDeck } from '../heroes/zhizhuxia';
 import { createDie } from '../../../engine/primitives';
 import { getDiceDefinition } from './diceRegistry';
 import { resourceSystem } from './resourceSystem';
@@ -445,6 +446,29 @@ export const CHARACTER_DATA_MAP: Record<SelectableCharacterId, CharacterData> = 
         statusAtlasId: DICETHRONE_STATUS_ATLAS_IDS.VAMPIRE_LORD,
         statusAtlasPath: 'dicethrone/images/xixuegui/status-icons-atlas.json',
         passiveAbilities: VAMPIRE_LORD_PASSIVE_ABILITIES,
+    },
+    zhizhuxia: {
+        id: 'zhizhuxia',
+        abilities: ZHIZHUXIA_ABILITIES,
+        tokens: ZHIZHUXIA_TOKENS,
+        initialTokens: ZHIZHUXIA_INITIAL_TOKENS,
+        initialStatusEffects: ZHIZHUXIA_INITIAL_STATUS_EFFECTS,
+        diceDefinitionId: 'zhizhuxia-dice',
+        getStartingDeck: getZhizhuxiaStartingDeck,
+        initialAbilityLevels: {
+            'heavy-punch': 1,
+            'combo-strike': 1,
+            'trap': 1,
+            'venom-punch': 1,
+            'wall-crawl': 1,
+            'spider-reflex': 1,
+            'counter': 1,
+            'spider-sense': 1,
+            'ultimate-spider': 1,
+        },
+        statusAtlasId: DICETHRONE_STATUS_ATLAS_IDS.ZHIZHUXIA,
+        statusAtlasPath: 'dicethrone/images/zhizhuxia/status-icons-atlas.json',
+        passiveAbilities: ZHIZHUXIA_PASSIVE_ABILITIES,
     },
 };
 

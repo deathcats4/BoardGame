@@ -72,6 +72,7 @@ import {
     drawCards,
     getActionLikeResponseWindowTiming,
     getMinionLikeResponseWindowLimitGroup,
+    findSpecificExtraActionPlay,
     isCardMinionLike,
     matchesDefId,
 } from './utils';
@@ -79,7 +80,7 @@ import { autoMulligan } from '../../../engine/primitives/mulligan';
 import { maybeQueueStartingHandMulliganPrompt } from './mulliganHandlers';
 import { resolveOnPlay, resolveSpecial, resolveTalent, resolveOnDestroy, resolveOngoingActivation } from './abilityRegistry';
 import type { AbilityContext } from './abilityRegistry';
-import { triggerActiveBaseAbility } from './baseAbilities';
+import { getActiveBaseAbilitySources, triggerActiveBaseAbilities } from './baseAbilities';
 import { collectExtendedBaseAbilityTriggers } from './baseAbilityQueue';
 import { fireTriggers, collectTriggers } from './ongoingEffects';
 import { getEffectivePower } from './ongoingModifiers';
@@ -541,6 +542,12 @@ function executeCommand(
             const def = getCardDef(card.defId) as ActionCardDef | FusionCardDef | undefined;
             const events: SmashUpEvent[] = [];
             let updatedState: MatchState<SmashUpCore> | undefined;
+            const specificExtraActionPlay = findSpecificExtraActionPlay(workingState.core.players[command.playerId], {
+                cardUid: card.uid,
+                defId: card.defId,
+                targetBaseIndex: command.payload.targetBaseIndex,
+                targetMinionUid: command.payload.targetMinionUid,
+            });
 
             const event = buildActionPlayedEvent({
                 playerId: command.playerId,
@@ -549,7 +556,11 @@ function executeCommand(
                 ownerId: card.owner,
                 targetBaseIndex: command.payload.targetBaseIndex,
                 targetMinionUid: command.payload.targetMinionUid,
-                isExtraAction: fromStored || discardActionPlay?.consumesNormalLimit === false || command.payload.consumesNormalLimit === false || undefined,
+                isExtraAction: fromStored
+                    || specificExtraActionPlay !== undefined
+                    || discardActionPlay?.consumesNormalLimit === false
+                    || command.payload.consumesNormalLimit === false
+                    || undefined,
                 fromDiscard,
                 fromStored,
                 discardPlaySourceId: discardActionPlay?.sourceId ?? command.payload.discardPlaySourceId,
@@ -568,6 +579,7 @@ function executeCommand(
                 targetMinionUid: command.payload.targetMinionUid,
                 fromDiscard,
                 fromStored,
+                destroyAttachedActionAtTurnEnd: specificExtraActionPlay?.entry.destroyAttachedActionAtTurnEnd === true,
                 now,
             });
             const counterWindowState = maybeQueueActionCounterWindow(workingState, pendingResolution, now);
@@ -728,24 +740,26 @@ function executeCommand(
 
             const events: SmashUpEvent[] = [];
 
-            // 记录“本回合已使用”，用于 oncePerTurn 门禁（与 USE_TALENT 的语义对齐：一旦发动即消耗次数）
-            const usedEvt: BaseAbilityUsedEvent = {
-                type: SU_EVENTS.BASE_ABILITY_USED,
-                payload: {
-                    playerId: command.playerId,
-                    baseIndex,
-                    baseDefId: base.defId,
-                },
-                sourceCommandType: command.type,
-                timestamp: now,
-            };
-            events.push(usedEvt);
+            const activeSources = getActiveBaseAbilitySources(core, baseIndex);
+            for (const sourceDefId of activeSources) {
+                const usedEvt: BaseAbilityUsedEvent = {
+                    type: SU_EVENTS.BASE_ABILITY_USED,
+                    payload: {
+                        playerId: command.playerId,
+                        baseIndex,
+                        baseDefId: sourceDefId,
+                    },
+                    sourceCommandType: command.type,
+                    timestamp: now,
+                };
+                events.push(usedEvt);
+            }
 
-            const result = triggerActiveBaseAbility(base.defId, {
+            const result = triggerActiveBaseAbilities({
                 state: core,
                 matchState: state,
                 baseIndex,
-                baseDefId: base.defId,
+                baseDefId: activeSources[0] ?? base.defId,
                 playerId: command.playerId,
                 targetBaseIndex,
                 targetMinionUid,

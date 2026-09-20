@@ -9,7 +9,9 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -28,6 +30,8 @@ const DEFAULT_PORT = 4867;
 const MAX_PORT_ATTEMPTS = 20;
 const MAX_MEDIA_FILES = 1500;
 const MAX_INDEX_FILES = 80;
+const MAX_KEY_LOOKUP_DIRECTORIES = 20000;
+const OFFLINE_VIEWER_FILE_NAME = "index.html";
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"]);
 const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".m4v", ".mkv"]);
 const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS]);
@@ -288,10 +292,50 @@ const resolveDirectoryFromKey = (key) => {
   }
   const state = readState();
   const entry = Object.values(state.directories ?? {}).find((candidate) => candidate?.id === key);
-  if (!entry?.path) {
-    throw new Error(`找不到目录 key: ${key}`);
+  if (entry?.path) {
+    return resolveDirectory(entry.path);
   }
-  return resolveDirectory(entry.path);
+
+  const lookupRoots = [
+    EVIDENCE_ROOT,
+    path.join(PROJECT_ROOT, "evidence"),
+    path.join(PROJECT_ROOT, "artifacts"),
+  ].filter((root, index, roots) => roots.indexOf(root) === index && existsSync(root));
+  const matches = [];
+  let scanned = 0;
+  const walk = (currentDir) => {
+    if (matches.length > 1 || scanned >= MAX_KEY_LOOKUP_DIRECTORIES) return;
+    let entries;
+    try {
+      entries = readdirSync(currentDir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const child of entries) {
+      if (matches.length > 1 || scanned >= MAX_KEY_LOOKUP_DIRECTORIES) return;
+      if (!child.isDirectory()) continue;
+      const candidate = path.join(currentDir, child.name);
+      scanned += 1;
+      try {
+        if (directoryId(candidate) === key) {
+          matches.push(realpathSync.native(candidate));
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      walk(candidate);
+    }
+  };
+  for (const root of lookupRoots) walk(root);
+
+  if (matches.length > 1) {
+    throw new Error(`目录 key 不唯一: ${key}`);
+  }
+  if (matches.length === 1) {
+    return resolveDirectory(matches[0]);
+  }
+  throw new Error(`找不到目录 key: ${key}`);
 };
 
 const resolveDirectoryFromUrl = (url) => {
@@ -600,6 +644,12 @@ const buildViewerUrl = (port, dirPath, focus = null, files = []) => {
   return url.toString();
 };
 
+const buildStableViewerUrl = (port, dirPath) => {
+  const url = new URL(`http://127.0.0.1:${port}/`);
+  url.searchParams.set("key", directoryId(dirPath));
+  return url.toString();
+};
+
 const httpJson = (port, pathname, { method = "GET", body = null, timeoutMs = 1200 } = {}) => new Promise((resolve, reject) => {
   const requestBody = body ? JSON.stringify(body) : null;
   const req = httpRequest({
@@ -808,6 +858,92 @@ const collectMedia = (dirPath, mediaIndex, selectedFiles = []) => {
   return results;
 };
 
+const escapeHtml = (value) => String(value)
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#39;");
+
+const writeOfflineViewerFile = (dirPath) => {
+  const mediaIndex = readMediaIndex(dirPath);
+  const items = collectMedia(dirPath, mediaIndex).map((item) => ({
+    relativePath: item.relativePath,
+    displayTitle: item.displayTitle,
+    description: item.description,
+    kind: item.kind,
+  }));
+  const title = mediaIndex.title || displayTitleForDirectory(dirPath) || "端到端截图";
+  const serializedItems = JSON.stringify(items).replaceAll("<", "\\u003c");
+  const markup = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="5" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    body { margin: 0; background: #111827; color: #e5e7eb; }
+    header { position: sticky; top: 0; z-index: 1; padding: 16px 20px; background: #1f2937; border-bottom: 1px solid #374151; }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    p { margin: 0; color: #9ca3af; font-size: 13px; }
+    main { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); padding: 20px; }
+    figure { margin: 0; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 12px; }
+    img { display: block; width: 100%; height: auto; border-radius: 8px; background: #030712; }
+    figcaption { padding-top: 10px; }
+    strong { display: block; font-size: 15px; }
+    span { display: block; margin-top: 4px; color: #9ca3af; font-size: 13px; line-height: 1.5; }
+    .empty { padding: 24px; color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>${escapeHtml(title)}</h1>
+    <p>这个文件固定在截图目录内；刷新页面会读取该目录当前文件。</p>
+  </header>
+  <main id="gallery"></main>
+  <script>
+    const items = ${serializedItems};
+    const gallery = document.querySelector("#gallery");
+    const cacheBust = Date.now();
+    if (items.length === 0) {
+      gallery.innerHTML = '<div class="empty">当前目录还没有截图。</div>';
+    } else {
+      for (const item of items) {
+        const figure = document.createElement("figure");
+        const image = document.createElement("img");
+        image.alt = item.displayTitle;
+        image.src = "./" + encodeURIComponent(item.relativePath) + "?updated=" + cacheBust;
+        const caption = document.createElement("figcaption");
+        const label = document.createElement("strong");
+        label.textContent = item.displayTitle;
+        caption.append(label);
+        if (item.description) {
+          const description = document.createElement("span");
+          description.textContent = item.description;
+          caption.append(description);
+        }
+        figure.append(image, caption);
+        gallery.append(figure);
+      }
+    }
+  </script>
+</body>
+</html>
+`;
+  const target = path.join(dirPath, OFFLINE_VIEWER_FILE_NAME);
+  const temp = path.join(dirPath, `.${OFFLINE_VIEWER_FILE_NAME}.${process.pid}.tmp`);
+  writeFileSync(temp, markup, "utf8");
+  try {
+    unlinkSync(target);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  renameSync(temp, target);
+  return target;
+};
+
 const serveStatic = (res, relativePath) => {
   const target = path.join(WEB_DIR, relativePath);
   const real = realpathSync.native(target);
@@ -865,7 +1001,8 @@ const createViewerServer = (port) => createServer(async (req, res) => {
         lastFocus: focus ? { relativePath: focus, updatedAt: new Date().toISOString() } : null,
         lastMediaSelection: files.length > 0 ? { relativePaths: files, updatedAt: new Date().toISOString() } : null,
       });
-      jsonResponse(res, 200, { ok: true, ...entry });
+      const offlineViewerFile = writeOfflineViewerFile(dirPath);
+      jsonResponse(res, 200, { ok: true, offlineViewerFile, ...entry });
       return;
     }
     if (req.method === "POST" && url.pathname === "/api/mark-open") {
@@ -882,8 +1019,10 @@ const createViewerServer = (port) => createServer(async (req, res) => {
       const requestedSelection = resolveMediaSelection(listing.directory, url.searchParams.getAll("show"));
       const selectedFiles = requestedSelection.length > 0 ? requestedSelection : registeredMediaSelectionForDirectory(listing.directory);
       const items = collectMedia(listing.directory, mediaIndex, selectedFiles);
+      const offlineViewerFile = writeOfflineViewerFile(listing.directory);
       jsonResponse(res, 200, {
         ok: true,
+        offlineViewerFile,
         requestedDirectory: listing.requestedDirectory,
         directory: listing.directory,
         directoryTitle: mediaIndex.title || displayTitleForDirectory(listing.directory),
@@ -941,8 +1080,11 @@ const launch = async (args) => {
     health = await waitForViewer(selected.port);
   }
 
-  const url = buildViewerUrl(selected.port, dirPath, focus, files);
-  await httpJson(selected.port, "/api/register", { method: "POST", body: { dir: dirPath, focus, files } });
+  const url = buildStableViewerUrl(selected.port, dirPath);
+  const registration = await httpJson(selected.port, "/api/register", { method: "POST", body: { dir: dirPath, focus, files } });
+  const offlineViewerFile = registration.offlineViewerFile ?? path.join(dirPath, OFFLINE_VIEWER_FILE_NAME);
+  const stableDirectoryKey = directoryId(dirPath);
+  const mediaCount = collectMedia(dirPath, readMediaIndex(dirPath), files).length;
 
   const previousEntry = stateBefore.directories?.[key];
   const alreadyOpen = Boolean(
@@ -953,24 +1095,33 @@ const launch = async (args) => {
   );
 
   if (args.noOpen) {
+    console.log(`MEDIA_COUNT=${mediaCount}`);
     console.log(`VIEWER_URL=${url}`);
+    console.log(`OFFLINE_VIEWER_FILE=${offlineViewerFile}`);
     console.log(`OPEN_BROWSER=false`);
-    console.log(`DIRECTORY_KEY=${key}`);
+    console.log(`DIRECTORY_KEY=${stableDirectoryKey}`);
+    console.log(`DIRECTORY_PATH=${dirPath}`);
     return;
   }
 
   if (alreadyOpen) {
+    console.log(`MEDIA_COUNT=${mediaCount}`);
     console.log(`VIEWER_URL=${url}`);
+    console.log(`OFFLINE_VIEWER_FILE=${offlineViewerFile}`);
     console.log(`ALREADY_OPEN=true`);
-    console.log(`DIRECTORY_KEY=${key}`);
+    console.log(`DIRECTORY_KEY=${stableDirectoryKey}`);
+    console.log(`DIRECTORY_PATH=${dirPath}`);
     return;
   }
 
   openBrowser(url);
   await httpJson(selected.port, "/api/mark-open", { method: "POST", body: { dir: dirPath } });
+  console.log(`MEDIA_COUNT=${mediaCount}`);
   console.log(`VIEWER_URL=${url}`);
+  console.log(`OFFLINE_VIEWER_FILE=${offlineViewerFile}`);
   console.log(`OPENED_BROWSER=true`);
-  console.log(`DIRECTORY_KEY=${key}`);
+  console.log(`DIRECTORY_KEY=${stableDirectoryKey}`);
+  console.log(`DIRECTORY_PATH=${dirPath}`);
 };
 
 try {

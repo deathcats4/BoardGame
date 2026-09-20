@@ -64,6 +64,8 @@ export interface ResolvedSmashUpReactionChoice {
 export interface AdvanceSmashUpReactionOptions {
     stopAfterExplicitPass?: boolean;
     materializeDomainEvents?: boolean;
+    /** 在新产生强制触发时，先挂起当前的后续交互，避免它抢在强制反应前显示。 */
+    suspendCurrentInteraction?: boolean;
 }
 
 type ReactionPostProcessor = (

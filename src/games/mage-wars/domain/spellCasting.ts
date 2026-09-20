@@ -71,9 +71,11 @@ export function resolveMageWarsSpellCasterRef(
 export function resolveMageWarsMageSpellCastMode(
     phase: MageWarsPhase,
     spell: Pick<MageWarsConfigSpellCard, 'spellActionSpeed'>,
+    options: { stunned?: boolean } = {},
 ): MageWarsSpellCastMode | undefined {
     if (phase === 'deployment') return 'deployment';
     if (spell.spellActionSpeed === 'quick') {
+        if (phase === 'creatureAction' && options.stunned) return 'action';
         return phase === 'initiativeQuickcast' || phase === 'finalQuickcast' || phase === 'creatureAction'
             ? 'quickcast'
             : undefined;
@@ -88,8 +90,9 @@ export function resolveMageWarsSpellCastMode(
     phase: MageWarsPhase,
     caster: MageWarsSpellCasterRef,
     spell: Pick<MageWarsConfigSpellCard, 'spellActionSpeed'>,
+    options: { stunned?: boolean } = {},
 ): MageWarsSpellCastMode | undefined {
-    if (caster.kind === 'mage') return resolveMageWarsMageSpellCastMode(phase, spell);
+    if (caster.kind === 'mage') return resolveMageWarsMageSpellCastMode(phase, spell, options);
     if (phase === 'deployment') return 'deployment';
     if (phase === 'creatureAction') return 'action';
     return undefined;

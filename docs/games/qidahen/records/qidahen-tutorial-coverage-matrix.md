@@ -32,6 +32,24 @@
 - `event-action`
 - `diplomacy-and-hire`
 
+## 2026-09-19 本轮新规范重构状态
+
+本轮按新的教程规范把“首局必须会读的卡牌 / 只读检视入口 / 触屏替代方式”挂回基础教程自然因果链：
+
+- `basic-opening` 在 `hand-resource` 与 `pick-action` 之间新增 `hand-inspect` 信息步骤。
+- 桌面端继续使用手牌右上角真实“看”入口；移动端正式手牌本体新增 620ms 触屏长按检视。
+- 长按检视后抑制同一 pointer 序列产生的合成 click，避免误打出、误支付或误弃牌；pointerup、pointercancel、pointerleave 与卸载均清理计时器。
+- 卡牌放大层提升到 `UI_Z_INDEX.cardPreviewTooltip`，确保教程提示卡不会盖住“关闭查看”入口。
+- 本轮最终截图批次：桌面 `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z`，移动端 `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile`；共 67 张桌面图和 3 张移动图，包含检视前、长按打开检视、关闭后回到牌桌三个状态。
+
+本轮验证状态：
+
+- `tutorialFlow.test.ts` 与 `Board.test.ts`：225 tests passed。
+- `npm run typecheck`：通过。
+- `npm run spec:lint`：通过。
+- `npm run test:e2e:file -- e2e/qidahen/qidahen-closeout.e2e.ts`：最终 `17/17 passed`；覆盖目录、基础回合、移动长按检视、轮盘分支、军备、事件、进攻/野战、撤退、攻城/占领、外交、跨年和朝鲜特例。
+- 当前没有七大恨教程 E2E 阻塞；仍保留“《七大恨》整体规则未全部覆盖”的产品范围边界，不把本轮教程收口扩大解释为全规则完成。
+
 ## 当前实现真相
 
 当前代码里实际存在的教程承载如下：
@@ -65,9 +83,10 @@
 
 ## 当前真实截图证据
 
-当前 `e2e/qidahen/qidahen-closeout.e2e.ts` 已在 2026-07-11 从当前工作区全量回跑，`16/16` 通过；全量桌面基线批次为：
+当前 `e2e/qidahen/qidahen-closeout.e2e.ts` 已于 2026-09-19 从当前工作区全量回跑，`17/17` 通过；本轮桌面与移动基线批次为：
 
-- `test-results/evidence-screenshots/_shared/qidahen-教程完成/current-closeout-final-20260711`
+- 桌面：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z`
+- 移动：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile`
 
 该批次实际产出以下截图组：
 
@@ -85,7 +104,7 @@
 - `36-41`：年中、新年与纪年
 - `42-46`：朝鲜与地图特例
 
-当前批次共 61 张桌面截图；另有 2 张移动横屏最终图。两类证据已发布到服务器任务 `boardgame/qidahen-tutorial-closeout`，远端清单共 63 张。历史目录和旧编号只能作为候选或回归对照，不得覆盖上述当前批次。
+当前批次共 67 张桌面截图，另有 3 张移动横屏最终图；移动端覆盖检视前、长按打开检视、关闭后回到牌桌。历史目录和旧编号只能作为候选或回归对照，不得覆盖上述当前批次。
 
 2026-07-14 第二章「进攻与野战」已单独重构并回跑：当前第二章证据以 `test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-07-13T16-44-14-494Z` 为准，截图 `23-27a`（含 `25b`）现在覆盖「突袭作战入口 -> 弃 1 张手牌支付 -> 察哈尔野战 -> 战术牌选中确认 -> 右侧「断后」按钮结算 -> 战后处理 -> 占领摘要」。
 
@@ -97,17 +116,16 @@
 
 - 当前已经有的真实证据：
   - 目录图：`00-教程目录-先选择章节.png`
-  - 基础回合：`01-12`
+  - 基础回合：`01`、`03-12`
   - 已真实覆盖：
     - 三种赢法
-    - 手牌上限真实弃牌入口
     - 公共轮盘入口
     - 轮盘真实选择入口
     - 手牌四种类型
     - 一次真实势力行动支付
     - 轮盘推进后的行动层提示
 - 当前缺口：
-  - 这轮已把基础章首个真实动作改成手牌上限弃牌，并在弃牌后进入轮盘真实选择；当前代码与教程顺序已不再把“赐印招安”误写成首个主操作。
+  - 这轮已继续纠正基础章入口：当前正式起手没有发生超限弃牌，教程不再展示与当前局面无关的手牌上限说明，欢迎页后直接进入公共轮盘的第一个真实决策。
   - 但当前基础章仍没有把“手牌行动与轮盘行动的先后由玩家决定”做成玩家真的在首章里亲自裁决的分支。
   - 规则书同层的 `执行事件 / 升级军备 / 势力行动 / 轮盘行动` 还没有被正式进行页完整映射；当前基础章最多只能证明“势力行动 + 轮盘行动”的低保真承接，不足以证明正式局完整首回合已收齐。
 
@@ -210,7 +228,7 @@
 | 规则条目 | 目标章节 | 当前状态 | 当前证据 | 当前缺口 |
 | :--- | :--- | :--- | :--- | :--- |
 | 胜利目标：16 区 / 攻首都 / 3 威望 | `basic-opening` | 已覆盖 | `01` | 当前玩家文案已明确三种赢法；后续文案修改仍需防止作者旁白腔回流 |
-| 回合骨架：手牌上限 -> 转轮盘 -> 手牌行动 + 轮盘行动 | `basic-opening` | 已覆盖 | `02-05` `07-12` | 基础章已从真实手牌上限弃牌进入轮盘真实选择，再完成一次手牌行动；轮盘行动由真实轮盘点击完成，横幅只做结果提示 |
+| 回合骨架：正式开局自动处理 -> 转轮盘 -> 手牌行动 + 轮盘行动 | `basic-opening` | 已覆盖 | `03-05` `07-12` | 当前局面没有超限弃牌；正式开局自动处理结束后直接进入轮盘真实选择，再完成一次手牌行动；轮盘行动由真实轮盘点击完成，横幅只做结果提示 |
 | 手牌行动全集：执行事件 / 升级军备 / 势力行动 | `basic-opening` `wheel-shared-cost` | 未完整覆盖 | `06-09` `16-22`；主页首回合《火炮技术》链 | 当前已证明势力行动与军备牌直点升级；事件牌完整一级入口、事件效果全集与普通手牌完整审计仍受 `2.4 / 4.5` 缺口约束 |
 | 手牌四种类型：事件 / 军备 / 战术 / 银两 | `basic-opening` | 已覆盖 | `05` | 无 |
 | 手牌支付是主要资源消耗 | `basic-opening` | 已覆盖 | `08-09` | 无 |
@@ -264,8 +282,9 @@
 - 教程预设状态：`src/games/qidahen/tutorialSetup.ts`
 - 玩家文案：`public/locales/zh-CN/game-qidahen.json`、`public/locales/en/game-qidahen.json`
 - 当前端到端链：`e2e/qidahen/qidahen-closeout.e2e.ts`
-- 当前桌面截图：`test-results/evidence-screenshots/_shared/qidahen-教程完成/current-closeout-final-20260711`
-- 当前视觉核验：`test-results/evidence-image-validation/qidahen-tutorial-closeout.json`
+- 当前桌面截图：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z`
+- 当前移动截图：`test-results/evidence-screenshots/_shared/qidahen-教程完成/2026-09-19T07-08-52-297Z-mobile`
+- 当前视觉核验：原始 PNG 抽审，重点覆盖手牌检视、卡面放大、战术确认条、攻城两层选择、跨年结果和移动长按检视。
 - 当前收口记录：`evidence/qidahen/qidahen-tutorial-closeout-e2e-test.md`
 
 后续只要修改章节、文案、交互承接物或截图顺序，必须同步更新上述源码、矩阵和当前证据。教程注入牌、隐藏续章和抽象按钮链仍不得被用来替代正式普通手牌真相源，也不得替 OpenSpec `2.4 / 4.5` 的未完成项背书。

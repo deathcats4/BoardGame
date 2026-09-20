@@ -69,10 +69,8 @@ import { evaluateTriggerCondition } from './combat';
 import { findHeroCard } from '../heroes';
 import { hasCurrentChoiceAnchor, registerChoiceEffectHandler } from './choiceEffects';
 import {
-    getPlayerPassiveAbilities,
     hasSpentTreantTreeSpiritThisTurn,
     hasUsableOwnUpkeepPassiveAction,
-    isPassiveActionUsable,
 } from './passiveAbility';
 import { registerBonusDiceSettlementHandler } from './bonusDiceSettlement';
 import { isCurrentBonusRollSettlement } from './rollContext';
@@ -160,65 +158,6 @@ const hasInteractivePendingBonusDiceSettlement = (core: DiceThroneCore): boolean
 
 const hasOpenedInteractiveBonusDiceSettlement = (events: readonly GameEvent[]): boolean =>
     events.some(event => isInteractiveBonusDiceRerollEvent(event as DiceThroneEvent));
-
-const shouldPauseForPostDamagePassiveAction = (
-    core: DiceThroneCore,
-    events: readonly GameEvent[],
-    phase: TurnPhase,
-    commandType: string,
-    timestamp: number,
-): { events: GameEvent[]; halt: true } | null => {
-    const attackResolvedIndex = events.findIndex(event => event.type === 'ATTACK_RESOLVED');
-    const eventsBeforeAttackResolved = (
-        attackResolvedIndex >= 0
-            ? events.slice(0, attackResolvedIndex)
-            : events
-    ) as DiceThroneEvent[];
-    const attackResolved = attackResolvedIndex >= 0
-        ? events[attackResolvedIndex] as Extract<DiceThroneEvent, { type: 'ATTACK_RESOLVED' }>
-        : undefined;
-    const coreBeforeAttackResolved = applyEvents(core, eventsBeforeAttackResolved, reduce);
-    const pendingAttack = coreBeforeAttackResolved.pendingAttack;
-    const attackerId = attackResolved?.payload.attackerId ?? pendingAttack?.attackerId;
-    if (!pendingAttack || pendingAttack.attackerId !== attackerId) {
-        return null;
-    }
-    if (pendingAttack.postDamagePassiveActionOpportunityOffered === true) return null;
-    if (getPendingAttackSettlementStage(pendingAttack) !== 'postDamagePending') return null;
-
-    const damageDealtThisBatch = eventsBeforeAttackResolved.some(event => event.type === 'DAMAGE_DEALT');
-    const hasResolvedAttackDamage = (pendingAttack.resolvedDamage ?? 0) > 0;
-    if (!damageDealtThisBatch && !hasResolvedAttackDamage) return null;
-
-    const hasUsablePostDamagePassive = getPlayerPassiveAbilities(coreBeforeAttackResolved, attackerId)
-        .some(passive => passive.actions.some((action, actionIndex) => (
-            action.requiresCurrentAttackDamageDealt === true
-            && isPassiveActionUsable(coreBeforeAttackResolved, attackerId, passive.id, actionIndex, phase)
-        )));
-    if (!hasUsablePostDamagePassive) return null;
-
-    const opportunityOfferedEvent: DiceThroneEvent = {
-        type: 'PENDING_ATTACK_UPDATED',
-        payload: {
-            attackerId,
-            patch: {
-                damageResolved: true,
-                postDamagePassiveActionOpportunityOffered: true,
-            },
-        },
-        sourceCommandType: attackResolved?.sourceCommandType ?? commandType,
-        timestamp: attackResolved?.timestamp ?? timestamp,
-    };
-
-    return {
-        events: [
-            ...eventsBeforeAttackResolved,
-            opportunityOfferedEvent,
-            ...(attackResolvedIndex >= 0 ? events.slice(attackResolvedIndex + 1) : []),
-        ],
-        halt: true,
-    };
-};
 
 registerBonusDiceSettlementHandler(POWDER_KEG_SETTLEMENT_ID, ({ state, settlement, timestamp }) => {
     const playerId = settlement.attackerId;
@@ -856,11 +795,6 @@ function resolvePostAttackFollowUp(
     timestamp: number,
     phase: TurnPhase
 ): PhaseExitResult {
-    const postDamagePassivePause = shouldPauseForPostDamagePassiveAction(core, events, phase, commandType, timestamp);
-    if (postDamagePassivePause) {
-        return postDamagePassivePause;
-    }
-
     const isWarMongerExtraOffensiveRoll =
         core.extraAttackInProgress?.sourceStatusId === 'war-monger';
     const parleyStacks = core.players[core.activePlayerId]?.statusEffects[STATUS_IDS.PARLEY] ?? 0;
@@ -2122,6 +2056,7 @@ export const diceThroneFlowHooks: FlowHooks<DiceThroneCore> = {
                             state: replayCore,
                             damageDealt: 0,
                             timestamp: replayTimestamp,
+                            damageOrigin: 'card',
                         },
                         { random },
                     );

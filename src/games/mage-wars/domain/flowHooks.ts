@@ -9,6 +9,7 @@ import {
     resolveMageWarsAttachedVisibleEnchantmentUpkeepDirectDamage,
     resolveMageWarsAttachedVisibleEnchantmentUpkeepHealTransfers,
     resolveMageWarsAttachedVisibleEnchantmentUpkeepManaCosts,
+    resolveMageWarsObjectChanneling,
     resolveMageWarsObjectRegeneration,
 } from './spellRules';
 import { MAGE_WARS_PHASE_ORDER } from './types';
@@ -168,19 +169,43 @@ function createUpkeepRegenerationEvents(
     ];
 }
 
+function createUpkeepBanishTickEvents(
+    core: MageWarsCore,
+    sourceCommandType: string,
+    timestamp: number,
+): MageWarsEvent[] {
+    return Object.values(core.objects)
+        .filter((object) => object.banished !== undefined)
+        .sort((left, right) => (
+            (left.createdAtSequence ?? Number.MAX_SAFE_INTEGER) - (right.createdAtSequence ?? Number.MAX_SAFE_INTEGER)
+            || left.id.localeCompare(right.id)
+        ))
+        .map((object): MageWarsEvent => ({
+            type: MAGE_WARS_EVENTS.ARENA_OBJECT_BANISH_TICKED,
+            payload: {
+                objectId: object.id,
+                sourceAbilityId: 'mw.spell.3413.banish-upkeep',
+                spellCardId: object.banished!.sourceSpellCardId,
+            },
+            sourceCommandType,
+            timestamp,
+        }));
+}
+
 function createObjectManaChannelEvents(
     core: MageWarsCore,
     sourceCommandType: string,
     timestamp: number,
 ): MageWarsEvent[] {
     return Object.values(core.objects)
-        .filter((object) => (object.spellcastingSource?.channeling ?? 0) > 0)
-        .map((object): MageWarsEvent => ({
+        .map((object) => ({ object, amount: resolveMageWarsObjectChanneling(core, object) }))
+        .filter(({ amount }) => amount > 0)
+        .map(({ object, amount }): MageWarsEvent => ({
             type: MAGE_WARS_EVENTS.OBJECT_MANA_CHANNELED,
             payload: {
                 ownerId: object.ownerId,
                 objectId: object.id,
-                amount: object.spellcastingSource?.channeling ?? 0,
+                amount,
             },
             sourceCommandType,
             timestamp,
@@ -700,6 +725,7 @@ export const mageWarsFlowHooks: FlowHooks<MageWarsCore> = {
                     phaseActorId,
                 }),
                 events: [
+                    ...createUpkeepBanishTickEvents(state.core, command.type, timestamp),
                     ...createUpkeepRegenerationEvents(state.core, command.type, timestamp),
                     ...createUpkeepRotDamageAvailableEvents(state.core, command.type, timestamp),
                     ...createUpkeepEnchantmentDirectDamageAvailableEvents(state.core, command.type, timestamp),

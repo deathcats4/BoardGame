@@ -37,6 +37,7 @@ import {
     cloneUponReflectionRuntimeState,
     createUponReflectionRuntimeState,
 } from './hauntRuntimeSetupModel';
+import { resolveHumanAcknowledgementPlayerIds } from './acknowledgementReadModel';
 import { resolveHauntRevealResolutionForTrigger } from './hauntSetupModel';
 import {
     cloneHauntTraitorResolution,
@@ -326,9 +327,7 @@ export function applyBetrayalRoomExploredState(
             rollId: core.recentRoll.id,
             playerId: event.payload.playerId,
             sourceTitle: event.payload.discovery.title,
-            requiredPlayerIds: core.playerIds.length > 0
-                ? [...core.playerIds]
-                : [event.payload.playerId],
+            requiredPlayerIds: resolveHumanAcknowledgementPlayerIds(core, event.payload.playerId),
             acknowledgedPlayerIds: [],
             effect: cloneUseEffect(event.payload.eventEffect),
             requiresAcknowledgement: true,

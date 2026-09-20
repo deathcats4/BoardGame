@@ -363,10 +363,29 @@
         "持有者下次进攻掷骰阶段结束时移除此状态并投 1 骰：1 点攻击无效；2-3 点本次攻击伤害减半并向上取整；4-6 点正常结算。"
       ]
     },
+    "combo": {
+      "name": "连击",
+      "description": [
+        "本次攻击造成伤害后，可消耗 1 个连击发动一次额外攻击。每回合每个效果只能激活一次。"
+      ]
+    },
+    "invisible": {
+      "name": "隐形",
+      "description": [
+        "受到不可防御伤害时，可消耗 1 个隐形，使本次伤害完全失效。"
+      ]
+    },
     "bleed": {
       "name": "流血",
       "description": [
         "负面状态效果，上限 2。持有者维持阶段投 1 骰：1-4 受到 1 点直接伤害；5-6 移除 1 层流血。"
+      ]
+    },
+    "webbed": {
+      "name": "落网",
+      "description": [
+        "施加时立即受到 2 点不可防御伤害。",
+        "目标下一次受到技能区普通攻击伤害时，该攻击变为不可防御，然后移除落网。手牌、Token、状态或系统直接伤害不会触发这次消费。"
       ]
     }
   },
@@ -377,6 +396,18 @@
     "cancel": "取消"
   },
   "tokens": {
+    "combo": {
+      "name": "连击",
+      "description": [
+        "本次攻击造成伤害后，可消耗 1 个连击发动一次额外攻击。每回合每个效果只能激活一次。"
+      ]
+    },
+    "invisible": {
+      "name": "隐形",
+      "description": [
+        "受到不可防御伤害时，可消耗 1 个隐形，使本次伤害完全失效。"
+      ]
+    },
     "taiji": {
       "name": "太极",
       "description": [
@@ -763,7 +794,8 @@
     "samurai": "武士",
     "tianshi": "炽天使",
     "lieren": "女猎手",
-    "vampire_lord": "吸血鬼领主"
+    "vampire_lord": "吸血鬼领主",
+    "zhizhuxia": "蜘蛛侠"
   },
   "characters": {
     "monk": "武僧",
@@ -781,7 +813,8 @@
     "artificer": "工匠",
     "tianshi": "炽天使",
     "lieren": "女猎手",
-    "vampire_lord": "吸血鬼领主"
+    "vampire_lord": "吸血鬼领主",
+    "zhizhuxia": "蜘蛛侠"
   },
   "companion": {
     "nyra": {
@@ -866,6 +899,14 @@
           "claw": "利爪面",
           "mesmerize": "催眠面",
           "blood_drop": "血滴面"
+        }
+      },
+      "zhizhuxia": {
+        "name": "蜘蛛侠骰子",
+        "face": {
+          "fist": "拳面",
+          "web": "蛛网面",
+          "spider": "蜘蛛面"
         }
       }
     },
@@ -1051,9 +1092,11 @@
       "nyras_bond": "魂之羁绊",
       "sabertooth": "剑齿虎",
       "mesmerize": "催眠",
-      "blood_drop": "血滴"
-    }
-  },
+    "blood_drop": "血滴",
+    "web": "蛛网",
+    "spider": "蜘蛛"
+  }
+},
   "bonusDie": {
     "title": "额外投掷",
     "confirm": "确认",
@@ -1122,6 +1165,14 @@
       "vampireLordRendClawsClaw": "利爪：本次攻击伤害 +1",
       "vampireLordRendClawsMesmerize": "催眠：抽 1 张牌",
       "vampireLordRendClawsBloodDrop": "血滴：获得 1 个鲜血之力",
+      "zhizhuxia.spiderReflex.fist": "拳：计入蜘蛛反射的伤害总和",
+      "zhizhuxia.spiderReflex.web": "蛛网：计入蜘蛛反射的伤害总和",
+      "zhizhuxia.spiderReflex.spider": "蜘蛛：计入蜘蛛反射的伤害总和",
+      "zhizhuxia.praise.fist": "拳：获得 1 个隐形",
+      "zhizhuxia.praise.web": "蛛网：对目标施加落网",
+      "zhizhuxia.praise.spider": "蜘蛛：获得 1 个连击",
+      "zhizhuxia.headTingle.spider": "蜘蛛：获得 1 个连击和 1 个隐形",
+      "zhizhuxia.headTingle.other": "非蜘蛛：抽 1 张牌",
       "lieren.savageForce.spear": "长矛：本次攻击伤害 +1",
       "lieren.savageForce.claw": "利爪：本次攻击伤害 +2",
       "lieren.savageForce.nyrasBond": "魂之羁绊：获得妮拉之系",
@@ -1528,7 +1579,9 @@
       "nyras_bond": "魂之羁绊",
       "sabertooth": "剑齿虎",
       "mesmerize": "催眠",
-      "blood_drop": "血滴"
+      "blood_drop": "血滴",
+      "spider": "蜘蛛",
+      "web": "蛛网"
     },
     "trigger": {
       "generic": "变体条件",
@@ -1881,7 +1934,7 @@
     "targetingRollOpponentDecidesTarget": "由对手决定谁承受本次攻击",
     "targetingRollPlayerOption": "{{player}}",
     "selectHandCardToDiscard": "选择 1 张手牌弃置",
-    "selectDeckCardToAddToHand": "从抽牌堆选择 1 张牌加入手牌，然后洗混抽牌堆",
+    "selectDeckCardToAddToHand": "从牌库选择 {{count}} 张牌加入手牌",
     "cardPoolSearchPlaceholder": "搜索牌名或关键词",
     "cardPoolSearchClear": "清空搜索",
     "cardPoolFilterResultCount": "显示 {{visible}} / {{total}}",
@@ -4656,7 +4709,31 @@
     "blood-magic-2-flayed": { "name": "皮开肉绽", "description": "2 个利爪 + 2 个血滴：造成 5 点不可防御伤害。", "effects": { "damage5Unblockable": "造成 5 点不可防御伤害" } },
     "undying": { "name": "不死之身", "description": "防御投掷 3 骰：若投出 2 个利爪，施加流血；若投出 2 个催眠，获得 1 个鲜血之力；每个血滴偷取 1 点生命值。", "effects": { "resolveDefense": "按防御骰结算流血、鲜血之力和偷取生命" } },
     "undying-2": { "name": "不死之身 II", "description": "防御投掷 4 骰：若投出 2 个利爪，施加流血；若投出 2 个催眠，获得 1 个鲜血之力；每个血滴偷取 1 点生命值。", "effects": { "resolveDefense": "按防御骰结算流血、鲜血之力和偷取生命" } },
-    "bloody-slaughter": { "name": "血色杀戮！", "description": "5 个血滴：从抽牌堆搜 1 张牌加入手牌并洗混抽牌堆，获得 2 个鲜血之力，然后造成 10 点伤害。", "effects": { "searchDeckCard": "从抽牌堆选择 1 张牌加入手牌，并洗混抽牌堆", "gainBloodPower": "获得 2 个鲜血之力", "damage10": "造成 10 点伤害" } }
+    "bloody-slaughter": { "name": "血色杀戮！", "description": "5 个血滴：从抽牌堆搜 1 张牌加入手牌并洗混抽牌堆，获得 2 个鲜血之力，然后造成 10 点伤害。", "effects": { "searchDeckCard": "从抽牌堆选择 1 张牌加入手牌，并洗混抽牌堆", "gainBloodPower": "获得 2 个鲜血之力", "damage10": "造成 10 点伤害" } },
+    "heavy-punch": { "name": "重拳", "description": "3/4/5 个拳：造成 4/5/6 点伤害。", "effects": { "damage4": "造成 4 点伤害", "damage5": "造成 5 点伤害", "damage6": "造成 6 点伤害" } },
+    "combo-strike": { "name": "连连连连击", "description": "2 个拳 + 2 个蜘蛛：造成 5 点伤害，并获得 1 个连击。", "effects": { "damage5": "造成 5 点伤害", "gainCombo": "获得 1 个连击" } },
+    "trap": { "name": "诱捕", "description": "小顺子：造成 5 点伤害并施加落网；大顺子：抽 1 张牌，造成 8 点伤害并施加落网。", "effects": { "damage5": "造成 5 点伤害", "draw1": "抽 1 张牌", "damage8": "造成 8 点伤害", "applyWebbed": "施加落网" } },
+    "venom-punch": { "name": "毒液重拳", "description": "4 个蜘蛛：获得隐形，造成 7 点不可防御伤害。", "effects": { "gainInvisible": "获得 1 个隐形", "damage7Unblockable": "造成 7 点不可防御伤害" } },
+    "wall-crawl": { "name": "墙上爬行", "description": "1 个拳 + 3 个蛛网：获得隐形，造成 7 点伤害。", "effects": { "gainInvisible": "获得 1 个隐形", "damage7": "造成 7 点伤害" } },
+    "spider-reflex": { "name": "蜘蛛反射", "description": "1 个拳 + 2 个蛛网 + 1 个蜘蛛：投 2 个奖励骰，造成点数总和伤害；总和不超过 5 时获得连击。", "effects": { "roll2AndDealSum": "投 2 个奖励骰并造成点数总和伤害；总和不超过 5 时获得连击" } },
+    "counter": { "name": "反击", "description": "防御投掷 3 个拳：造成 3 点伤害。", "effects": { "damage3": "造成 3 点伤害" } },
+    "spider-sense": { "name": "蜘蛛感应", "description": "防御投掷 2 个蛛网：若投出蜘蛛，受到的伤害减半并向上取整。可弃置隐形进行 1 次额外防御投骰。", "effects": { "preventHalfOnSpider": "若投出蜘蛛，受到的伤害减半并向上取整；可弃置隐形额外防御投骰" } },
+    "ultimate-spider": { "name": "毒液冲击波", "description": "5 个蜘蛛：获得隐形，施加落网，造成 13 点不可防御伤害。", "effects": { "gainInvisible": "获得 1 个隐形", "applyWebbed": "施加落网", "damage13": "造成 13 点不可防御伤害" } },
+    "card-zhizhuxia-milkshake": { "effects": { "heal3": "治疗 3 点生命" } },
+    "card-zhizhuxia-wallet-arrival": { "effects": { "gain2CP": "获得 2 点气" } },
+    "card-zhizhuxia-spider-launcher": { "effects": { "applyWebbed": "施加落网" } },
+    "card-zhizhuxia-praise": { "effects": { "roll1": "投掷 1 骰并按骰面结算效果" } },
+    "card-zhizhuxia-flying-escape": { "effects": { "acceptWeb": "允许蜘蛛感应将蛛网视为成功面" } },
+    "card-zhizhuxia-ambush": { "effects": { "discardInvisibleAndAdd3": "消耗 1 个隐形，本次攻击伤害 +3" } },
+    "card-zhizhuxia-invisible-punch": { "effects": { "counter3": "蜘蛛感应成功时造成 3 点直接伤害" } },
+    "card-zhizhuxia-wishful-thinking": { "effects": { "prevent3": "消耗 1 个隐形并获得 3 点伤害护盾" } },
+    "card-zhizhuxia-oh-no": { "effects": { "gainInvisible": "获得 1 个隐形" } },
+    "card-zhizhuxia-radioactive-blood": { "effects": { "gainCombo": "获得 1 个连击" } },
+    "card-zhizhuxia-head-tingle": { "effects": { "roll1": "投掷 1 骰并按骰面结算效果" } },
+    "heavy-punch-2": { "name": "重拳 II", "description": "3/4/5 个拳：造成 5/6/7 点伤害；若至少 4 颗骰子数字相同，获得 1 个连击。", "effects": { "damage5": "造成 5 点伤害", "damage6": "造成 6 点伤害", "damage7": "造成 7 点伤害", "gainComboIfFourOfAKind": "若至少 4 颗骰子数字相同，获得 1 个连击" } },
+    "combo-strike-2": { "name": "连连连击 II", "description": "2 个蛛网 + 2 个蜘蛛：造成 6 点伤害，并获得 1 个连击。", "effects": { "damage6": "造成 6 点伤害", "gainCombo": "获得 1 个连击" } },
+    "trap-2": { "name": "诱捕 II", "description": "小顺子：造成 6 点伤害并施加落网；大顺子：抽 1 张牌，造成 9 点伤害并施加落网。", "effects": { "damage6": "造成 6 点伤害", "draw1": "抽 1 张牌", "damage9": "造成 9 点伤害", "applyWebbed": "施加落网" } },
+    "venom-punch-2": { "name": "毒液重拳 II", "description": "4 个蜘蛛：获得隐形，造成 8 点不可防御伤害。", "effects": { "gainInvisible": "获得 1 个隐形", "damage8Unblockable": "造成 8 点不可防御伤害" } }
   },
   "cards": {
     "card-energetic": {
@@ -4710,6 +4787,21 @@
         "modifyDieTo6": "将 1 颗骰子改为 6"
       }
     },
+    "upgrade-zhizhuxia-heavy-punch-2": { "name": "重拳 II", "description": "升级你的重拳。3/4/5 个拳分别造成 5/6/7 点伤害；若至少 4 颗骰子数字相同，获得 1 个连击。" },
+    "upgrade-zhizhuxia-combo-strike-2": { "name": "连连连击 II", "description": "升级你的连击打击。2 个蛛网 + 2 个蜘蛛：造成 6 点伤害，并获得 1 个连击。" },
+    "upgrade-zhizhuxia-trap-2": { "name": "诱捕 II", "description": "升级你的诱捕。小顺子造成 6 点伤害并施加落网；大顺子抽 1 张牌，造成 9 点伤害并施加落网。" },
+    "upgrade-zhizhuxia-venom-punch-2": { "name": "毒液重拳 II", "description": "升级你的毒液重拳。4 个蜘蛛：获得隐形，造成 8 点不可防御伤害。" },
+    "card-zhizhuxia-milkshake": { "name": "我爱奶昔！", "description": "治疗 3 点生命。", "effects": { "heal3": "治疗 3 点生命" } },
+    "card-zhizhuxia-wallet-arrival": { "name": "钱包到账！", "description": "获得 2 点气。", "effects": { "gain2CP": "获得 2 点气" } },
+    "card-zhizhuxia-spider-launcher": { "name": "蜘蛛发射器！", "description": "对 1 名对手施加落网。", "effects": { "applyWebbed": "施加落网" } },
+    "card-zhizhuxia-praise": { "name": "赞爆！", "description": "投掷 1 骰：拳获得隐形，蛛网对目标施加落网，蜘蛛获得连击。", "effects": { "roll1": "投掷 1 骰并按骰面结算效果" } },
+    "card-zhizhuxia-flying-escape": { "name": "飞荡脱身！", "description": "在防御投掷中，允许蜘蛛感应将蛛网视为成功面。", "effects": { "acceptWeb": "允许蜘蛛感应将蛛网视为成功面" } },
+    "card-zhizhuxia-ambush": { "name": "奇袭！", "description": "消耗 1 个隐形，使本次攻击伤害 +3。", "effects": { "discardInvisibleAndAdd3": "消耗 1 个隐形，本次攻击伤害 +3" } },
+    "card-zhizhuxia-invisible-punch": { "name": "隐形重拳！", "description": "若蜘蛛感应成功，造成 3 点直接伤害。", "effects": { "counter3": "蜘蛛感应成功时造成 3 点直接伤害" } },
+    "card-zhizhuxia-wishful-thinking": { "name": "想的美！", "description": "消耗 1 个隐形，获得 3 点伤害护盾。", "effects": { "prevent3": "消耗 1 个隐形并获得 3 点伤害护盾" } },
+    "card-zhizhuxia-oh-no": { "name": "啊呀！", "description": "获得 1 个隐形。", "effects": { "gainInvisible": "获得 1 个隐形" } },
+    "card-zhizhuxia-radioactive-blood": { "name": "放射性血液！", "description": "获得 1 个连击。", "effects": { "gainCombo": "获得 1 个连击" } },
+    "card-zhizhuxia-head-tingle": { "name": "头皮发麻！", "description": "投掷 1 骰：若投出蜘蛛，获得连击和隐形；否则抽 1 张牌。", "effects": { "roll1": "投掷 1 骰并按骰面结算效果" } },
     "upgrade-revolver-2": {
       "name": "左轮手枪 II",
       "description": "升级你的左轮手枪。3/4/5 个子弹分别造成 4/5/6 点伤害。若至少有 4 颗骰子数字相同，则施加击倒。"
@@ -5733,7 +5825,7 @@
     "card-vampire-lord-blood-from-above": { "name": "血从天降！", "description": "投掷 1 颗骰子，获得该骰值向上取整一半的鲜血之力。" },
     "card-vampire-lord-total-demise": { "name": "死无全尸！", "description": "攻击修正：投掷 5 颗骰子；每掷出 1 个利爪，本次攻击伤害 +1；如果至少增加 3 点伤害，施加 1 层流血。" },
     "card-vampire-lord-boiling-blood": { "name": "沸血之力！", "description": "攻击修正：本次攻击伤害 +1；此外，被攻击对手每有 1 层流血，本次攻击伤害再 +1。" },
-    "card-vampire-lord-gushing-blood": { "name": "血流如注！", "description": "获得 1 个鲜血之力和 1 个催眠。" },
+    "card-vampire-lord-gushing-blood": { "name": "血流如注！", "description": "获得 1 个鲜血之力和 1 CP。" },
     "upgrade-vampire-lord-undying-2": { "name": "不死之身 II", "description": "升级不死之身至 II 级。" },
     "upgrade-vampire-lord-blood-thirst-2-blood-river": { "name": "血之渴望 II / 血流成河", "description": "升级血之渴望至 II 级，并保留卡面下区“血流成河”作为同一升级后的可选技能变体。" },
     "upgrade-vampire-lord-blood-magic-2-flayed": { "name": "鲜血魔法 II / 皮开肉绽", "description": "升级鲜血魔法至 II 级，并保留卡面下区“皮开肉绽”作为同一升级后的可选技能变体。" },
@@ -5810,12 +5902,17 @@
       "drawShort": "抽 2 张",
       "draw": "拥有至少 3 个鲜血之力时，消耗 3 个鲜血之力，抽 2 张牌；每回合每个效果只能激活一次",
       "healShort": "吸血治疗",
-      "heal": "拥有至少 4 个鲜血之力时，消耗 4 个鲜血之力，治疗等同于本次成功攻击造成的伤害；只能在你的投掷阶段激活，每回合每个效果只能激活一次"
+      "heal": "拥有至少 4 个鲜血之力时，消耗 4 个鲜血之力，治疗等同于你本回合最近一次成功攻击造成的伤害；只能在你的主要阶段 2 激活，每回合每个效果只能激活一次"
     },
     "vampireLordMesmerize": {
       "name": "催眠",
       "useShort": "使用催眠",
       "use": "强迫一名对手重掷 1 颗骰子：拥有该指示物的玩家可以花费 1 个催眠并投掷 1 颗骰子。如果投出 5-6，你可以强迫对手重掷任意 1 颗骰子"
+    },
+    "zhizhuxiaCombo": {
+      "name": "连击",
+      "useShort": "发动连击",
+      "use": "在本次攻击造成伤害后，消耗 1 个连击发动一次额外攻击；每回合每个效果只能激活一次"
     },
     "artificerWorkshop": {
       "buildNanobotShort": "制造纳米",

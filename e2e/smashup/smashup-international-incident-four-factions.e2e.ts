@@ -9,6 +9,17 @@ type InteractionOption = {
   value?: unknown;
 };
 
+type SmashUpReactionSession = {
+  responseWindowType?: string;
+};
+
+type SmashUpResolutionFrame = {
+  id?: string;
+  metadata?: {
+    smashupReactionSession?: SmashUpReactionSession;
+  };
+};
+
 type SmashUpE2EState = {
   core?: {
     currentPlayerIndex?: number;
@@ -24,6 +35,10 @@ type SmashUpE2EState = {
       current?: {
         windowType?: string;
       };
+    };
+    resolution?: {
+      activeFrameId?: string;
+      frames?: SmashUpResolutionFrame[];
     };
   };
 };
@@ -64,6 +79,26 @@ function optionHasTriggerId(option: InteractionOption, triggerIdPart: string): b
   return !!value
     && typeof value === 'object'
     && String((value as { triggerId?: unknown }).triggerId ?? '').includes(triggerIdPart);
+}
+
+function getLiveReactionSession(state: SmashUpE2EState): SmashUpReactionSession | undefined {
+  const frames = state.sys?.resolution?.frames ?? [];
+  const frameIds = [
+    state.sys?.resolution?.activeFrameId,
+    ...frames.map(frame => frame.id).reverse(),
+  ].filter((frameId): frameId is string => Boolean(frameId));
+
+  for (const frameId of frameIds) {
+    const frame = frames.find(candidate => candidate.id === frameId);
+    const session = frame?.metadata?.smashupReactionSession;
+    if (session) return session;
+  }
+
+  return undefined;
+}
+
+function isLiveReactionWindow(state: SmashUpE2EState, windowType: string): boolean {
+  return getLiveReactionSession(state)?.responseWindowType === windowType;
 }
 
 async function closeFactionDetailIfPresent(page: Page): Promise<void> {
@@ -721,8 +756,15 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
     await page.waitForFunction(
       () => {
         const state = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__?.state?.get?.();
-        const windowType = state?.sys?.responseWindow?.current?.windowType;
-        return state?.sys?.phase === 'scoreBases' && windowType === 'meFirst';
+        const frames = state?.sys?.resolution?.frames ?? [];
+        const frameIds = [
+          state?.sys?.resolution?.activeFrameId,
+          ...frames.map(frame => frame.id).reverse(),
+        ].filter((frameId): frameId is string => Boolean(frameId));
+        const session = frameIds
+          .map(frameId => frames.find(frame => frame.id === frameId)?.metadata?.smashupReactionSession)
+          .find(Boolean);
+        return state?.sys?.phase === 'scoreBases' && session?.responseWindowType === 'meFirst';
       },
       { timeout: 20000, polling: 200 },
     );
@@ -871,8 +913,15 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
     await page.waitForFunction(
       () => {
         const state = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__?.state?.get?.();
-        const windowType = state?.sys?.responseWindow?.current?.windowType;
-        return state?.sys?.phase === 'scoreBases' && windowType === 'meFirst';
+        const frames = state?.sys?.resolution?.frames ?? [];
+        const frameIds = [
+          state?.sys?.resolution?.activeFrameId,
+          ...frames.map(frame => frame.id).reverse(),
+        ].filter((frameId): frameId is string => Boolean(frameId));
+        const session = frameIds
+          .map(frameId => frames.find(frame => frame.id === frameId)?.metadata?.smashupReactionSession)
+          .find(Boolean);
+        return state?.sys?.phase === 'scoreBases' && session?.responseWindowType === 'meFirst';
       },
       { timeout: 20000, polling: 200 },
     );
@@ -903,7 +952,7 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
           .map((card: { uid?: string }) => card.uid)
           .filter((uid?: string) => uid === 'rev-quick' || uid === 'rev-smart'),
         attachedSetupUidsOnBoard,
-        responseWindow: state.sys.responseWindow?.current ?? null,
+        responseWindow: getLiveReactionSession(state) ?? null,
         triggerQueueLength: state.core.triggerQueue?.length ?? 0,
         interactionSource: state.sys.interaction?.current?.data?.sourceId ?? null,
       };
@@ -969,8 +1018,15 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
     await page.waitForFunction(
       () => {
         const state = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__?.state?.get?.();
-        const windowType = state?.sys?.responseWindow?.current?.windowType;
-        return state?.sys?.phase === 'scoreBases' && windowType === 'meFirst';
+        const frames = state?.sys?.resolution?.frames ?? [];
+        const frameIds = [
+          state?.sys?.resolution?.activeFrameId,
+          ...frames.map(frame => frame.id).reverse(),
+        ].filter((frameId): frameId is string => Boolean(frameId));
+        const session = frameIds
+          .map(frameId => frames.find(frame => frame.id === frameId)?.metadata?.smashupReactionSession)
+          .find(Boolean);
+        return state?.sys?.phase === 'scoreBases' && session?.responseWindowType === 'meFirst';
       },
       { timeout: 20000, polling: 200 },
     );
@@ -980,25 +1036,72 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
     await game.playCard('musketeers_last_stand', {
       targetBaseIndex: 0,
     });
+    await game.waitForInteraction('musketeers_last_stand', 10000);
+    await game.selectInteractionOptionBy(
+      option => optionHasMinionUid(option, 'last-stand-guard'),
+      '最后一搏选择计分基地上的己方随从',
+    );
     await game.waitForNoInteraction(10000);
     await dismissSpotlightIfPresent(page);
+    const lastStandFinalState = await game.getState();
+    const lastStandSettlement = await page.evaluate(() => {
+      const state = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__?.state?.get?.();
+      const events = (state?.sys?.eventStream?.entries ?? [])
+        .map((entry: { event?: { type?: string; payload?: any } }) => entry.event)
+        .filter((event: { type?: string } | undefined): event is { type: string; payload?: any } => Boolean(event?.type));
+      const reshuffle = [...events].reverse().find(event => (
+        event.type === 'su:deck_reshuffled'
+        && event.payload?.playerId === '0'
+        && Array.isArray(event.payload?.deckUids)
+        && event.payload.deckUids.includes('last-stand-card')
+        && event.payload.deckUids.includes('last-stand-guard')
+      ));
+      const reshuffleIndex = reshuffle ? events.indexOf(reshuffle) : -1;
+      const drawnAfterReshuffle = reshuffleIndex >= 0
+        ? events.slice(reshuffleIndex + 1).find(event => (
+          event.type === 'su:cards_drawn'
+          && event.payload?.playerId === '0'
+          && Array.isArray(event.payload?.cardUids)
+          && event.payload.cardUids.includes('last-stand-card')
+          && event.payload.cardUids.includes('last-stand-guard')
+        ))
+        : undefined;
+      return {
+        actionPlayed: events.some(event => (
+          event.type === 'su:action_played' && event.payload?.cardUid === 'last-stand-card'
+        )),
+        baseCleared: events.some(event => (
+          event.type === 'su:base_cleared' && event.payload?.baseDefId === 'base_the_dohyo'
+        )),
+        baseReplaced: events.some(event => (
+          event.type === 'su:base_replaced' && event.payload?.oldBaseDefId === 'base_the_dohyo'
+        )),
+        reshuffledUids: reshuffle?.payload?.deckUids ?? [],
+        drawnAfterReshuffle: drawnAfterReshuffle?.payload?.cardUids ?? [],
+      };
+    });
+    expect(lastStandSettlement.actionPlayed).toBe(true);
+    expect(lastStandSettlement.baseCleared).toBe(true);
+    expect(lastStandSettlement.baseReplaced).toBe(true);
+    expect(lastStandSettlement.reshuffledUids).toEqual(
+      expect.arrayContaining(['last-stand-card', 'last-stand-guard']),
+    );
+    expect(lastStandSettlement.drawnAfterReshuffle).toEqual(
+      expect.arrayContaining(['last-stand-card', 'last-stand-guard']),
+    );
     await expect.poll(async () => {
       const state = await game.getState();
       const player = state.core.players['0'];
       return {
         p0Vp: player.vp,
         p1Vp: state.core.players['1']?.vp,
-        handUids: player.hand.map((card: { uid?: string }) => card.uid),
-        deckUids: player.deck.map((card: { uid?: string }) => card.uid),
-        responseWindow: state.sys.responseWindow?.current ?? null,
+        responseWindow: getLiveReactionSession(state) ?? null,
         triggerQueueLength: state.core.triggerQueue?.length ?? 0,
         interactionSource: state.sys.interaction?.current?.data?.sourceId ?? null,
       };
     }, { timeout: 10000 }).toEqual({
       p0Vp: 3,
       p1Vp: 2,
-      handUids: ['last-stand-draw'],
-      deckUids: [],
       responseWindow: null,
       triggerQueueLength: 0,
       interactionSource: null,
@@ -1063,7 +1166,7 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
         p0Vp: state.core.players['0']?.vp,
         p1Vp: state.core.players['1']?.vp,
         targetInDiscard: player1DiscardUids.includes('capa-target'),
-        responseWindow: state.sys.responseWindow?.current ?? null,
+        responseWindow: getLiveReactionSession(state) ?? null,
         triggerQueueLength: state.core.triggerQueue?.length ?? 0,
         interactionSource: state.sys.interaction?.current?.data?.sourceId ?? null,
       };
@@ -1140,6 +1243,18 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
       option => optionHasCardUid(option, 'aramis-biding-time'),
       '阿拉密斯消费等待时机额外行动',
     );
+    await page.waitForFunction(() => {
+      const harness = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__;
+      const options = harness?.state?.get?.()?.sys?.interaction?.current?.data?.options ?? [];
+      return options.some((option: InteractionOption) => (
+        (option.value as { minionUid?: unknown } | undefined)?.minionUid === 'aramis'
+      ));
+    }, { timeout: 10000, polling: 200 });
+    await game.screenshot('39-阿拉密斯-等待时机选择目标随从', testInfo);
+    await game.selectInteractionOptionBy(
+      option => optionHasMinionUid(option, 'aramis'),
+      '阿拉密斯等待时机选择目标随从',
+    );
     await game.waitForNoInteraction(10000);
     await dismissSpotlightIfPresent(page);
 
@@ -1184,6 +1299,11 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
           { uid: 'all-for-one', defId: 'musketeers_all_for_one', type: 'action', owner: '0' },
           { uid: 'all-for-one-en-garde', defId: 'musketeers_en_garde', type: 'action', owner: '0' },
         ],
+        deck: [
+          { uid: 'all-for-one-draw-filler', defId: 'musketeers_athos', type: 'minion', owner: '0' },
+          { uid: 'all-for-one-turn-draw-filler', defId: 'musketeers_athos', type: 'minion', owner: '0' },
+          { uid: 'all-for-one-turn-draw-filler-2', defId: 'musketeers_athos', type: 'minion', owner: '0' },
+        ],
         factions: ['musketeers', 'sumo_wrestlers'],
         minionsPlayed: 0,
         minionLimit: 1,
@@ -1200,7 +1320,6 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
         },
       ],
     });
-
     await game.playCard('musketeers_all_for_one', { targetMinionUid: 'all-for-one-host' });
     await game.waitForNoInteraction(10000);
     await dismissSpotlightIfPresent(page);
@@ -1234,8 +1353,8 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
       discardUids: ['all-for-one-en-garde'],
     });
     await game.screenshot('41-全为一-直接影响宿主后加力', testInfo);
-
     await page.getByTestId('su-end-turn-action-button').click();
+    await page.waitForTimeout(1000);
     await expect.poll(async () => {
       const state = await game.getState();
       const host = state.core.bases[0]?.minions.find((minion: { uid?: string }) => minion.uid === 'all-for-one-host');
@@ -1476,6 +1595,11 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
 
     await game.screenshot('45-圣热尔韦堡垒-行动影响己方随从前', testInfo);
     await game.playCard('luchadors_cheap_pop');
+    await game.waitForInteraction('luchadors_cheap_pop', 10000);
+    await game.selectInteractionOptionBy(
+      option => optionHasMinionUid(option, 'bastion-ally'),
+      '廉价欢呼选择圣热尔韦堡垒上的己方随从',
+    );
     await game.waitForNoInteraction(10000);
     await dismissSpotlightIfPresent(page);
 
@@ -1504,6 +1628,11 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
     await game.screenshot('46-圣热尔韦堡垒-获得额外行动后', testInfo);
 
     await game.playCard('luchadors_tag_team');
+    await game.waitForInteraction('luchadors_tag_team_base', 10000);
+    await game.selectInteractionOptionBy(
+      option => optionHasBaseIndex(option, 0),
+      '团队标记选择圣热尔韦堡垒',
+    );
     await game.waitForNoInteraction(10000);
     await dismissSpotlightIfPresent(page);
 
@@ -1602,5 +1731,142 @@ test.describe('大杀四方《环游世界：国际事件》四派系真实入�
       interactionSource: null,
     });
     await game.screenshot('49-擂台边-压制附着并抽牌后', testInfo);
+  });
+
+  test('连连获胜可从真实手牌入口授予两个限定额外行动', async ({ page, game }, testInfo) => {
+    test.setTimeout(120000);
+    await setChineseLocale(page.context());
+    await game.openTestGame('smashup', {
+      p0: 'musketeers,sumo_wrestlers',
+      p1: 'mounties,luchadors',
+      skipFactionSelect: true,
+      seed: 20260919,
+    }, 45000);
+
+    await game.setupScene({
+      gameId: 'smashup',
+      currentPlayer: '0',
+      phase: 'playCards',
+      player0: {
+        hand: [
+          { uid: 'on-a-roll', defId: 'musketeers_on_a_roll', type: 'action', owner: '0' },
+          { uid: 'roll-technique', defId: 'sumo_wrestlers_technique_prize', type: 'action', owner: '0' },
+          { uid: 'roll-en-garde', defId: 'musketeers_en_garde', type: 'action', owner: '0' },
+        ],
+        deck: [
+          { uid: 'roll-draw', defId: 'musketeers_biding_time', type: 'action', owner: '0' },
+        ],
+        factions: ['musketeers', 'sumo_wrestlers'],
+        minionsPlayed: 0,
+        minionLimit: 1,
+        actionsPlayed: 0,
+        actionLimit: 1,
+      },
+      player1: { factions: ['mounties', 'luchadors'] },
+      bases: [
+        {
+          defId: 'base_the_dohyo',
+          minions: [
+            { uid: 'roll-target', defId: 'sumo_wrestlers_rookie_sumo', owner: '0', controller: '0', power: 2 },
+            { uid: 'roll-other', defId: 'sumo_wrestlers_third_tier', owner: '0', controller: '0', power: 3 },
+          ],
+        },
+      ],
+    });
+
+    await game.screenshot('50-连连获胜-真实手牌入口前', testInfo);
+    await game.playCard('musketeers_on_a_roll');
+    await game.waitForInteraction('musketeers_on_a_roll', 10000);
+    await game.screenshot('51-连连获胜-选择限定目标随从', testInfo);
+    await game.selectInteractionOptionBy(
+      option => optionHasMinionUid(option, 'roll-target'),
+      '连连获胜选择限定目标随从',
+    );
+    await game.waitForNoInteraction(10000);
+    await dismissSpotlightIfPresent(page);
+
+    await expect.poll(async () => {
+      const state = await game.getState();
+      const player = state.core.players['0'];
+      return {
+        handUids: player.hand.map((card: { uid?: string }) => card.uid),
+        discardUids: player.discard.map((card: { uid?: string }) => card.uid),
+        actionsPlayed: player.actionsPlayed,
+        actionLimit: player.actionLimit,
+        interactionSource: state.sys.interaction?.current?.data?.sourceId ?? null,
+      };
+    }, { timeout: 10000 }).toEqual({
+      handUids: ['roll-technique', 'roll-en-garde'],
+      discardUids: ['on-a-roll'],
+      actionsPlayed: 1,
+      actionLimit: 3,
+      interactionSource: null,
+    });
+    await game.screenshot('52-连连获胜-获得两个限定额外行动后', testInfo);
+
+    await game.playCard('sumo_wrestlers_technique_prize');
+    await game.waitForInteraction('sumo_wrestlers_technique_prize', 10000);
+    await page.waitForFunction(() => {
+      const options = (window as SmashUpE2EWindow).__BG_TEST_HARNESS__?.state?.get?.()?.sys?.interaction?.current?.data?.options ?? [];
+      return options.some(option => (option?.value as { minionUid?: unknown } | undefined)?.minionUid === 'roll-target');
+    }, { timeout: 10000, polling: 200 });
+    await game.screenshot('53-连连获胜-第一张额外行动候选中包含限定随从', testInfo);
+    await game.selectInteractionOptionBy(
+      option => optionHasMinionUid(option, 'roll-target'),
+      '连连获胜第一张额外行动选择限定随从',
+    );
+    await game.waitForNoInteraction(10000);
+    await dismissSpotlightIfPresent(page);
+
+    await expect.poll(async () => {
+      const state = await game.getState();
+      const target = state.core.bases[0]?.minions.find((minion: { uid?: string }) => minion.uid === 'roll-target');
+      const other = state.core.bases[0]?.minions.find((minion: { uid?: string }) => minion.uid === 'roll-other');
+      const player = state.core.players['0'];
+      return {
+        targetCounters: target?.powerCounters ?? 0,
+        otherCounters: other?.powerCounters ?? 0,
+        actionsPlayed: player.actionsPlayed,
+        actionLimit: player.actionLimit,
+        handUids: player.hand.map((card: { uid?: string }) => card.uid),
+      };
+    }, { timeout: 10000 }).toEqual({
+      targetCounters: 3,
+      otherCounters: 0,
+      actionsPlayed: 2,
+      actionLimit: 3,
+      handUids: ['roll-en-garde'],
+    });
+    await game.screenshot('54-连连获胜-第一张额外行动结算后', testInfo);
+
+    await game.playCard('musketeers_en_garde', { targetMinionUid: 'roll-target' });
+    await game.waitForNoInteraction(10000);
+    await dismissSpotlightIfPresent(page);
+    await game.screenshot('55-连连获胜-第二张额外行动作用于限定随从后', testInfo);
+
+    await expect.poll(async () => {
+      const state = await game.getState();
+      const target = state.core.bases[0]?.minions.find((minion: { uid?: string }) => minion.uid === 'roll-target');
+      const other = state.core.bases[0]?.minions.find((minion: { uid?: string }) => minion.uid === 'roll-other');
+      const player = state.core.players['0'];
+      return {
+        targetTempPower: target?.tempPowerModifier ?? 0,
+        otherTempPower: other?.tempPowerModifier ?? 0,
+        actionsPlayed: player.actionsPlayed,
+        actionLimit: player.actionLimit,
+        handUids: player.hand.map((card: { uid?: string }) => card.uid),
+        discardUids: player.discard.map((card: { uid?: string }) => card.uid),
+        interactionSource: state.sys.interaction?.current?.data?.sourceId ?? null,
+      };
+    }, { timeout: 10000 }).toEqual({
+      targetTempPower: 1,
+      otherTempPower: 0,
+      actionsPlayed: 3,
+      actionLimit: 4,
+      handUids: ['roll-draw'],
+      discardUids: ['on-a-roll', 'roll-technique', 'roll-en-garde'],
+      interactionSource: null,
+    });
+    await game.screenshot('56-连连获胜-第二张额外行动结算并清理后', testInfo);
   });
 });

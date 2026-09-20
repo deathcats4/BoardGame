@@ -53,9 +53,7 @@ export const buildInitialHandCards = (
 ): QidahenCore['handCards'] => {
     let nextId = 1;
     return factionOrder.flatMap((factionId) => {
-        const visibleCardCount = factionId === 'ming'
-            ? factions[factionId].handCount + 1
-            : factions[factionId].handCount;
+        const visibleCardCount = factions[factionId].handCount;
         return Array.from({ length: visibleCardCount }, (_, index) => {
             const cardId = `hand-${nextId}`;
             nextId += 1;

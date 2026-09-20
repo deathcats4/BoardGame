@@ -230,6 +230,25 @@ export const TutorialOverlay: React.FC = () => {
 
     /** 从 DOMRect 直接算出提示框位置，和 targetRect 一起原子更新 */
     const applyLayout = (rect: DOMRect | null) => {
+      const protectedRegionRects = (
+        currentStep.avoidOverlapSelectors ?? []
+      ).flatMap((selector) =>
+        Array.from(document.querySelectorAll(selector)).map((element) =>
+          element.getBoundingClientRect(),
+        ),
+      );
+      const getProtectedOverlapArea = (bounds: {
+        left: number;
+        top: number;
+        right: number;
+        bottom: number;
+      }) =>
+        protectedRegionRects.reduce(
+          (area, protectedBounds) =>
+            area + getRectIntersectionArea(bounds, protectedBounds),
+          0,
+        );
+
       // 1. 更新高亮区域
       setTargetRect((prev) => {
         if (!rect) return null;
@@ -435,9 +454,11 @@ export const TutorialOverlay: React.FC = () => {
                     (rect.left + rect.right) / 2,
                 )
               : 0;
+            const protectedOverlap = getProtectedOverlapArea(candidate.bounds);
             return {
               candidate,
               overlap,
+              protectedOverlap,
               lateralPenalty,
               axisClearance,
               preferencePenalty,
@@ -446,6 +467,8 @@ export const TutorialOverlay: React.FC = () => {
             };
           })
           .sort((a, b) => {
+            if (a.protectedOverlap !== b.protectedOverlap)
+              return a.protectedOverlap - b.protectedOverlap;
             if (a.overlap !== b.overlap) return a.overlap - b.overlap;
             if (a.lateralPenalty !== b.lateralPenalty)
               return a.lateralPenalty - b.lateralPenalty;
@@ -458,7 +481,8 @@ export const TutorialOverlay: React.FC = () => {
             return a.index - b.index;
           });
         const explicitVerticalCandidate =
-          preferredPlacement === "top" || preferredPlacement === "bottom"
+          protectedRegionRects.length === 0 &&
+          (preferredPlacement === "top" || preferredPlacement === "bottom")
             ? compactCandidates.find(
                 (candidate) => candidate.placement === preferredPlacement,
               )
@@ -525,7 +549,32 @@ export const TutorialOverlay: React.FC = () => {
       }
 
       const padding = currentStep.requireAction ? 20 : 12;
-      const tooltipWidth = hasStepVisual ? 520 : 384;
+      const safeMargin = 8;
+      const defaultTooltipWidth = hasStepVisual ? 520 : 384;
+      const rightmostProtectedEdge =
+        protectedRegionRects.length > 0
+          ? Math.max(...protectedRegionRects.map((bounds) => bounds.right))
+          : null;
+      const leftmostProtectedEdge =
+        protectedRegionRects.length > 0
+          ? Math.min(...protectedRegionRects.map((bounds) => bounds.left))
+          : null;
+      const protectedSideWidth =
+        rightmostProtectedEdge !== null && leftmostProtectedEdge !== null
+          ? Math.max(
+              viewportWidth -
+                safeArea.right -
+                rightmostProtectedEdge -
+                safeMargin,
+              leftmostProtectedEdge - safeArea.left - safeMargin,
+            )
+          : null;
+      const tooltipWidth = Math.min(
+        currentStep.tooltipMaxWidth ?? defaultTooltipWidth,
+        protectedSideWidth && protectedSideWidth > 0
+          ? protectedSideWidth
+          : viewportWidth - safeArea.left - safeArea.right - safeMargin * 2,
+      );
       // 用实际 DOM 尺寸；首次渲染前使用偏保守的高度，避免提示卡短暂压住玩家要点的目标。
       const measured = tooltipRef.current?.getBoundingClientRect();
       const hasMeasuredTooltip = Boolean(
@@ -536,9 +585,14 @@ export const TutorialOverlay: React.FC = () => {
         : hasStepVisual
           ? 480
           : 220;
-      const actualTooltipWidth = hasMeasuredTooltip
-        ? measured!.width
-        : tooltipWidth;
+      const actualTooltipWidth = currentStep.tooltipMaxWidth
+        ? Math.min(
+            hasMeasuredTooltip ? measured!.width : tooltipWidth,
+            tooltipWidth,
+          )
+        : hasMeasuredTooltip
+          ? measured!.width
+          : tooltipWidth;
 
       const spaceRight = viewportWidth - rect.right;
       const spaceLeft = rect.left;
@@ -561,7 +615,6 @@ export const TutorialOverlay: React.FC = () => {
 
       const arrowBase =
         "bg-white w-4 h-4 absolute rotate-45 border-gray-100 z-0";
-      const safeMargin = 8;
       const minTop = safeArea.top + safeMargin;
       const maxTop =
         viewportHeight - tooltipHeight - safeArea.bottom - safeMargin;
@@ -579,26 +632,54 @@ export const TutorialOverlay: React.FC = () => {
           position: "fixed",
           zIndex: UI_Z_INDEX.tutorial,
         };
+        if (currentStep.tooltipMaxWidth) {
+          styles.width = actualTooltipWidth;
+        }
         let arrow = "";
         switch (placement) {
           case "right":
             styles.left = rect.right + padding;
             styles.top = rect.top + rect.height / 2 - tooltipHeight / 2;
+            if (rightmostProtectedEdge !== null) {
+              styles.left = Math.max(styles.left, rightmostProtectedEdge);
+            }
             arrow = "-left-[6px] top-[40px] border-b border-l";
             break;
           case "left":
             styles.left = rect.left - actualTooltipWidth - padding;
             styles.top = rect.top + rect.height / 2 - tooltipHeight / 2;
+            if (leftmostProtectedEdge !== null) {
+              styles.left = Math.min(
+                styles.left,
+                leftmostProtectedEdge - actualTooltipWidth,
+              );
+            }
             arrow = "-right-[6px] top-[40px] border-t border-r";
             break;
           case "bottom":
             styles.top = rect.bottom + padding;
             styles.left = rect.left + rect.width / 2 - actualTooltipWidth / 2;
+            if (rightmostProtectedEdge !== null) {
+              styles.top = Math.max(
+                styles.top,
+                Math.max(
+                  ...protectedRegionRects.map((bounds) => bounds.bottom),
+                ),
+              );
+            }
             arrow = "-top-[6px] left-1/2 -translate-x-1/2 border-t border-l";
             break;
           case "top":
             styles.top = rect.top - tooltipHeight - padding;
             styles.left = rect.left + rect.width / 2 - actualTooltipWidth / 2;
+            if (leftmostProtectedEdge !== null) {
+              styles.top = Math.min(
+                styles.top,
+                Math.min(
+                  ...protectedRegionRects.map((bounds) => bounds.top),
+                ) - tooltipHeight,
+              );
+            }
             arrow = "-bottom-[6px] left-1/2 -translate-x-1/2 border-b border-r";
             break;
         }
@@ -626,6 +707,7 @@ export const TutorialOverlay: React.FC = () => {
           placement,
           bounds,
           overlapArea: getRectIntersectionArea(bounds, targetBounds),
+          protectedOverlapArea: getProtectedOverlapArea(bounds),
         };
       };
 
@@ -654,6 +736,8 @@ export const TutorialOverlay: React.FC = () => {
         )
         .sort(
           (left, right) =>
+            left.candidate.protectedOverlapArea -
+              right.candidate.protectedOverlapArea ||
             left.candidate.overlapArea - right.candidate.overlapArea ||
             left.index - right.index,
         )[0]?.candidate;
@@ -665,7 +749,7 @@ export const TutorialOverlay: React.FC = () => {
         selectedPlacement?.placement === "left" ||
         selectedPlacement?.placement === "right";
       const minimumLateralHeight = Math.min(
-        320,
+        tooltipHeight,
         viewportHeight - safeArea.top - safeArea.bottom - safeMargin * 2,
       );
       const topValue =

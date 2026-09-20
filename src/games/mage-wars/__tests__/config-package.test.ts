@@ -63,7 +63,7 @@ describe('mage-wars config package', () => {
         expect(byType('mage')).toHaveLength(4);
         expect(byType('card')).toHaveLength(157);
         expect(byType('card').filter((object) => object.tags?.includes('standard-starting-spell'))).toHaveLength(153);
-        expect(byType('card').filter((object) => object.tags?.includes('apprentice-spell'))).toHaveLength(92);
+        expect(byType('card').filter((object) => object.tags?.includes('apprentice-spell'))).toHaveLength(93);
         expect(byType('board-zone')).toHaveLength(18);
         expect(byType('board-zone').filter((object) => object.tags?.includes('apprentice-2x3'))).toHaveLength(6);
         expect(byType('board-zone').filter((object) => object.tags?.includes('formal-4x3'))).toHaveLength(12);
@@ -374,7 +374,7 @@ describe('mage-wars config package', () => {
 
         const legacySpellObjects = materialized.package.objects.filter((object) => object.tags?.includes('apprentice-spell'));
 
-        expect(legacySpellObjects).toHaveLength(92);
+        expect(legacySpellObjects).toHaveLength(93);
         for (const object of legacySpellObjects) {
             const cardId = object.data?.cardId;
             expect(typeof cardId).toBe('number');
@@ -422,15 +422,16 @@ describe('mage-wars config package', () => {
             3405, 3409,
         ];
 
-        expect(speedByCardId.size).toBe(92);
+        expect(speedByCardId.size).toBe(93);
         expect([...speedByCardId.values()].every((speed) => speed === 'quick' || speed === 'standard')).toBe(true);
-        expect([...speedByCardId.values()].filter((speed) => speed === 'quick')).toHaveLength(62);
+        expect([...speedByCardId.values()].filter((speed) => speed === 'quick')).toHaveLength(63);
         expect([...speedByCardId.entries()]
             .filter(([, speed]) => speed === 'standard')
             .map(([spellCardId]) => spellCardId)
             .sort((left, right) => Number(left) - Number(right))).toEqual(standardSpellCardIds);
         expect(requireMageWarsSpellCardFromConfig(1710).spellActionSpeed).toBe('quick');
         expect(requireMageWarsSpellCardFromConfig(1806).spellActionSpeed).toBe('quick');
+        expect(requireMageWarsSpellCardFromConfig(1807).spellActionSpeed).toBe('quick');
         expect(requireMageWarsSpellCardFromConfig(2224).spellActionSpeed).toBe('quick');
         expect(requireMageWarsSpellCardFromConfig(2800).spellActionSpeed).toBe('standard');
         expect(requireMageWarsSpellCardFromConfig(3400).spellActionSpeed).toBe('quick');
@@ -577,6 +578,21 @@ describe('mage-wars config package', () => {
             ],
             unsupportedRules: undefined,
         });
+        expect(requireMageWarsSpellCardFromConfig(1807).semantics).toEqual({
+            abilityKind: 'visible-object-enchantment',
+            attachment: {
+                kind: 'enchantment',
+                visibility: 'revealed',
+                anchor: 'object',
+            },
+            continuousModifiers: undefined,
+            grants: undefined,
+            movementEffects: [
+                { kind: 'direct-damage', amount: 1, damageType: 'aether' },
+            ],
+            unsupportedRules: undefined,
+        });
+        expect(requireMageWarsSpellCardFromConfig(1807).requiresCodeSupport).toBe(false);
         expect(requireMageWarsSpellCardFromConfig(1801).requiresCodeSupport).toBe(false);
         expect(requireMageWarsSpellCardFromConfig(1826).semantics).toEqual({
             abilityKind: 'visible-object-enchantment',
