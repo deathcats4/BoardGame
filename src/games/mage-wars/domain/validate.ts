@@ -68,7 +68,6 @@ import {
     isMageWarsQuickSpell,
     isMageWarsSameEnchantmentAnchor,
     isMageWarsSleepSpellTarget,
-    isMageWarsStatusHealingSpell,
     isMageWarsToxinEnchantmentArenaObject,
     isMageWarsToxinStatusToken,
     isMageWarsStandardSpell,
