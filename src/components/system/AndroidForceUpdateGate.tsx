@@ -2,6 +2,7 @@ import { RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { UI_Z_INDEX } from '../../core';
 import type { AndroidForceUpdateState } from '../../lib/mobile/androidLiveUpdates';
+import { GameChangelogPreview } from './GameChangelogPreview';
 
 interface AndroidForceUpdateGateProps {
     state: AndroidForceUpdateState;
@@ -89,7 +90,7 @@ export const AndroidForceUpdateGate = ({
             </div>
 
             <div className="relative flex h-full min-h-0 items-center justify-center px-5 py-[max(1.5rem,env(safe-area-inset-top))]">
-                <section className="w-full max-w-[24rem] rounded-[18px] border border-amber-200/15 bg-[#161008]/92 p-6 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-md">
+                <section className="max-h-[calc(100dvh-3rem)] w-full max-w-[24rem] overflow-y-auto rounded-[18px] border border-amber-200/15 bg-[#161008]/92 p-6 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-md">
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/20 bg-amber-100/5">
                         <div className="h-9 w-9 animate-spin rounded-full border-2 border-amber-200/20 border-t-amber-300" />
                     </div>
@@ -149,6 +150,8 @@ export const AndroidForceUpdateGate = ({
                             </div>
                         </div>
                     )}
+
+                    <GameChangelogPreview />
 
                     {state.reason && state.phase !== 'checking' && (
                         <p className="mt-4 rounded-2xl border border-red-400/15 bg-red-500/8 px-3 py-2 text-left text-xs leading-5 text-red-100/80">
