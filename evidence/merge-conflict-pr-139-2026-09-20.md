@@ -41,7 +41,8 @@
 
 ## 最终结果
 
-- 解决提交：当前双亲合并提交；最终哈希以 `git show -s --format=%H HEAD` 回查为准。
-- 普通/严格合并审计：待第二次双亲合并提交后重跑。
+- 解决提交：`d7f6105982816611d7ef6ce78c2d96b4d05151bb`，双亲为 `af88ffc6ec341ea2b503191cb9564cd3e802825e` 与 `bae9b809d083ee4eee37fc7743982c76de48fe63`。
+- 普通合并审计：通过；冲突文件为混合结果，0 个单边覆盖。
+- 严格合并审计：通过；未发现完全等于任一父提交的冲突文件。
 - 推送目标：PR #139 原 head 分支 `deathcats4/BoardGame:codex/refactor-smashup-variant-binding-metadata`
-- 下一步：推送源分支，再回查并合并 PR。
+- 下一步：推送源分支，回查 PR 状态后执行合并。
